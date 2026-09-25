@@ -30,9 +30,9 @@ docker compose up -d
 cd api
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements-dev.txt
+python -m pip install -r requirements-dev.txt
 cp .env.example .env               # Windows: copy .env.example .env
-alembic upgrade head               # create the tables
+python -m alembic upgrade head     # create the tables
 python -m app.cli seed             # admin account, demo user, topics, a sample lesson
 cd ..
 
@@ -40,13 +40,17 @@ cd ..
 npm install
 ```
 
+> **Always run Python tools as `python -m <tool>`** (`python -m alembic`, `python -m pytest`, `python -m uvicorn`, `python -m ruff`). This guarantees the copy inside `api/.venv` runs.
+>
+> **Using Anaconda?** Its `(base)` environment puts its own `alembic` and `pip` ahead of the venv's, which causes `ModuleNotFoundError: No module named 'psycopg'`. Run `conda deactivate` before activating `.venv` (your prompt should show only `(.venv)`), or turn it off for good with `conda config --set auto_activate_base false`. Check with `which python`: it should end in `api/.venv/bin/python`.
+
 ## Running it
 
 Use three terminals:
 
 ```bash
 # Terminal 1: API
-cd api && source .venv/bin/activate && uvicorn app.main:app --reload
+cd api && source .venv/bin/activate && python -m uvicorn app.main:app --reload
 
 # Terminal 2: main app
 npm run dev:web
@@ -72,13 +76,13 @@ cd api && python -m app.cli send-reset --email admin@sgjio.example.com --scope a
 
 | Task                      | Command                                                                               |
 | ------------------------- | ------------------------------------------------------------------------------------- |
-| API tests                 | `cd api && pytest`                                                                    |
-| API lint and format       | `cd api && ruff check . && ruff format .`                                             |
+| API tests                 | `cd api && python -m pytest`                                                          |
+| API lint and format       | `cd api && python -m ruff check . && python -m ruff format .`                         |
 | Front-end lint and format | `npm run lint` · `npm run format`                                                     |
 | Type-check both apps      | `npm run typecheck`                                                                   |
 | Build both apps           | `npm run build`                                                                       |
-| New database migration    | `cd api && alembic revision --autogenerate -m "what changed"`                         |
-| Apply migrations          | `cd api && alembic upgrade head`                                                      |
+| New database migration    | `cd api && python -m alembic revision --autogenerate -m "what changed"`               |
+| Apply migrations          | `cd api && python -m alembic upgrade head`                                            |
 | Add an administrator      | `cd api && python -m app.cli create-admin --email you@example.com --name "Your Name"` |
 
 The API tests use a separate `sgjio_test` database, so they never touch your data.
@@ -98,3 +102,4 @@ More detail:
 - [`CONTRIBUTING.md`](CONTRIBUTING.md): branches, commits and pull requests
 - [`docs/data-model.md`](docs/data-model.md): tables and how they relate
 - [`docs/decisions.md`](docs/decisions.md): values chosen for the open decisions in the stories (to confirm as a team)
+- [`CLAUDE.md`](CLAUDE.md): project briefing read automatically by Claude Code
