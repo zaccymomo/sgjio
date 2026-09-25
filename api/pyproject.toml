@@ -1,0 +1,23 @@
+# Tool configuration for the API. Dependencies live in requirements*.txt.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+# FastAPI's Depends() in default arguments is the intended pattern.
+ignore = ["B008"]
+
+[tool.ruff.lint.isort]
+# The local alembic/ folder holds migrations; the import means the library.
+known-third-party = ["alembic"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    # Starlette's TestClient notice about a future httpx rename; harmless for now.
+    "ignore:Using `httpx` with `starlette.testclient`",
+]
