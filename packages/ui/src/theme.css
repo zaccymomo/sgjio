@@ -1,0 +1,49 @@
+/*
+ * SGJio design tokens (SCRUM-75), taken from the SGJIO Figma file.
+ *
+ * These are Tailwind v4 theme variables, so each one becomes utility classes:
+ * --color-brand  ->  bg-brand, text-brand, border-brand, ring-brand ...
+ * --radius-md    ->  rounded-md
+ * --text-2xs     ->  text-2xs
+ *
+ * Change a value here and both the main app and the admin portal follow.
+ */
+@theme {
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Colours */
+  --color-brand: #f43f5e; /* primary red: badges, progress rings, active tab */
+  --color-brand-soft: #fff1f2; /* red tint behind brand elements */
+  --color-ink: #111827; /* headings, dark cards, primary buttons */
+  --color-muted: #4b5563; /* body text and labels */
+  --color-subtle: #9ca3af; /* secondary text, inactive icons */
+  --color-line: #e5e7eb; /* borders and dividers */
+  --color-surface: #f9fafb; /* section and card backgrounds */
+
+  /* Not in Figma. Errors use a deeper red than the brand red so an error never looks
+     like decoration. */
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+  --color-success: #16a34a;
+  --color-success-soft: #f0fdf4;
+
+  /* Corner radii used in Figma: badges and buttons 4, cards 8, topic tiles 10 */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+
+  /* Small sizes used in Figma, below Tailwind's text-xs (12px) */
+  --text-2xs: 0.625rem; /* 10px: tab labels, captions */
+  --text-2xs--line-height: 0.875rem;
+  --text-caption: 0.6875rem; /* 11px: meta text such as "Under 2 min" */
+  --text-caption--line-height: 1rem;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-white font-sans text-ink;
+  }
+}

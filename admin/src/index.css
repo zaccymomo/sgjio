@@ -1,0 +1,5 @@
+@import "tailwindcss";
+@import "@sgjio/ui/theme.css";
+
+/* Let Tailwind see the class names used inside the shared UI package. */
+@source "../../packages/ui/src";
