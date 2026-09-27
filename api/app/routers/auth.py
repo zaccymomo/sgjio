@@ -1,8 +1,9 @@
-"""Sign-in, sign-out and "who am I" for the main app and the admin portal.
+"""Registering, signing in, signing out and "who am I" for both front ends.
 
-The same routes are mounted twice: at /api/auth for the main app and at /api/admin/auth
-for the admin portal. Each uses its own cookie and its own sessions, so the two never
-mix. The sign-in pages themselves are built in SCRUM-62 and SCRUM-68.
+The sign-in routes are mounted twice: at /api/auth for the main app and at
+/api/admin/auth for the admin portal. Each uses its own cookie and its own sessions, so
+the two never mix. Registration is mounted only for the main app, because administrator
+accounts are made with `python -m app.cli create-admin` (SCRUM-68).
 """
 
 from datetime import UTC, datetime
@@ -11,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_admin, require_user
-from app.auth.service import sign_in
+from app.auth.service import register, sign_in
 from app.auth.sessions import (
     COOKIE_NAMES,
     clear_session_cookie,
@@ -21,12 +22,16 @@ from app.auth.sessions import (
 )
 from app.db import get_db
 from app.models import AuthScope, User
-from app.schemas import SignInRequest, SignInResponse, UserOut
+from app.schemas import RegisterRequest, RegisterResponse, SignInRequest, SignInResponse, UserOut
 
 INVALID_CREDENTIALS = {
     "code": "invalid_credentials",
     "message": "The email or password is incorrect.",
 }
+
+# An email already in use is a conflict; everything else registration refuses is the shape
+# of what was sent, which is what 422 already means for this API.
+REGISTER_PROBLEM_STATUS = {"email_taken": status.HTTP_409_CONFLICT}
 
 
 def build_auth_router(scope: AuthScope) -> APIRouter:
@@ -65,6 +70,49 @@ def build_auth_router(scope: AuthScope) -> APIRouter:
         token, _ = create_session(db, result.user, scope)
         set_session_cookie(response, scope, token)
         return SignInResponse(user=UserOut.model_validate(result.user))
+
+    if scope == AuthScope.APP:
+
+        @router.post(
+            "/register",
+            response_model=RegisterResponse,
+            status_code=status.HTTP_201_CREATED,
+            responses={
+                409: {"description": "That email is already registered"},
+                422: {"description": "A field is missing, malformed, or the password is too weak"},
+            },
+        )
+        def register_route(
+            body: RegisterRequest, response: Response, db: Session = Depends(get_db)
+        ) -> RegisterResponse:
+            """Create an account and sign the new user in (SCRUM-61 AC1)."""
+            result = register(
+                db,
+                name=body.name,
+                email=body.email,
+                password=body.password,
+                password_confirmation=body.password_confirmation,
+                user_type=body.user_type,
+            )
+
+            if result.problem is not None:
+                problem = result.problem
+                detail = {
+                    "code": problem.code,
+                    "message": problem.message,
+                    # Which field to highlight (AC2-AC5).
+                    "field": problem.field,
+                }
+                if problem.failures:
+                    detail["failures"] = problem.failures
+                refused = REGISTER_PROBLEM_STATUS.get(
+                    problem.code, status.HTTP_422_UNPROCESSABLE_CONTENT
+                )
+                raise HTTPException(refused, detail=detail)
+
+            token, _ = create_session(db, result.user, scope)
+            set_session_cookie(response, scope, token)
+            return RegisterResponse(user=UserOut.model_validate(result.user))
 
     @router.post("/sign-out", status_code=status.HTTP_204_NO_CONTENT)
     def sign_out_route(request: Request, response: Response, db: Session = Depends(get_db)) -> None:

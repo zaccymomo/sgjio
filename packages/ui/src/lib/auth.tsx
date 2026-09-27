@@ -15,7 +15,13 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { ErrorState } from "../components/ErrorState";
 import { FullPageSpinner } from "../components/Spinner";
 import { ApiError, apiFetch } from "./api";
-import { AuthContext, useAuth, type AuthStatus, type User } from "./auth-context";
+import {
+  AuthContext,
+  useAuth,
+  type AuthStatus,
+  type RegisterInput,
+  type User,
+} from "./auth-context";
 
 type AuthState = { status: AuthStatus; user: User | null };
 
@@ -59,14 +65,27 @@ export function AuthProvider({ basePath, children }: { basePath: string; childre
     [basePath],
   );
 
+  const register = useCallback(
+    async (input: RegisterInput) => {
+      const result = await apiFetch<{ user: User }>(`${basePath}/register`, {
+        method: "POST",
+        body: input,
+      });
+      // Registering signs the new user in straight away (SCRUM-61 AC1).
+      setState({ status: "signed-in", user: result.user });
+      return result.user;
+    },
+    [basePath],
+  );
+
   const signOut = useCallback(async () => {
     await apiFetch<void>(`${basePath}/sign-out`, { method: "POST" });
     setState({ status: "signed-out", user: null });
   }, [basePath]);
 
   const value = useMemo(
-    () => ({ ...state, signIn, signOut, refresh }),
-    [state, signIn, signOut, refresh],
+    () => ({ ...state, signIn, register, signOut, refresh }),
+    [state, signIn, register, signOut, refresh],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

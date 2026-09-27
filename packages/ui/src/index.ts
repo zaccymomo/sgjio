@@ -10,12 +10,27 @@ export { ErrorState } from "./components/ErrorState";
 export { Logo } from "./components/Logo";
 export { PasswordField } from "./components/PasswordField";
 export { Placeholder } from "./components/Placeholder";
+export { ProgressRing } from "./components/ProgressRing";
 export { SignInForm } from "./components/SignInForm";
 export { FullPageSpinner, Spinner } from "./components/Spinner";
 export { TextField, type TextFieldProps } from "./components/TextField";
 
 export { ApiError, apiFetch } from "./lib/api";
 export { AuthProvider, RequireAuth } from "./lib/auth";
-export { safeNextPath, useAuth, type AuthStatus, type User } from "./lib/auth-context";
+export {
+  safeNextPath,
+  useAuth,
+  type AuthStatus,
+  type RegisterInput,
+  type User,
+  type UserType,
+} from "./lib/auth-context";
 export { cn } from "./lib/cn";
 export { formatTime } from "./lib/format";
+export {
+  looksLikeEmail,
+  passwordRuleFailures,
+  PASSWORD_HINT,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+} from "./lib/validation";

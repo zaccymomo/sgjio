@@ -6,9 +6,11 @@ import { ComingSoonPage } from "./pages/ComingSoonPage";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { HomePage } from "./pages/HomePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+import { ProfileSetupPage } from "./pages/ProfileSetupPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
+import { TopicPage } from "./pages/TopicPage";
 
 // The five tabs from the Figma bottom bar.
 const NAV: NavItem[] = [
@@ -42,6 +44,10 @@ export function App() {
           <Route element={<RequireAuth />}>
             <Route element={<SignedInLayout />}>
               <Route index element={<HomePage />} />
+              {/* Where registration lands a new account (SCRUM-61 AC8) */}
+              <Route path="profile-setup" element={<ProfileSetupPage />} />
+              {/* A progress circle leads here (SCRUM-43 AC9) */}
+              <Route path="topics/:topicId" element={<TopicPage />} />
               <Route
                 path="practice"
                 element={<ComingSoonPage title="AI scenario practice" module="Module 4" />}

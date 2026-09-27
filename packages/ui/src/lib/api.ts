@@ -14,12 +14,21 @@ export class ApiError extends Error {
   readonly fieldErrors: Record<string, string>;
   /** Set when sign-in is temporarily blocked (HTTP 429). */
   readonly blockedUntil?: Date;
+  /** The one field the API blames, e.g. "email" for an address already registered. */
+  readonly field?: string;
+  /** One message per rule broken, e.g. each password rule (SCRUM-61 AC4). */
+  readonly failures: string[];
 
   constructor(
     status: number,
     code: string,
     message: string,
-    extra: { fieldErrors?: Record<string, string>; blockedUntil?: Date } = {},
+    extra: {
+      fieldErrors?: Record<string, string>;
+      blockedUntil?: Date;
+      field?: string;
+      failures?: string[];
+    } = {},
   ) {
     super(message);
     this.name = "ApiError";
@@ -27,6 +36,8 @@ export class ApiError extends Error {
     this.code = code;
     this.fieldErrors = extra.fieldErrors ?? {};
     this.blockedUntil = extra.blockedUntil;
+    this.field = extra.field;
+    this.failures = extra.failures ?? [];
   }
 }
 
@@ -72,7 +83,8 @@ function toApiError(status: number, data: unknown): ApiError {
     const fieldErrors: Record<string, string> = {};
     for (const item of detail as ValidationItem[]) {
       const field = item.loc?.[item.loc.length - 1];
-      if (typeof field === "string" && item.msg) fieldErrors[field] = item.msg;
+      if (typeof field === "string" && item.msg)
+        fieldErrors[field] = cleanValidationMessage(item.msg);
     }
     return new ApiError(status, "validation_error", "Please check the highlighted fields.", {
       fieldErrors,
@@ -81,13 +93,17 @@ function toApiError(status: number, data: unknown): ApiError {
 
   // SGJio errors: { code, message, ...extra }
   if (detail && typeof detail === "object") {
-    const { code, message, blocked_until } = detail as {
+    const { code, message, blocked_until, field, failures } = detail as {
       code?: string;
       message?: string;
       blocked_until?: string;
+      field?: string;
+      failures?: string[];
     };
     return new ApiError(status, code ?? "error", message ?? "Something went wrong.", {
       blockedUntil: blocked_until ? new Date(blocked_until) : undefined,
+      field,
+      failures,
     });
   }
 
@@ -96,4 +112,12 @@ function toApiError(status: number, data: unknown): ApiError {
     "error",
     typeof detail === "string" ? detail : "Something went wrong. Please try again.",
   );
+}
+
+/**
+ * Pydantic prefixes messages from our own checks with "Value error, ". The rest of the
+ * message is already written for the reader, so drop the prefix before showing it.
+ */
+function cleanValidationMessage(message: string): string {
+  return message.replace(/^Value error, /, "");
 }

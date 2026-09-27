@@ -18,6 +18,8 @@ Already fixed by the stories, and built as written:
 
 - Reset links are valid for **5 minutes**, work **once**, and a new request cancels earlier links (SCRUM-63, SCRUM-69).
 - Sign-in and "forgot password" never reveal whether an email has an account or is an administrator (SCRUM-62, 63, 68, 69). Failed attempts on unknown emails are blocked the same way, for the same reason.
+- **Registration is the one place that does say an email is already in use** (SCRUM-61 AC2 asks for it, so the person can be sent to sign in instead). Sign-in and "forgot password" still do not, so neither of those pages can be used to check who has an account.
+- Registration never creates administrators. New accounts are always ordinary users, and `/register` exists only on the main app, not the admin portal (SCRUM-68).
 
 ## Other setup choices
 

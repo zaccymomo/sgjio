@@ -10,6 +10,8 @@ erDiagram
     topics ||--o{ lessons : "contains"
     lessons ||--o| quiz_questions : "ends with"
     quiz_questions ||--|{ quiz_options : "offers"
+    users ||--o{ lesson_completions : "completed"
+    lessons ||--o{ lesson_completions : "completed by"
 
     users {
         uuid id PK
@@ -53,6 +55,14 @@ erDiagram
         bool is_correct "at most one true per question"
         int position
     }
+    lesson_completions {
+        uuid id PK
+        uuid user_id FK "unique with lesson_id"
+        uuid lesson_id FK
+        bool answered_correctly "best result so far"
+        timestamptz completed_at "first completion"
+        timestamptz updated_at
+    }
     auth_sessions {
         uuid id PK
         uuid user_id FK
@@ -85,7 +95,10 @@ erDiagram
 - **A lesson belongs to one topic.** This keeps the progress-circle arithmetic simple, as assumed in SCRUM-56. A draft may have no topic yet; publishing requires one.
 - **Withdrawn lessons are kept, not deleted** (`status = withdrawn`), so users' history still shows lessons they completed (SCRUM-52 AC4).
 - **Enumerations are stored as text with a CHECK constraint**, not native Postgres enums, so adding a value later is a simple migration.
-- **Quiz attempts and progress are not here yet.** SCRUM-16 adds them as a new migration on top of this one.
+- **Completion is one row per user per lesson** (`lesson_completions`, SCRUM-16). It is written the first time the quiz is answered, right or wrong (AC3), and the unique constraint on `(user_id, lesson_id)` is what makes completion count once however many times the quiz is retaken (AC5, AC6).
+- **Correctness is a column on that row, not a second table.** `answered_correctly` holds the _best_ result so far, so a later wrong answer never clears an earlier correct one (SCRUM-16 AC5). Completion feeds the progress circles; correctness feeds tiers (SCRUM-27).
+- **A completion row outlives withdrawal.** Withdrawing a lesson leaves the row in place, so the user's history keeps it (SCRUM-52 AC4), while the progress query filters on `status = published` so the circle's two figures both shrink and `completed` can never exceed `available` (SCRUM-16 AC8).
+- **Individual attempts are not stored.** Only the completion and the best result are. A full attempt history would be a separate table; SCRUM-42 and SCRUM-44 will say whether one is needed.
 
 ## Seed data
 
@@ -93,4 +106,8 @@ erDiagram
 
 - one administrator and one Newcomer user (see README for the sign-in details)
 - the six topics from the Figma home screen: Singlish, Hawker & Food, Workplace, Public Etiquette, Festivals, Getting Around
-- one published sample lesson with a four-option quiz: "Ordering at a Local Hawker Centre"
+- three published lessons per topic, eighteen in all, each with a four-option quiz question
+- some completed lessons for the Newcomer account, chosen so the landing page shows every
+  state a progress circle can be in: not started, in progress and complete. These are only
+  added when that account has no progress at all, so re-seeding never overwrites real
+  progress made by clicking through the app.
