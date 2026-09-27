@@ -18,14 +18,13 @@ SCRUM-61: add registration form and validation
 
 1. Push your branch and open a pull request into `main`. The template asks for the Jira key and the acceptance criteria you checked.
 2. CI runs lint, type checks, API tests and both builds. It must pass.
-3. **At least one teammate reviews and approves** before merging.
-4. Merge with "Squash and merge", then delete the branch.
+3. Merge with "Squash and merge", then delete the branch.
 
 ## Branch protection (one-time, repository owner)
 
 GitHub → repository → **Settings → Branches → Add branch ruleset** (or "Add rule") for `main`:
 
-- Require a pull request before merging, with **1 required approval**
+- Require a pull request before merging, with **0 required approvals**
 - Require status checks to pass: select **API** and **Front end** (they appear after CI has run once)
 - Block force pushes
 
