@@ -38,7 +38,7 @@ Seed logins: main app `newcomer@sgjio.example.com` / `UserPass123`; admin `admin
 
 ## Conventions
 
-- Branch `SCRUM-<n>-short-name`; commit messages start `SCRUM-<n>: ...`; PRs into `main` need one approval and green CI (`.github/workflows/ci.yml`).
+- Branch `SCRUM-<n>-short-name`; commit messages start `SCRUM-<n>: ...`; PRs into `main` need green CI (`.github/workflows/ci.yml`).
 - Before finishing any change, run the relevant tests, lint, format and typecheck. CI also runs `alembic check`, so models and migrations must match.
 - Never edit a migration already on `main`; add a new one. Enums are stored as VARCHAR + CHECK (`_enum()` in `models.py`), not native Postgres enums.
 - New settings go in `api/app/config.py` **and** `api/.env.example`. Never commit `.env`.
