@@ -1,15 +1,21 @@
-"""Sign-in for either front end: credentials, lockout and the admin-only rule together."""
+"""Registering and signing in: credentials, lockout and the admin-only rule together."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import normalise_email
 from app.auth.lockout import blocked_until, record_attempt
-from app.models import AuthScope, User
-from app.security import hash_password, password_needs_rehash, verify_password
+from app.models import AuthScope, User, UserRole, UserType
+from app.security import (
+    hash_password,
+    password_needs_rehash,
+    password_rule_failures,
+    verify_password,
+)
 
 
 @dataclass
@@ -51,3 +57,98 @@ def sign_in(
         user.password_hash = hash_password(password)
         db.commit()
     return SignInResult(user=user)
+
+
+# --- Registration (SCRUM-61) --------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class FieldProblem:
+    """Why a registration was refused, named so the form can highlight the right field."""
+
+    field: str
+    code: str
+    message: str
+    #: One message per broken password rule, so the user is told the rule (AC4).
+    failures: list[str] = field(default_factory=list)
+
+
+@dataclass
+class RegisterResult:
+    user: User | None = None
+    problem: FieldProblem | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.user is not None
+
+
+# Registration does say when an email is already in use, because the person needs to be
+# offered the sign-in page instead (AC2). Sign-in and "forgot password" deliberately do
+# not (SCRUM-62 AC2, SCRUM-63), so those pages cannot be used to check who has an account.
+EMAIL_TAKEN = FieldProblem(
+    field="email",
+    code="email_taken",
+    message="That email is already registered.",
+)
+
+
+def register(
+    db: Session,
+    name: str,
+    email: str,
+    password: str,
+    password_confirmation: str,
+    user_type: UserType,
+) -> RegisterResult:
+    """Create a main-app account, or return the one problem that stopped it.
+
+    Email format and the required fields are already checked by `RegisterRequest`; this
+    covers the rules that need the database or the password policy. New accounts are
+    always ordinary users: administrators are made with `python -m app.cli create-admin`
+    (SCRUM-68).
+    """
+    email = normalise_email(email)
+
+    if password != password_confirmation:
+        # AC5
+        return RegisterResult(
+            problem=FieldProblem(
+                field="password_confirmation",
+                code="password_mismatch",
+                message="The passwords do not match.",
+            )
+        )
+
+    failures = password_rule_failures(password)
+    if failures:
+        # AC4
+        return RegisterResult(
+            problem=FieldProblem(
+                field="password",
+                code="weak_password",
+                message=" ".join(failures),
+                failures=failures,
+            )
+        )
+
+    if db.scalar(select(User.id).where(User.email == email)) is not None:
+        return RegisterResult(problem=EMAIL_TAKEN)
+
+    user = User(
+        name=name.strip(),
+        email=email,
+        password_hash=hash_password(password),
+        role=UserRole.USER,
+        user_type=user_type,
+    )
+    db.add(user)
+    try:
+        db.commit()
+    except IntegrityError:
+        # The only unique constraint on users is the email, so two people registering the
+        # same address at the same moment lands here rather than raising a 500.
+        db.rollback()
+        return RegisterResult(problem=EMAIL_TAKEN)
+    db.refresh(user)
+    return RegisterResult(user=user)

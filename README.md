@@ -63,7 +63,7 @@ Sign in with the seeded accounts (development only):
 
 | Where               | Email                        | Password       |
 | ------------------- | ---------------------------- | -------------- |
-| Main app (5173)     | `newcomer@sgjio.example.com` | `UserPass123`  |
+| Main app (5173)     | `newcomer@sgjio.example.com` | `  `           |
 | Admin portal (5174) | `admin@sgjio.example.com`    | `AdminPass123` |
 
 Emails the app sends appear in Mailpit at **http://localhost:8025**. To try one:
@@ -71,6 +71,44 @@ Emails the app sends appear in Mailpit at **http://localhost:8025**. To try one:
 ```bash
 cd api && python -m app.cli send-reset --email admin@sgjio.example.com --scope admin
 ```
+
+## Looking inside the database
+
+Only the `db` container has to be running for this — the API does not.
+
+### With DBeaver
+
+Install [DBeaver Community](https://dbeaver.io/download/), then **Database → New Database Connection → PostgreSQL** and fill in:
+
+| Field    | Value       |
+| -------- | ----------- |
+| Host     | `localhost` |
+| Port     | `5432`      |
+| Database | `sgjio`     |
+| Username | `sgjio`     |
+| Password | `sgjio`     |
+
+Select **Test Connection** (DBeaver downloads the PostgreSQL driver the first time, which takes a moment), then **Finish**. The tables are under **sgjio → Databases → sgjio → Schemas → public → Tables**; open one to see its rows, or select **SQL Editor → New SQL script** to write a query.
+
+Two settings worth knowing. Tick **Show all databases** on the connection's PostgreSQL tab if you also want to see `sgjio_test`. And DBeaver does not save edits until you select **Save**, so a changed cell is only in the grid until then.
+
+### With psql instead
+
+No install needed, since it runs inside the container:
+
+```bash
+docker compose exec db psql -U sgjio -d sgjio
+```
+
+| At the `sgjio=#` prompt | What it does                                       |
+| ----------------------- | -------------------------------------------------- |
+| `\dt`                   | list the tables                                    |
+| `\d lessons`            | show one table's columns                           |
+| `select * from topics;` | read rows                                          |
+| `\x`                    | switch to one field per line, for long lesson text |
+| `\q`                    | quit                                               |
+
+After seeding you should find 2 users, 6 topics and 18 published lessons, each with a quiz question and four options, plus some completed lessons for the Newcomer account so the landing page circles have something to show. [`docs/data-model.md`](docs/data-model.md) explains how the tables relate.
 
 ## Everyday commands
 

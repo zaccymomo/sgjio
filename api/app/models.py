@@ -18,6 +18,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy import (
@@ -236,6 +237,42 @@ class QuizOption(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     question: Mapped[QuizQuestion] = relationship(back_populates="options")
+
+
+# --- Progress -----------------------------------------------------------------------------
+
+
+class LessonCompletion(Base):
+    """One row per lesson a user has finished (SCRUM-16).
+
+    A row is written the first time the user answers the lesson's quiz question, right or
+    wrong (AC3), so this table is the "completed" half of every progress circle. Whether
+    they were right is kept separately in `answered_correctly`, which holds the *best*
+    result so far: a later wrong answer never clears an earlier correct one (AC5).
+
+    The unique constraint is what makes completion count once however many times the quiz
+    is retaken, and makes a repeated submission harmless (AC5, AC6).
+    """
+
+    __tablename__ = "lesson_completions"
+    __table_args__ = (UniqueConstraint("user_id", "lesson_id"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # A withdrawn lesson stays in the user's history (SCRUM-52), so this is never deleted
+    # when a lesson leaves the published set; the progress query filters by status instead.
+    lesson_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    answered_correctly: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # When the lesson was first completed. Retakes update `updated_at`, not this.
+    completed_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+
+    user: Mapped[User] = relationship()
+    lesson: Mapped[Lesson] = relationship()
 
 
 # --- Authentication support ---------------------------------------------------------------
