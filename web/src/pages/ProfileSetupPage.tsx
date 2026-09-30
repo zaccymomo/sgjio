@@ -1,4 +1,5 @@
 import { Button, ErrorState, Spinner, useAuth } from "@sgjio/ui";
+import { ChevronLeft } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { ProfileForm } from "../components/ProfileForm";
@@ -20,11 +21,13 @@ export function ProfileSetupPage() {
           Welcome to SGJio{firstName ? `, ${firstName}` : ""}
         </h1>
         <p className="mt-1 text-sm text-muted">
-          Your account is ready. Tell us a little more so lessons and buddies suit you.
+          Your account is ready. Three quick questions help us suggest lessons and buddies that suit
+          you. You can change your answers any time in Settings.
         </p>
       </div>
 
       <LoadedProfileForm
+        showProgress
         submitLabel="Continue"
         onSaved={() => navigate("/", { replace: true })}
         secondaryAction={
@@ -44,6 +47,13 @@ export function EditProfilePage() {
   return (
     <div className="flex flex-col gap-4">
       <div>
+        <Link
+          to="/settings"
+          className="mb-2 inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-ink"
+        >
+          <ChevronLeft className="size-4" aria-hidden />
+          Settings
+        </Link>
         <h1 className="text-[22px] font-bold text-ink">Edit your profile</h1>
         <p className="mt-1 text-sm text-muted">
           Changes are used for your next lesson suggestions and buddy matches.

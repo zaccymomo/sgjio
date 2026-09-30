@@ -15,6 +15,20 @@ export const PASSWORD_MAX_LENGTH = 128;
 export const PASSWORD_HINT = `At least ${PASSWORD_MIN_LENGTH} characters, including a letter and a number.`;
 
 /**
+ * The rules as a checklist, for showing which are met while typing. Same rules as
+ * passwordRuleFailures() below; the length ceiling is left out because almost nobody
+ * reaches it, and passwordRuleFailures() still reports it.
+ */
+export const PASSWORD_RULES: Array<{ label: string; met: (password: string) => boolean }> = [
+  {
+    label: `At least ${PASSWORD_MIN_LENGTH} characters`,
+    met: (password) => password.length >= PASSWORD_MIN_LENGTH,
+  },
+  { label: "A letter", met: (password) => /[A-Za-z]/.test(password) },
+  { label: "A number", met: (password) => /\d/.test(password) },
+];
+
+/**
  * One message per password rule the password breaks; empty means it is acceptable.
  * Mirrors password_rule_failures() in api/app/security.py (SCRUM-61 AC4).
  */
