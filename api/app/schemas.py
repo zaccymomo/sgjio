@@ -15,6 +15,7 @@ from pydantic import (
 
 from app.auth import normalise_email
 from app.models import UserRole, UserType
+from app.profile_options import INTERESTS, LANGUAGES, NEIGHBOURHOODS
 
 # Email syntax check for registration. Built once: TypeAdapter compiles a validator.
 _EMAIL = TypeAdapter(EmailStr)
@@ -96,6 +97,63 @@ class ResetTokenRequest(BaseModel):
 class ResetPasswordRequest(ResetTokenRequest):
     password: str = Field(min_length=1, max_length=256)
     password_confirmation: str = Field(min_length=1, max_length=256)
+
+
+class ProfileOptionsOut(BaseModel):
+    interests: list[str]
+    languages: list[str]
+    neighbourhoods: list[str]
+
+
+class ProfileOut(BaseModel):
+    """The signed-in user's own matching preferences. Empty until profile setup is done."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    interests: list[str] = []
+    languages: list[str] = []
+    neighbourhood: str | None = None
+
+
+def _choices(values: list[str], allowed: list[str], what: str) -> list[str]:
+    """Keep the order given, drop repeats, and refuse anything not offered."""
+    unique = list(dict.fromkeys(values))
+    unknown = [value for value in unique if value not in allowed]
+    if unknown:
+        raise ValueError(f"Choose {what} from the list.")
+    return unique
+
+
+class ProfileIn(BaseModel):
+    """Profile setup and editing (SCRUM-14 AC1, AC4). Every field is required (AC2)."""
+
+    interests: list[str] = Field(max_length=len(INTERESTS))
+    languages: list[str] = Field(max_length=len(LANGUAGES))
+    # Validated even when left out, so a missing neighbourhood gets the plain message.
+    neighbourhood: str | None = Field(default=None, validate_default=True)
+
+    @field_validator("interests")
+    @classmethod
+    def _check_interests(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("Select at least one interest.")
+        return _choices(value, INTERESTS, "interests")
+
+    @field_validator("languages")
+    @classmethod
+    def _check_languages(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("Select at least one language you speak.")
+        return _choices(value, LANGUAGES, "languages")
+
+    @field_validator("neighbourhood")
+    @classmethod
+    def _check_neighbourhood(cls, value: str | None) -> str:
+        if not value:
+            raise ValueError("Select your neighbourhood.")
+        if value not in NEIGHBOURHOODS:
+            raise ValueError("Choose a neighbourhood from the list.")
+        return value
 
 
 class ErrorDetail(BaseModel):
