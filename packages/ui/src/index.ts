@@ -9,8 +9,9 @@ export { Button, type ButtonProps } from "./components/Button";
 export { ErrorState } from "./components/ErrorState";
 export { Logo } from "./components/Logo";
 export { PasswordField } from "./components/PasswordField";
+export { PasswordRules } from "./components/PasswordRules";
 export { Placeholder } from "./components/Placeholder";
-export { ForgotPasswordForm, ResetPasswordForm } from "./components/PasswordResetForms";
+export { ForgotPasswordCard, ResetPasswordCard } from "./components/PasswordResetCards";
 export { ProgressRing } from "./components/ProgressRing";
 export { SignInForm } from "./components/SignInForm";
 export { FullPageSpinner, Spinner } from "./components/Spinner";
@@ -35,4 +36,5 @@ export {
   PASSWORD_HINT,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  PASSWORD_RULES,
 } from "./lib/validation";

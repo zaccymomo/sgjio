@@ -1,5 +1,5 @@
 import { Alert, ApiError, Button, cn } from "@sgjio/ui";
-import { Check } from "lucide-react";
+import { Check, ChevronDown, Heart, Languages, MapPin, type LucideIcon } from "lucide-react";
 import { useId, useRef, useState, type FormEvent, type ReactNode, type RefObject } from "react";
 
 import { saveProfile, type Profile, type ProfileOptions } from "../lib/profile";
@@ -19,6 +19,7 @@ export function ProfileForm({
   submitLabel,
   onSaved,
   secondaryAction,
+  showProgress = false,
 }: {
   initial: Profile;
   options: ProfileOptions;
@@ -26,6 +27,8 @@ export function ProfileForm({
   onSaved: (profile: Profile) => void;
   /** e.g. "Skip for now" or "Cancel", shown beside the submit button. */
   secondaryAction?: ReactNode;
+  /** Show "2 of 3 done" above the form, for onboarding. */
+  showProgress?: boolean;
 }) {
   const [interests, setInterests] = useState(initial.interests);
   const [languages, setLanguages] = useState(initial.languages);
@@ -37,6 +40,8 @@ export function ProfileForm({
   const interestsRef = useRef<HTMLButtonElement>(null);
   const languagesRef = useRef<HTMLButtonElement>(null);
   const neighbourhoodRef = useRef<HTMLSelectElement>(null);
+
+  const done = [interests.length > 0, languages.length > 0, !!neighbourhood].filter(Boolean).length;
 
   /** Highlight the fields and focus the first one, top to bottom. */
   function showErrors(next: FieldErrors) {
@@ -84,48 +89,81 @@ export function ProfileForm({
     return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
   }
 
+  const missingCount = FIELD_ORDER.filter((field) => errors[field]).length;
+
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {showProgress && <Progress done={done} total={FIELD_ORDER.length} />}
+
       {formError && <Alert tone="error">{formError}</Alert>}
+      {missingCount > 0 && (
+        <Alert tone="error">
+          {missingCount === 1
+            ? "One section still needs an answer."
+            : `${missingCount} sections still need an answer.`}
+        </Alert>
+      )}
 
-      <ChoiceGroup
-        legend="Interests"
-        hint="Select everything you enjoy. We use this to suggest lessons and buddies."
-        choices={options.interests}
-        selected={interests}
-        onToggle={(value) => {
-          setInterests((current) => toggle(current, value));
-          setErrors((current) => ({ ...current, interests: undefined }));
-        }}
+      <Section
+        icon={Heart}
+        title="What are you into?"
+        description="Pick as many as you like. We use these to suggest lessons and buddies."
         error={errors.interests}
-        firstRef={interestsRef}
-      />
+      >
+        <ChoiceGroup
+          legend="Interests"
+          choices={options.interests}
+          selected={interests}
+          collapsedCount={12}
+          onToggle={(value) => {
+            setInterests((current) => toggle(current, value));
+            setErrors((current) => ({ ...current, interests: undefined }));
+          }}
+          error={errors.interests}
+          firstRef={interestsRef}
+        />
+      </Section>
 
-      <ChoiceGroup
-        legend="Languages you speak"
-        choices={options.languages}
-        selected={languages}
-        onToggle={(value) => {
-          setLanguages((current) => toggle(current, value));
-          setErrors((current) => ({ ...current, languages: undefined }));
-        }}
+      <Section
+        icon={Languages}
+        title="Which languages do you speak?"
+        description="Include any you're comfortable chatting in, not just your first language."
         error={errors.languages}
-        firstRef={languagesRef}
-      />
+      >
+        <ChoiceGroup
+          legend="Languages you speak"
+          choices={options.languages}
+          selected={languages}
+          collapsedCount={8}
+          onToggle={(value) => {
+            setLanguages((current) => toggle(current, value));
+            setErrors((current) => ({ ...current, languages: undefined }));
+          }}
+          error={errors.languages}
+          firstRef={languagesRef}
+        />
+      </Section>
 
-      <NeighbourhoodSelect
-        value={neighbourhood}
-        choices={options.neighbourhoods}
-        onChange={(value) => {
-          setNeighbourhood(value);
-          setErrors((current) => ({ ...current, neighbourhood: undefined }));
-        }}
+      <Section
+        icon={MapPin}
+        title="Where do you live?"
+        description="Only the area is used, to find buddies near you. We never ask for your address."
         error={errors.neighbourhood}
-        selectRef={neighbourhoodRef}
-      />
+      >
+        <NeighbourhoodSelect
+          value={neighbourhood}
+          choices={options.neighbourhoods}
+          onChange={(value) => {
+            setNeighbourhood(value);
+            setErrors((current) => ({ ...current, neighbourhood: undefined }));
+          }}
+          error={errors.neighbourhood}
+          selectRef={neighbourhoodRef}
+        />
+      </Section>
 
-      <div className="flex flex-col gap-2 sm:flex-row-reverse sm:justify-start">
-        <Button type="submit" loading={submitting}>
+      <div className="flex flex-col gap-2 pt-2 sm:flex-row-reverse sm:justify-start">
+        <Button type="submit" loading={submitting} className="sm:min-w-40">
           {submitLabel}
         </Button>
         {secondaryAction}
@@ -134,42 +172,104 @@ export function ProfileForm({
   );
 }
 
-/** A set of on/off chips. Each chip is a button with aria-pressed. */
+function Progress({ done, total }: { done: number; total: number }) {
+  return (
+    <div className="flex items-center gap-3" aria-live="polite">
+      <div
+        className="h-1.5 flex-1 overflow-hidden rounded-full bg-line"
+        role="progressbar"
+        aria-label="Profile progress"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={done}
+      >
+        <div
+          className="h-full rounded-full bg-brand transition-[width] duration-300"
+          style={{ width: `${(done / total) * 100}%` }}
+        />
+      </div>
+      <span className="shrink-0 text-caption font-medium text-muted">
+        {done} of {total} done
+      </span>
+    </div>
+  );
+}
+
+/** One question of the form, as a card. It turns red while its answer is missing. */
+function Section({
+  icon: Icon,
+  title,
+  description,
+  error,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  error?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className={cn(
+        "rounded-lg border bg-white p-4 transition-colors sm:p-5",
+        error ? "border-danger" : "border-line",
+      )}
+    >
+      <div className="mb-4 flex items-start gap-3">
+        <div
+          className={cn(
+            "flex size-9 shrink-0 items-center justify-center rounded-full",
+            error ? "bg-danger-soft text-danger" : "bg-brand-soft text-brand",
+          )}
+        >
+          <Icon className="size-4" aria-hidden />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-ink">{title}</h2>
+          <p className="mt-0.5 text-sm text-muted">{description}</p>
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * A set of on/off chips, each a button with aria-pressed. Long lists start collapsed
+ * (anything already selected always stays visible) with a button to show the rest.
+ */
 function ChoiceGroup({
   legend,
-  hint,
   choices,
   selected,
+  collapsedCount,
   onToggle,
   error,
   firstRef,
 }: {
   legend: string;
-  hint?: string;
   choices: string[];
   selected: string[];
+  collapsedCount: number;
   onToggle: (value: string) => void;
   error?: string;
   firstRef: RefObject<HTMLButtonElement | null>;
 }) {
   const messageId = useId();
-  const message = error ?? hint;
+  const [expanded, setExpanded] = useState(false);
+  const canCollapse = choices.length > collapsedCount;
+  const visible =
+    expanded || !canCollapse
+      ? choices
+      : choices.filter((choice, index) => index < collapsedCount || selected.includes(choice));
+  const hidden = choices.length - visible.length;
 
   return (
-    <fieldset aria-describedby={message ? messageId : undefined}>
-      <legend className="mb-1.5 text-xs font-semibold text-ink">
-        {legend}
-        {selected.length > 0 && (
-          <span className="ml-1.5 font-normal text-muted">{selected.length} selected</span>
-        )}
-      </legend>
-      <div
-        className={cn(
-          "flex flex-wrap gap-2 rounded-md",
-          error && "border border-danger bg-danger-soft/40 p-2",
-        )}
-      >
-        {choices.map((choice, index) => {
+    <fieldset aria-describedby={error ? messageId : undefined}>
+      <legend className="sr-only">{legend}</legend>
+      <div className="flex flex-wrap gap-2">
+        {visible.map((choice, index) => {
           const on = selected.includes(choice);
           return (
             <button
@@ -179,22 +279,40 @@ function ChoiceGroup({
               aria-pressed={on}
               onClick={() => onToggle(choice)}
               className={cn(
-                "inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors",
-                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink",
+                "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm transition-colors",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
                 on
-                  ? "border-ink bg-ink font-medium text-white"
-                  : "border-line bg-white text-ink hover:bg-surface",
+                  ? "border-brand bg-brand-soft font-medium text-ink"
+                  : "border-line bg-white text-muted hover:border-subtle hover:text-ink",
               )}
             >
-              {on && <Check className="size-3.5" aria-hidden />}
+              {on && <Check className="size-3.5 text-brand" aria-hidden />}
               {choice}
             </button>
           );
         })}
+        {canCollapse && (hidden > 0 || expanded) && (
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            aria-expanded={expanded}
+            className="inline-flex h-9 items-center gap-1 rounded-full px-3 text-sm font-semibold text-brand hover:bg-brand-soft focus-visible:outline-2 focus-visible:outline-brand"
+          >
+            {expanded ? "Show fewer" : `Show ${hidden} more`}
+            <ChevronDown
+              className={cn("size-4 transition-transform", expanded && "rotate-180")}
+              aria-hidden
+            />
+          </button>
+        )}
       </div>
-      {message && (
-        <p id={messageId} className={cn("mt-1.5 text-xs", error ? "text-danger" : "text-muted")}>
-          {message}
+      {error ? (
+        <p id={messageId} className="mt-3 text-xs text-danger">
+          {error}
+        </p>
+      ) : (
+        <p className="mt-3 text-xs text-muted">
+          {selected.length === 0 ? "None selected yet" : `${selected.length} selected`}
         </p>
       )}
     </fieldset>
@@ -216,40 +334,52 @@ function NeighbourhoodSelect({
 }) {
   const id = useId();
   const messageId = `${id}-message`;
-  const message = error ?? "Only the area is used, never your address.";
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-xs font-semibold text-ink">
+      {/* The section heading already asks the question; the label is for screen readers. */}
+      <label htmlFor={id} className="sr-only">
         Neighbourhood
       </label>
-      <select
-        id={id}
-        ref={selectRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={messageId}
-        className={cn(
-          "h-11 w-full rounded-sm border bg-white px-3 text-sm outline-none transition-colors focus:ring-2",
-          value ? "text-ink" : "text-subtle",
-          error
-            ? "border-danger focus:ring-danger/20"
-            : "border-line focus:border-ink focus:ring-ink/10",
-        )}
-      >
-        <option value="" disabled>
-          Select your neighbourhood
-        </option>
-        {choices.map((choice) => (
-          <option key={choice} value={choice} className="text-ink">
-            {choice}
+      <div className="relative">
+        <MapPin
+          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle"
+          aria-hidden
+        />
+        <select
+          id={id}
+          ref={selectRef}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? messageId : undefined}
+          className={cn(
+            "h-11 w-full appearance-none rounded-sm border bg-white pr-10 pl-9 text-sm outline-none transition-colors focus:ring-2",
+            value ? "text-ink" : "text-subtle",
+            error
+              ? "border-danger focus:ring-danger/20"
+              : "border-line focus:border-ink focus:ring-ink/10",
+          )}
+        >
+          <option value="" disabled>
+            Select your neighbourhood
           </option>
-        ))}
-      </select>
-      <p id={messageId} className={cn("text-xs", error ? "text-danger" : "text-muted")}>
-        {message}
-      </p>
+          {choices.map((choice) => (
+            <option key={choice} value={choice} className="text-ink">
+              {choice}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-subtle"
+          aria-hidden
+        />
+      </div>
+      {error && (
+        <p id={messageId} className="text-xs text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
