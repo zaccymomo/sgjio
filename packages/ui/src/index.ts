@@ -10,6 +10,7 @@ export { ErrorState } from "./components/ErrorState";
 export { Logo } from "./components/Logo";
 export { PasswordField } from "./components/PasswordField";
 export { Placeholder } from "./components/Placeholder";
+export { ForgotPasswordForm, ResetPasswordForm } from "./components/PasswordResetForms";
 export { ProgressRing } from "./components/ProgressRing";
 export { SignInForm } from "./components/SignInForm";
 export { FullPageSpinner, Spinner } from "./components/Spinner";
@@ -22,6 +23,7 @@ export {
   useAuth,
   type AuthStatus,
   type RegisterInput,
+  type ResetPasswordInput,
   type User,
   type UserType,
 } from "./lib/auth-context";

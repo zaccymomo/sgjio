@@ -53,7 +53,7 @@ Seed logins: main app `newcomer@sgjio.example.com` / `UserPass123`; admin `admin
 - Errors are `{"detail": {"code", "message", ...}}`; the front end reads them via `ApiError`.
 - Sign-in never reveals whether an email exists or is an admin. Lockout: 5 consecutive failures per email per scope blocks for 15 minutes (429 with `blocked_until`).
 - Password rules: `password_rule_failures()` in `app/security.py` (8+ chars, a letter and a number).
-- Password reset: `request_password_reset`, `check_reset_token`, `consume_reset_token`, `set_new_password` in `auth/reset.py`. Links last 5 minutes, work once, a new request cancels old ones; the emails already exist. SCRUM-63/69 still need the endpoints and pages.
+- Password reset: `request_password_reset`, `check_reset_token`, `consume_reset_token`, `set_new_password` in `auth/reset.py`. Links last 5 minutes, work once, a new request cancels old ones. Endpoints `forgot-password`, `reset-password/check` and `reset-password` exist on both `/api/auth` and `/api/admin/auth`; the main-app pages are done (SCRUM-63) using `ForgotPasswordForm`/`ResetPasswordForm` from `@sgjio/ui`, and the admin pages (SCRUM-69) can reuse them.
 
 ## Product rules that stories depend on
 

@@ -1,5 +1,5 @@
-import { AuthCard, SignInForm, safeNextPath, useAuth } from "@sgjio/ui";
-import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Alert, AuthCard, SignInForm, safeNextPath, useAuth } from "@sgjio/ui";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 /**
  * Main-app sign-in. Working scaffold for SCRUM-62: the form and redirect are done, and
@@ -10,6 +10,8 @@ export function SignInPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const next = safeNextPath(params.get("next"));
+  // Set by the reset-password page after a new password is saved (SCRUM-63 AC5).
+  const passwordReset = (useLocation().state as { passwordReset?: boolean } | null)?.passwordReset;
 
   // Already signed in: go straight to where they were heading.
   if (status === "signed-in") return <Navigate to={next} replace />;
@@ -27,6 +29,11 @@ export function SignInPage() {
         </>
       }
     >
+      {passwordReset && (
+        <Alert tone="success" className="mb-4">
+          Your password has been reset. Sign in with your new password.
+        </Alert>
+      )}
       <SignInForm
         forgotPasswordHref="/forgot-password"
         onSuccess={() => navigate(next, { replace: true })}
