@@ -13,6 +13,8 @@ Several Sprint 1 stories leave a value open for the team to decide. The setup ta
 | How are administrators created?         | SCRUM-68           | Seeded, or `python -m app.cli create-admin`                                                                                  | `api/app/cli.py`                                                              |
 | Can a lesson be in more than one topic? | SCRUM-56           | **No, exactly one** (as the story assumes)                                                                                   | `Lesson.topic_id` in `api/app/models.py`                                      |
 | Removed lessons: withdrawn or deleted?  | SCRUM-52           | **Withdrawn** (kept for users' history), as criterion 4 assumes                                                              | `LessonStatus.WITHDRAWN`                                                      |
+| Profile choices                         | SCRUM-14           | **Fixed lists** of 20 interests, 24 languages and 28 neighbourhoods (planning areas), not free text, so matching can compare | `api/app/profile_options.py`                                                  |
+| Can onboarding be skipped?              | SCRUM-14           | **Yes**, "Skip for now" goes home; Settings then offers "Set up". Continue still requires every field (AC2)                  | `web/src/pages/ProfileSetupPage.tsx`                                          |
 
 Already fixed by the stories, and built as written:
 
