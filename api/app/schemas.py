@@ -80,6 +80,24 @@ class SignInResponse(BaseModel):
     user: UserOut
 
 
+class ForgotPasswordRequest(BaseModel):
+    # Not validated as an email, and never refused for an unknown one: the answer is the
+    # same whatever is sent, so the page cannot be used to check who has an account
+    # (SCRUM-63 AC2, SCRUM-69 AC2).
+    email: str = Field(min_length=1, max_length=254)
+
+
+class ResetTokenRequest(BaseModel):
+    """The token from an emailed reset link. Sent in the body so it stays out of logs."""
+
+    token: str = Field(min_length=1, max_length=256)
+
+
+class ResetPasswordRequest(ResetTokenRequest):
+    password: str = Field(min_length=1, max_length=256)
+    password_confirmation: str = Field(min_length=1, max_length=256)
+
+
 class ErrorDetail(BaseModel):
     """Shape of `detail` in every error response the front ends need to understand."""
 

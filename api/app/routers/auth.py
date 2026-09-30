@@ -1,4 +1,4 @@
-"""Registering, signing in, signing out and "who am I" for both front ends.
+"""Registering, signing in, signing out, password reset and "who am I" for both front ends.
 
 The sign-in routes are mounted twice: at /api/auth for the main app and at
 /api/admin/auth for the admin portal. Each uses its own cookie and its own sessions, so
@@ -12,7 +12,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_admin, require_user
-from app.auth.service import register, sign_in
+from app.auth.reset import (
+    check_reset_token,
+    consume_reset_token,
+    request_password_reset,
+    set_new_password,
+)
+from app.auth.service import FieldProblem, new_password_problem, register, sign_in
 from app.auth.sessions import (
     COOKIE_NAMES,
     clear_session_cookie,
@@ -22,16 +28,40 @@ from app.auth.sessions import (
 )
 from app.db import get_db
 from app.models import AuthScope, User
-from app.schemas import RegisterRequest, RegisterResponse, SignInRequest, SignInResponse, UserOut
+from app.schemas import (
+    ForgotPasswordRequest,
+    RegisterRequest,
+    RegisterResponse,
+    ResetPasswordRequest,
+    ResetTokenRequest,
+    SignInRequest,
+    SignInResponse,
+    UserOut,
+)
 
 INVALID_CREDENTIALS = {
     "code": "invalid_credentials",
     "message": "The email or password is incorrect.",
 }
 
+# A used, expired, cancelled or made-up link all look the same to the reader (SCRUM-63 AC6).
+RESET_LINK_INVALID = {
+    "code": "reset_link_invalid",
+    "message": "This reset link is no longer valid. Request a new one.",
+}
+
 # An email already in use is a conflict; everything else registration refuses is the shape
 # of what was sent, which is what 422 already means for this API.
 REGISTER_PROBLEM_STATUS = {"email_taken": status.HTTP_409_CONFLICT}
+
+
+def problem_error(problem: FieldProblem) -> HTTPException:
+    """A refused form as an API error, naming the field to highlight."""
+    detail = {"code": problem.code, "message": problem.message, "field": problem.field}
+    if problem.failures:
+        detail["failures"] = problem.failures
+    refused = REGISTER_PROBLEM_STATUS.get(problem.code, status.HTTP_422_UNPROCESSABLE_CONTENT)
+    return HTTPException(refused, detail=detail)
 
 
 def build_auth_router(scope: AuthScope) -> APIRouter:
@@ -96,23 +126,48 @@ def build_auth_router(scope: AuthScope) -> APIRouter:
             )
 
             if result.problem is not None:
-                problem = result.problem
-                detail = {
-                    "code": problem.code,
-                    "message": problem.message,
-                    # Which field to highlight (AC2-AC5).
-                    "field": problem.field,
-                }
-                if problem.failures:
-                    detail["failures"] = problem.failures
-                refused = REGISTER_PROBLEM_STATUS.get(
-                    problem.code, status.HTTP_422_UNPROCESSABLE_CONTENT
-                )
-                raise HTTPException(refused, detail=detail)
+                # Which field to highlight (AC2-AC5).
+                raise problem_error(result.problem)
 
             token, _ = create_session(db, result.user, scope)
             set_session_cookie(response, scope, token)
             return RegisterResponse(user=UserOut.model_validate(result.user))
+
+    @router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
+    def forgot_password_route(body: ForgotPasswordRequest, db: Session = Depends(get_db)) -> None:
+        """Email a reset link if the account exists. The answer is the same either way."""
+        request_password_reset(db, body.email, scope)
+
+    @router.post(
+        "/reset-password/check",
+        status_code=status.HTTP_204_NO_CONTENT,
+        responses={410: {"description": "The link was used, expired or replaced"}},
+    )
+    def check_reset_link_route(body: ResetTokenRequest, db: Session = Depends(get_db)) -> None:
+        """Lets the page say straight away that a link is dead, before a password is typed."""
+        if check_reset_token(db, body.token, scope) is None:
+            raise HTTPException(status.HTTP_410_GONE, detail=RESET_LINK_INVALID)
+
+    @router.post(
+        "/reset-password",
+        status_code=status.HTTP_204_NO_CONTENT,
+        responses={
+            410: {"description": "The link was used, expired or replaced"},
+            422: {"description": "The passwords do not match or break a password rule"},
+        },
+    )
+    def reset_password_route(body: ResetPasswordRequest, db: Session = Depends(get_db)) -> None:
+        """Save a new password from a reset link and sign out everywhere (SCRUM-63 AC4-AC6)."""
+        # Check the password before using up the link, so a typo does not cost the link.
+        if check_reset_token(db, body.token, scope) is None:
+            raise HTTPException(status.HTTP_410_GONE, detail=RESET_LINK_INVALID)
+        problem = new_password_problem(body.password, body.password_confirmation)
+        if problem is not None:
+            raise problem_error(problem)
+        user = consume_reset_token(db, body.token, scope)
+        if user is None:
+            raise HTTPException(status.HTTP_410_GONE, detail=RESET_LINK_INVALID)
+        set_new_password(db, user, body.password)
 
     @router.post("/sign-out", status_code=status.HTTP_204_NO_CONTENT)
     def sign_out_route(request: Request, response: Response, db: Session = Depends(get_db)) -> None:

@@ -95,3 +95,114 @@ def test_new_password_replaces_old_and_signs_out_everywhere(client, db, make_use
     new = client.post("/api/auth/sign-in", json={"email": user.email, "password": "BrandNew456"})
     assert old.status_code == 401
     assert new.status_code == 200
+
+
+# --- SCRUM-63: the reset endpoints the main app's pages call -------------------------------
+
+
+def _forgot(client, email="user@example.com"):
+    return client.post("/api/auth/forgot-password", json={"email": email})
+
+
+def _reset(client, token, password="NewPass456", confirmation=None):
+    return client.post(
+        "/api/auth/reset-password",
+        json={
+            "token": token,
+            "password": password,
+            "password_confirmation": password if confirmation is None else confirmation,
+        },
+    )
+
+
+def test_forgot_password_answers_the_same_for_known_and_unknown_emails(client, make_user):
+    # AC2: the response never reveals whether the email has an account.
+    make_user()
+    known = _forgot(client, "user@example.com")
+    unknown = _forgot(client, "nobody@example.com")
+    assert known.status_code == unknown.status_code == 204
+    assert known.content == unknown.content == b""
+    # AC3: only the registered email gets a link.
+    assert [email.to for email in mailer.outbox] == ["user@example.com"]
+
+
+def test_reset_link_can_be_checked_before_use(client, make_user):
+    make_user()
+    _forgot(client)
+    _, token = _token_from_last_email()
+    assert client.post("/api/auth/reset-password/check", json={"token": token}).status_code == 204
+    # Checking does not use the link up.
+    assert client.post("/api/auth/reset-password/check", json={"token": token}).status_code == 204
+
+
+def test_resetting_changes_the_password_and_signs_out_everywhere(client, make_user):
+    # AC4-AC5
+    make_user()
+    client.post("/api/auth/sign-in", json={"email": "user@example.com", "password": "Password123"})
+    assert client.get("/api/auth/me").status_code == 200
+
+    _forgot(client)
+    _, token = _token_from_last_email()
+    assert _reset(client, token).status_code == 204
+
+    assert client.get("/api/auth/me").status_code == 401
+    old = client.post(
+        "/api/auth/sign-in", json={"email": "user@example.com", "password": "Password123"}
+    )
+    assert old.status_code == 401
+    new = client.post(
+        "/api/auth/sign-in", json={"email": "user@example.com", "password": "NewPass456"}
+    )
+    assert new.status_code == 200
+
+
+def test_a_weak_or_mismatched_password_is_refused_without_using_up_the_link(client, make_user):
+    # AC4: the password rules from SCRUM-61 apply.
+    make_user()
+    _forgot(client)
+    _, token = _token_from_last_email()
+
+    weak = _reset(client, token, password="short")
+    assert weak.status_code == 422
+    assert weak.json()["detail"]["field"] == "password"
+    assert "Include at least one number." in weak.json()["detail"]["failures"]
+
+    mismatch = _reset(client, token, confirmation="Different789")
+    assert mismatch.status_code == 422
+    assert mismatch.json()["detail"]["code"] == "password_mismatch"
+
+    assert _reset(client, token).status_code == 204
+
+
+def test_used_expired_or_replaced_links_are_refused(client, db, make_user):
+    # AC6-AC7
+    make_user()
+    _forgot(client)
+    _, first = _token_from_last_email()
+    _forgot(client)
+    _, second = _token_from_last_email()
+
+    replaced = _reset(client, first)
+    assert replaced.status_code == 410
+    assert replaced.json()["detail"]["code"] == "reset_link_invalid"
+
+    assert _reset(client, second).status_code == 204
+    assert _reset(client, second).status_code == 410
+    check = client.post("/api/auth/reset-password/check", json={"token": second})
+    assert check.status_code == 410
+
+    _forgot(client)
+    _, third = _token_from_last_email()
+    db.execute(
+        update(PasswordResetToken).values(expires_at=datetime.now(UTC) - timedelta(seconds=1))
+    )
+    db.commit()
+    assert _reset(client, third).status_code == 410
+
+
+def test_main_app_links_do_not_work_on_the_admin_portal(client, make_user):
+    make_user(role=UserRole.ADMIN)
+    _forgot(client)
+    _, token = _token_from_last_email()
+    response = client.post("/api/admin/auth/reset-password/check", json={"token": token})
+    assert response.status_code == 410
