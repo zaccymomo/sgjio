@@ -28,7 +28,7 @@ export {
   type UserType,
 } from "./lib/auth-context";
 export { cn } from "./lib/cn";
-export { formatTime } from "./lib/format";
+export { formatDate, formatTime } from "./lib/format";
 export {
   looksLikeEmail,
   passwordRuleFailures,
