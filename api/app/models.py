@@ -141,7 +141,13 @@ class Profile(Base):
 
 
 class Topic(Base):
-    """A cultural topic, shown as one progress circle on the landing page (SCRUM-57)."""
+    """A cultural topic, shown as one progress circle on the landing page (SCRUM-57).
+
+    `archived_at` is empty for an active topic and holds the time it was archived
+    otherwise. An archived topic is hidden from users but keeps its lessons, their
+    completions and its name (the unique index below still covers it). A topic with no
+    lessons at all can be deleted instead.
+    """
 
     __tablename__ = "topics"
     __table_args__ = (
@@ -151,6 +157,7 @@ class Topic(Base):
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     name: Mapped[str] = mapped_column(String(80), nullable=False)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
 
