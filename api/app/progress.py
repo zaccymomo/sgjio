@@ -9,6 +9,9 @@ Two rules from SCRUM-16 AC8 are enforced here rather than left to the caller:
 - because "completed" is counted over the same set of published lessons as "available",
   completed can never exceed available -- so a circle cannot read "13 / 12" after an
   administrator withdraws a lesson somebody had already finished (SCRUM-52)
+
+Topics an administrator has archived (SCRUM-57) are left out entirely, so their circle
+disappears and the overall figure shrinks with it; restoring brings both back.
 """
 
 import uuid
@@ -18,6 +21,7 @@ from sqlalchemy import Select, and_, func, select
 from sqlalchemy.orm import Session
 
 from app.models import Lesson, LessonCompletion, LessonStatus, Topic
+from app.topics import visible_to_users
 
 
 @dataclass(frozen=True)
@@ -43,7 +47,7 @@ def _topic_rows(user_id: uuid.UUID) -> Select:
         LessonCompletion.lesson_id == Lesson.id,
         LessonCompletion.user_id == user_id,
     )
-    return (
+    query = (
         select(
             Topic.id,
             Topic.name,
@@ -56,6 +60,7 @@ def _topic_rows(user_id: uuid.UUID) -> Select:
         # Alphabetical, so the circles do not move around between visits.
         .order_by(Topic.name)
     )
+    return visible_to_users(query)
 
 
 def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
