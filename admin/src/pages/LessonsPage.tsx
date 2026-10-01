@@ -20,9 +20,6 @@ export function LessonsPage() {
       <Placeholder story="SCRUM-64" title="Lesson editor">
         Opened by "New lesson" and by selecting a draft.
       </Placeholder>
-      <Placeholder story="SCRUM-57" title="Topics">
-        Create and rename topics. Six sample topics are already seeded.
-      </Placeholder>
     </div>
   );
 }
