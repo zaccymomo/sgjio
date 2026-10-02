@@ -6,6 +6,7 @@ export { Alert } from "./components/Alert";
 export { AppShell, type NavItem } from "./components/AppShell";
 export { AuthCard } from "./components/AuthCard";
 export { Button, type ButtonProps } from "./components/Button";
+export { Dialog } from "./components/Dialog";
 export { ErrorState } from "./components/ErrorState";
 export { Logo } from "./components/Logo";
 export { PasswordField } from "./components/PasswordField";
