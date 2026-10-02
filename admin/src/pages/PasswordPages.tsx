@@ -12,9 +12,9 @@ import {
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-const REQUEST_PATH = "/api/admin/auth/password-reset/request";
-const VALIDATE_PATH = "/api/admin/auth/password-reset/validate";
-const CONFIRM_PATH = "/api/admin/auth/password-reset/confirm";
+const REQUEST_PATH = "/api/admin/auth/forgot-password";
+const VALIDATE_PATH = "/api/admin/auth/reset-password/check";
+const CONFIRM_PATH = "/api/admin/auth/reset-password";
 
 const backToSignIn = (
   <Link to="/sign-in" className="font-semibold text-brand hover:underline">
@@ -104,9 +104,9 @@ export function ResetPasswordPage() {
   useEffect(() => {
     let active = true;
     if (!token) return;
-    void apiFetch<{ valid: boolean }>(`${VALIDATE_PATH}?token=${encodeURIComponent(token)}`)
-      .then((result) => {
-        if (active) setValid(result.valid);
+    void apiFetch<void>(VALIDATE_PATH, { method: "POST", body: { token } })
+      .then(() => {
+        if (active) setValid(true);
       })
       .catch(() => {
         // A link that cannot be checked is not safe to use; invite a fresh request instead.
@@ -144,13 +144,13 @@ export function ResetPasswordPage() {
 
     setSubmitting(true);
     try {
-      await apiFetch<{ message: string }>(CONFIRM_PATH, {
+      await apiFetch<void>(CONFIRM_PATH, {
         method: "POST",
         body: { token, password, password_confirmation: passwordConfirmation },
       });
       setComplete(true);
     } catch (error) {
-      if (error instanceof ApiError && error.code === "invalid_reset_token") {
+      if (error instanceof ApiError && error.code === "reset_link_invalid") {
         setValid(false);
       } else if (error instanceof ApiError && error.field) {
         setFieldErrors({ [error.field]: error.message });

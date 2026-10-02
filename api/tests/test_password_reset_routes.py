@@ -6,9 +6,9 @@ from app import mailer
 from app.models import UserRole
 
 ADMIN = {"email": "admin@example.com", "password": "AdminPass123"}
-REQUEST = "/api/admin/auth/password-reset/request"
-VALIDATE = "/api/admin/auth/password-reset/validate"
-CONFIRM = "/api/admin/auth/password-reset/confirm"
+REQUEST = "/api/admin/auth/forgot-password"
+VALIDATE = "/api/admin/auth/reset-password/check"
+CONFIRM = "/api/admin/auth/reset-password"
 
 
 def _token_from_email() -> str:
@@ -39,14 +39,13 @@ def test_admin_reset_link_can_be_validated_and_resets_password(client, make_user
     client.post(REQUEST, json={"email": ADMIN["email"]})
     token = _token_from_email()
 
-    assert client.get(VALIDATE, params={"token": token}).json() == {"valid": True}
+    assert client.post(VALIDATE, json={"token": token}).status_code == 204
     response = client.post(
         CONFIRM,
         json={"token": token, "password": "NewAdmin456", "password_confirmation": "NewAdmin456"},
     )
-    assert response.status_code == 200
-    assert response.json()["message"] == "Your password has been reset."
-    assert client.get(VALIDATE, params={"token": token}).json() == {"valid": False}
+    assert response.status_code == 204
+    assert client.post(VALIDATE, json={"token": token}).status_code == 410
     assert client.post("/api/admin/auth/sign-in", json=ADMIN).status_code == 401
     assert (
         client.post(
@@ -66,8 +65,8 @@ def test_invalid_or_reused_admin_reset_link_is_refused(client, make_user):
     }
     response = client.post(CONFIRM, json=body)
 
-    assert response.status_code == 400
-    assert response.json()["detail"]["code"] == "invalid_reset_token"
+    assert response.status_code == 410
+    assert response.json()["detail"]["code"] == "reset_link_invalid"
 
 
 def test_bad_new_password_does_not_consume_admin_reset_link(client, make_user):
@@ -81,7 +80,7 @@ def test_bad_new_password_does_not_consume_admin_reset_link(client, make_user):
     )
     assert mismatch.status_code == 422
     assert mismatch.json()["detail"]["code"] == "password_mismatch"
-    assert client.get(VALIDATE, params={"token": token}).json() == {"valid": True}
+    assert client.post(VALIDATE, json={"token": token}).status_code == 204
 
     weak = client.post(
         CONFIRM,
@@ -89,7 +88,7 @@ def test_bad_new_password_does_not_consume_admin_reset_link(client, make_user):
     )
     assert weak.status_code == 422
     assert weak.json()["detail"]["code"] == "weak_password"
-    assert client.get(VALIDATE, params={"token": token}).json() == {"valid": True}
+    assert client.post(VALIDATE, json={"token": token}).status_code == 204
 
 
 def test_new_admin_reset_request_invalidates_the_previous_link(client, make_user):
@@ -100,5 +99,5 @@ def test_new_admin_reset_request_invalidates_the_previous_link(client, make_user
     second_token = _token_from_email()
 
     assert first_token != second_token
-    assert client.get(VALIDATE, params={"token": first_token}).json() == {"valid": False}
-    assert client.get(VALIDATE, params={"token": second_token}).json() == {"valid": True}
+    assert client.post(VALIDATE, json={"token": first_token}).status_code == 410
+    assert client.post(VALIDATE, json={"token": second_token}).status_code == 204

@@ -1,3 +1,4 @@
+import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Logo } from "./Logo";
@@ -6,12 +7,15 @@ import { Logo } from "./Logo";
 export function AuthCard({
   title,
   subtitle,
+  icon: Icon,
   badge,
   children,
   footer,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
+  /** Shown in a tinted circle above the title, e.g. a key on "Forgot your password?". */
+  icon?: LucideIcon;
   /** Small label next to the logo, e.g. "Admin". */
   badge?: string;
   children: ReactNode;
@@ -29,6 +33,11 @@ export function AuthCard({
           )}
         </div>
         <div className="rounded-md border border-line bg-white p-6 shadow-sm">
+          {Icon && (
+            <div className="mb-4 flex size-11 items-center justify-center rounded-full bg-brand-soft text-brand">
+              <Icon className="size-5" aria-hidden />
+            </div>
+          )}
           <h1 className="text-xl font-bold text-ink">{title}</h1>
           {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
           <div className="mt-6">{children}</div>

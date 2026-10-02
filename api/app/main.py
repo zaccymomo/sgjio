@@ -9,7 +9,7 @@ import logging
 from fastapi import FastAPI
 
 from app.models import AuthScope
-from app.routers import admin, health, progress
+from app.routers import admin, health, profile, progress
 from app.routers.auth import build_auth_router
 
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +26,7 @@ app = FastAPI(
 # /api to this app, so the browser sees one origin and cookies just work (no CORS).
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(progress.router, prefix="/api", tags=["Progress"])
+app.include_router(profile.router, prefix="/api", tags=["Profile"])
 app.include_router(build_auth_router(AuthScope.APP), prefix="/api/auth", tags=["Auth (main app)"])
 app.include_router(
     build_auth_router(AuthScope.ADMIN), prefix="/api/admin/auth", tags=["Auth (admin portal)"]

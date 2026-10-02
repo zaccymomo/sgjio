@@ -20,6 +20,7 @@ import {
   useAuth,
   type AuthStatus,
   type RegisterInput,
+  type ResetPasswordInput,
   type User,
 } from "./auth-context";
 
@@ -83,9 +84,53 @@ export function AuthProvider({ basePath, children }: { basePath: string; childre
     setState({ status: "signed-out", user: null });
   }, [basePath]);
 
+  const requestPasswordReset = useCallback(
+    async (email: string) => {
+      await apiFetch<void>(`${basePath}/forgot-password`, { method: "POST", body: { email } });
+    },
+    [basePath],
+  );
+
+  const checkResetLink = useCallback(
+    async (token: string) => {
+      await apiFetch<void>(`${basePath}/reset-password/check`, {
+        method: "POST",
+        body: { token },
+      });
+    },
+    [basePath],
+  );
+
+  const resetPassword = useCallback(
+    async (input: ResetPasswordInput) => {
+      await apiFetch<void>(`${basePath}/reset-password`, { method: "POST", body: input });
+      // The server has ended every session for this account, this browser's included.
+      setState({ status: "signed-out", user: null });
+    },
+    [basePath],
+  );
+
   const value = useMemo(
-    () => ({ ...state, signIn, register, signOut, refresh }),
-    [state, signIn, register, signOut, refresh],
+    () => ({
+      ...state,
+      signIn,
+      register,
+      signOut,
+      refresh,
+      requestPasswordReset,
+      checkResetLink,
+      resetPassword,
+    }),
+    [
+      state,
+      signIn,
+      register,
+      signOut,
+      refresh,
+      requestPasswordReset,
+      checkResetLink,
+      resetPassword,
+    ],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
