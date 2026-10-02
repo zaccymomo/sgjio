@@ -10,7 +10,9 @@ export { Dialog } from "./components/Dialog";
 export { ErrorState } from "./components/ErrorState";
 export { Logo } from "./components/Logo";
 export { PasswordField } from "./components/PasswordField";
+export { PasswordRules } from "./components/PasswordRules";
 export { Placeholder } from "./components/Placeholder";
+export { ForgotPasswordCard, ResetPasswordCard } from "./components/PasswordResetCards";
 export { ProgressRing } from "./components/ProgressRing";
 export { SignInForm } from "./components/SignInForm";
 export { FullPageSpinner, Spinner } from "./components/Spinner";
@@ -23,15 +25,17 @@ export {
   useAuth,
   type AuthStatus,
   type RegisterInput,
+  type ResetPasswordInput,
   type User,
   type UserType,
 } from "./lib/auth-context";
 export { cn } from "./lib/cn";
-export { formatTime } from "./lib/format";
+export { formatDate, formatTime } from "./lib/format";
 export {
   looksLikeEmail,
   passwordRuleFailures,
   PASSWORD_HINT,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
+  PASSWORD_RULES,
 } from "./lib/validation";
