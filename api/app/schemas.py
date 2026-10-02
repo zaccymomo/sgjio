@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Annotated
 
 from pydantic import (
+    AwareDatetime,
     BaseModel,
     ConfigDict,
     EmailStr,
@@ -249,3 +250,64 @@ class LessonOrderRequest(OrderRequest):
     """
 
     topic_id: uuid.UUID | None
+
+
+# --- Lessons (SCRUM-64) -------------------------------------------------------------------
+# What a lesson "is" lives here and, in the admin portal, in admin/src/lib/lessons.ts and
+# admin/src/components/LessonForm.tsx. A change to the lesson's fields should touch these,
+# not every route and page.
+
+# Matches lessons.title (String(200)).
+MAX_LESSON_TITLE = 200
+# A lesson should take under 2 minutes to read: about 400 words, or 2,500 characters.
+# Drafts get ten times that, for pasted notes, while still bounding one request.
+MAX_LESSON_CONTENT = 20_000
+
+LessonTitle = Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_LESSON_TITLE)]
+LessonContent = Annotated[str, Field(max_length=MAX_LESSON_CONTENT)]
+
+
+class LessonFields(BaseModel):
+    """A draft's fields as the editor saves them. Any may be empty: required fields are
+    checked when publishing (SCRUM-56, SCRUM-70). `topic_id: null` means no topic yet."""
+
+    title: LessonTitle = ""
+    content: LessonContent = ""
+    topic_id: uuid.UUID | None = None
+
+
+class LessonCreateRequest(LessonFields):
+    """A new draft. Every field is optional."""
+
+
+class LessonUpdateRequest(LessonFields):
+    """Change a draft. Fields left out keep their value.
+
+    `updated_at` is the "last updated" time the editor loaded. If the lesson has changed
+    since, the save is refused (lesson_out_of_date) rather than overwriting that change.
+    """
+
+    updated_at: AwareDatetime
+
+    def changes(self) -> dict:
+        """Only the lesson fields the request actually sent."""
+        return self.model_dump(include=self.model_fields_set & set(LessonFields.model_fields))
+
+
+class LessonOut(BaseModel):
+    """One lesson, body included, for the editor. `deletable` is true only for a draft
+    that has never been published."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    content: str
+    topic_id: uuid.UUID | None
+    status: LessonStatus
+    published_at: datetime | None
+    withdrawn_at: datetime | None
+    position: int
+    created_at: datetime
+    updated_at: datetime
+    deletable: bool
