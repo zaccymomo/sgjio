@@ -6,7 +6,8 @@ its author forgets to add the guard.
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import AwareDatetime
 from sqlalchemy.orm import Session
 
 from app import lessons, topics
@@ -15,8 +16,11 @@ from app.db import get_db
 from app.models import User
 from app.problems import ContentProblem
 from app.schemas import (
+    LessonCreateRequest,
     LessonOrderRequest,
+    LessonOut,
     LessonSummaryOut,
+    LessonUpdateRequest,
     TopicOrderRequest,
     TopicOut,
     TopicRequest,
@@ -144,5 +148,83 @@ def reorder_lessons(
     that was out of date gets 409 order_out_of_date. Returns every lesson, in order."""
     try:
         return lessons.reorder_lessons(db, body.topic_id, body.ids, body.previous_ids)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+# --- Lesson drafts (SCRUM-64) -------------------------------------------------------------
+
+LESSON_NOT_FOUND = {404: {"description": "No lesson with that id (lesson_not_found)"}}
+TOPIC_REFUSED = {
+    404: {"description": "No topic with that id (topic_not_found, field topic_id)"},
+    409: {"description": "That topic is archived (topic_archived, field topic_id)"},
+}
+
+
+@router.post(
+    "/lessons",
+    response_model=LessonOut,
+    status_code=status.HTTP_201_CREATED,
+    responses=TOPIC_REFUSED,
+)
+def create_lesson(body: LessonCreateRequest, db: Session = Depends(get_db)) -> lessons.LessonDetail:
+    """Create a draft at the end of its topic. Every field may be empty."""
+    try:
+        return lessons.create_lesson(db, body.title, body.content, body.topic_id)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+@router.get("/lessons/{lesson_id}", response_model=LessonOut, responses=LESSON_NOT_FOUND)
+def get_lesson(lesson_id: uuid.UUID, db: Session = Depends(get_db)) -> lessons.LessonDetail:
+    """One lesson of any status, body included."""
+    try:
+        return lessons.get_lesson(db, lesson_id)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+@router.patch(
+    "/lessons/{lesson_id}",
+    response_model=LessonOut,
+    responses={
+        **LESSON_NOT_FOUND,
+        **TOPIC_REFUSED,
+        409: {
+            "description": "Not a draft (lesson_not_draft), changed since it was loaded "
+            "(lesson_out_of_date), or the topic is archived (topic_archived)"
+        },
+    },
+)
+def update_lesson(
+    lesson_id: uuid.UUID, body: LessonUpdateRequest, db: Session = Depends(get_db)
+) -> lessons.LessonDetail:
+    """Change a draft's title, content or topic; fields left out are kept. A new topic puts
+    the lesson at the end of it. Send the `updated_at` the editor loaded."""
+    try:
+        return lessons.update_lesson(db, lesson_id, body.updated_at, body.changes())
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+@router.delete(
+    "/lessons/{lesson_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        **LESSON_NOT_FOUND,
+        409: {
+            "description": "Published at some point, so withdraw it instead "
+            "(lesson_not_deletable), or changed since it was loaded (lesson_out_of_date)"
+        },
+    },
+)
+def delete_lesson(
+    lesson_id: uuid.UUID,
+    updated_at: AwareDatetime = Query(description="The `updated_at` the editor loaded"),
+    db: Session = Depends(get_db),
+) -> None:
+    """Delete a lesson that has never been published."""
+    try:
+        lessons.delete_lesson(db, lesson_id, updated_at)
     except ContentProblem as problem:
         raise _refuse(problem) from None
