@@ -1,0 +1,524 @@
+"""SCRUM-64: writing a lesson and saving it as a draft."""
+
+import uuid
+from datetime import UTC, datetime
+
+import pytest
+
+from app.models import (
+    Lesson,
+    LessonCompletion,
+    LessonStatus,
+    QuizOption,
+    QuizQuestion,
+    Topic,
+    UserRole,
+)
+from app.schemas import MAX_LESSON_CONTENT, MAX_LESSON_TITLE
+
+ADMIN = {"email": "admin@example.com", "password": "AdminPass123"}
+USER = {"email": "user@example.com", "password": "Password123"}
+URL = "/api/admin/lessons"
+
+
+@pytest.fixture
+def admin(client, make_user):
+    """The test client, signed in to the admin portal."""
+    make_user(ADMIN["email"], ADMIN["password"], role=UserRole.ADMIN)
+    assert client.post("/api/admin/auth/sign-in", json=ADMIN).status_code == 200
+    return client
+
+
+def _topic(db, name: str, position: int = 0, archived: bool = False) -> Topic:
+    topic = Topic(name=name, position=position, archived_at=datetime.now(UTC) if archived else None)
+    db.add(topic)
+    db.commit()
+    return topic
+
+
+def _lesson(
+    db,
+    topic: Topic | None,
+    title: str = "Lesson",
+    position: int = 0,
+    status: LessonStatus = LessonStatus.DRAFT,
+    published_at: datetime | None = None,
+) -> Lesson:
+    lesson = Lesson(
+        title=title,
+        content="Body",
+        topic=topic,
+        status=status,
+        position=position,
+        published_at=published_at,
+    )
+    db.add(lesson)
+    db.commit()
+    return lesson
+
+
+def _url(lesson) -> str:
+    return f"{URL}/{getattr(lesson, 'id', lesson)}"
+
+
+def _loaded(client, lesson) -> dict:
+    """The lesson as the editor loads it."""
+    response = client.get(_url(lesson))
+    assert response.status_code == 200
+    return response.json()
+
+
+def _save(client, lesson, updated_at: str | None = None, **changes):
+    """Save as the editor does, naming the "last updated" time it loaded."""
+    if updated_at is None:
+        updated_at = _loaded(client, lesson)["updated_at"]
+    return client.patch(_url(lesson), json={"updated_at": updated_at, **changes})
+
+
+def _delete(client, lesson, updated_at: str | None = None):
+    if updated_at is None:
+        updated_at = _loaded(client, lesson)["updated_at"]
+    return client.delete(_url(lesson), params={"updated_at": updated_at})
+
+
+def _code(response) -> str:
+    return response.json()["detail"]["code"]
+
+
+def _group_titles(client, topic: Topic | None) -> list[str]:
+    """One topic's lessons in the order the admin page shows them."""
+    topic_id = str(topic.id) if topic else None
+    return [row["title"] for row in client.get(URL).json() if row["topic_id"] == topic_id]
+
+
+# --- Get ----------------------------------------------------------------------------------
+
+
+def test_get_returns_the_lesson_with_its_body(admin, db):
+    topic = _topic(db, "Singlish")
+    lesson = _lesson(db, topic, "Lah, Leh and Lor")
+
+    body = _loaded(admin, lesson)
+
+    assert set(body) == {
+        "id",
+        "title",
+        "content",
+        "topic_id",
+        "status",
+        "published_at",
+        "withdrawn_at",
+        "position",
+        "created_at",
+        "updated_at",
+        "deletable",
+    }
+    assert body["title"] == "Lah, Leh and Lor"
+    assert body["content"] == "Body"
+    assert body["topic_id"] == str(topic.id)
+    assert body["status"] == "draft"
+    assert body["deletable"] is True
+
+
+def test_get_works_for_every_status(admin, db):
+    for status in LessonStatus:
+        lesson = _lesson(db, None, status=status)
+        assert _loaded(admin, lesson)["status"] == status.value
+
+
+def test_get_an_unknown_lesson_is_not_found(admin):
+    response = admin.get(_url(uuid.uuid4()))
+    assert response.status_code == 404
+    assert _code(response) == "lesson_not_found"
+
+
+# --- Create -------------------------------------------------------------------------------
+
+
+def test_create_an_empty_draft(admin, db):
+    response = admin.post(URL, json={})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["title"] == ""
+    assert body["content"] == ""
+    assert body["topic_id"] is None
+    assert body["status"] == "draft"
+    assert body["published_at"] is None
+    assert body["deletable"] is True
+    assert db.get(Lesson, uuid.UUID(body["id"])) is not None
+
+
+def test_create_with_every_field(admin, db):
+    topic = _topic(db, "Singlish")
+
+    response = admin.post(
+        URL,
+        json={"title": "  Lah  ", "content": "# Lah\n\n**Bold**", "topic_id": str(topic.id)},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["title"] == "Lah"  # trimmed
+    assert body["content"] == "# Lah\n\n**Bold**"  # kept exactly as written
+    assert body["topic_id"] == str(topic.id)
+
+
+def test_create_puts_the_draft_at_the_end_of_its_topic(admin, db):
+    topic = _topic(db, "Singlish")
+    _lesson(db, topic, "First", position=0)
+    _lesson(db, topic, "Second", position=5)
+
+    admin.post(URL, json={"title": "New", "topic_id": str(topic.id)})
+
+    assert _group_titles(admin, topic) == ["First", "Second", "New"]
+
+
+def test_create_without_a_topic_goes_at_the_end_of_lessons_with_no_topic(admin, db):
+    _lesson(db, None, "Loose", position=3)
+
+    admin.post(URL, json={"title": "New"})
+
+    assert _group_titles(admin, None) == ["Loose", "New"]
+
+
+def test_create_in_an_unknown_topic_is_refused(admin, db):
+    response = admin.post(URL, json={"topic_id": str(uuid.uuid4())})
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == {
+        "code": "topic_not_found",
+        "message": "That topic does not exist.",
+        "field": "topic_id",
+    }
+    assert db.query(Lesson).count() == 0
+
+
+def test_create_in_an_archived_topic_is_refused(admin, db):
+    topic = _topic(db, "Old", archived=True)
+
+    response = admin.post(URL, json={"topic_id": str(topic.id)})
+
+    assert response.status_code == 409
+    assert _code(response) == "topic_archived"
+    assert response.json()["detail"]["field"] == "topic_id"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("title", "x" * (MAX_LESSON_TITLE + 1)),
+        ("content", "x" * (MAX_LESSON_CONTENT + 1)),
+        ("title", None),
+        ("topic_id", "not-an-id"),
+    ],
+)
+def test_create_refuses_invalid_fields(admin, field, value):
+    response = admin.post(URL, json={field: value})
+    assert response.status_code == 422
+
+
+def test_a_title_at_the_limit_is_accepted_once_trimmed(admin):
+    title = "x" * MAX_LESSON_TITLE
+    response = admin.post(URL, json={"title": f"  {title}  "})
+    assert response.status_code == 201
+    assert response.json()["title"] == title
+
+
+def test_content_at_the_limit_is_accepted(admin):
+    response = admin.post(URL, json={"content": "x" * MAX_LESSON_CONTENT})
+    assert response.status_code == 201
+
+
+# --- Edit ---------------------------------------------------------------------------------
+
+
+def test_edit_a_draft(admin, db):
+    lesson = _lesson(db, None, "Old title")
+    before = _loaded(admin, lesson)
+
+    response = _save(admin, lesson, title="New title", content="New body")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["title"] == "New title"
+    assert body["content"] == "New body"
+    assert body["updated_at"] > before["updated_at"]
+
+
+def test_saving_empty_fields_is_allowed(admin, db):
+    topic = _topic(db, "Singlish")
+    lesson = _lesson(db, topic, "Title")
+
+    response = _save(admin, lesson, title="", content="", topic_id=None)
+
+    assert response.status_code == 200
+    assert response.json()["title"] == ""
+    assert response.json()["topic_id"] is None
+
+
+def test_fields_left_out_are_kept(admin, db):
+    topic = _topic(db, "Singlish")
+    lesson = _lesson(db, topic, "Title")
+
+    body = _save(admin, lesson, content="Only the body").json()
+
+    assert body["title"] == "Title"
+    assert body["topic_id"] == str(topic.id)
+    assert body["content"] == "Only the body"
+
+
+def test_a_save_that_changes_nothing_keeps_last_updated(admin, db):
+    topic = _topic(db, "Singlish")
+    lesson = _lesson(db, topic, "Title")
+    before = _loaded(admin, lesson)
+
+    response = _save(
+        admin,
+        lesson,
+        title=before["title"],
+        content=before["content"],
+        topic_id=before["topic_id"],
+    )
+
+    assert response.status_code == 200
+    assert response.json()["updated_at"] == before["updated_at"]
+    assert response.json()["position"] == before["position"]
+
+
+def test_changing_topic_moves_the_lesson_to_the_end_of_the_new_topic(admin, db):
+    old, new = _topic(db, "Old", position=0), _topic(db, "New", position=1)
+    _lesson(db, old, "Stays 1", position=0)
+    moving = _lesson(db, old, "Moving", position=1)
+    _lesson(db, old, "Stays 2", position=2)
+    _lesson(db, new, "Already there", position=7)
+
+    response = _save(admin, moving, topic_id=str(new.id))
+
+    assert response.status_code == 200
+    assert response.json()["position"] == 8
+    assert _group_titles(admin, new) == ["Already there", "Moving"]
+    # The topic it left keeps its order and its positions.
+    assert _group_titles(admin, old) == ["Stays 1", "Stays 2"]
+    positions = {row["title"]: row["position"] for row in admin.get(URL).json()}
+    assert positions["Stays 1"] == 0
+    assert positions["Stays 2"] == 2
+
+
+def test_removing_the_topic_moves_the_lesson_to_the_end_of_lessons_with_no_topic(admin, db):
+    topic = _topic(db, "Singlish")
+    _lesson(db, None, "Loose", position=4)
+    lesson = _lesson(db, topic, "Moving")
+
+    body = _save(admin, lesson, topic_id=None).json()
+
+    assert body["topic_id"] is None
+    assert _group_titles(admin, None) == ["Loose", "Moving"]
+
+
+def test_moving_into_an_unknown_or_archived_topic_is_refused(admin, db):
+    topic = _topic(db, "Singlish")
+    archived = _topic(db, "Old", archived=True)
+    lesson = _lesson(db, topic, "Title")
+
+    unknown = _save(admin, lesson, topic_id=str(uuid.uuid4()))
+    into_archived = _save(admin, lesson, topic_id=str(archived.id), title="Changed")
+
+    assert (unknown.status_code, _code(unknown)) == (404, "topic_not_found")
+    assert unknown.json()["detail"]["field"] == "topic_id"
+    assert (into_archived.status_code, _code(into_archived)) == (409, "topic_archived")
+    # Nothing in a refused save is kept.
+    assert _loaded(admin, lesson)["title"] == "Title"
+    assert _loaded(admin, lesson)["topic_id"] == str(topic.id)
+
+
+def test_a_lesson_already_in_an_archived_topic_keeps_saving(admin, db):
+    archived = _topic(db, "Old", archived=True)
+    lesson = _lesson(db, archived, "Title")
+
+    response = _save(admin, lesson, title="Edited", topic_id=str(archived.id))
+
+    assert response.status_code == 200
+    assert response.json()["topic_id"] == str(archived.id)
+
+
+@pytest.mark.parametrize("status", [LessonStatus.PUBLISHED, LessonStatus.WITHDRAWN])
+def test_only_drafts_can_be_edited(admin, db, status):
+    lesson = _lesson(db, None, "Title", status=status, published_at=datetime.now(UTC))
+
+    response = _save(admin, lesson, title="Changed")
+
+    assert response.status_code == 409
+    assert _code(response) == "lesson_not_draft"
+    assert _loaded(admin, lesson)["title"] == "Title"
+
+
+def test_a_save_from_an_out_of_date_editor_is_refused(admin, db):
+    lesson = _lesson(db, None, "Title")
+    first_tab = _loaded(admin, lesson)["updated_at"]
+    assert _save(admin, lesson, first_tab, title="Saved in another tab").status_code == 200
+
+    response = _save(admin, lesson, first_tab, title="Would overwrite it")
+
+    assert response.status_code == 409
+    assert _code(response) == "lesson_out_of_date"
+    assert _loaded(admin, lesson)["title"] == "Saved in another tab"
+
+
+def test_reordering_does_not_make_an_open_editor_out_of_date(admin, db):
+    topic = _topic(db, "Singlish")
+    a, b = _lesson(db, topic, "A", position=0), _lesson(db, topic, "B", position=1)
+    loaded = _loaded(admin, a)["updated_at"]
+    admin.put(
+        f"{URL}/order",
+        json={
+            "topic_id": str(topic.id),
+            "ids": [str(b.id), str(a.id)],
+            "previous_ids": [str(a.id), str(b.id)],
+        },
+    )
+
+    assert _save(admin, a, loaded, title="Edited").status_code == 200
+
+
+def test_a_save_needs_the_last_updated_time(admin, db):
+    lesson = _lesson(db, None)
+
+    missing = admin.patch(_url(lesson), json={"title": "x"})
+    without_time_zone = admin.patch(
+        _url(lesson), json={"title": "x", "updated_at": "2026-01-01T00:00:00"}
+    )
+
+    assert missing.status_code == 422
+    assert without_time_zone.status_code == 422
+
+
+def test_edit_an_unknown_lesson_is_not_found(admin):
+    response = _save(admin, uuid.uuid4(), "2026-01-01T00:00:00Z", title="x")
+    assert response.status_code == 404
+    assert _code(response) == "lesson_not_found"
+
+
+# --- Delete -------------------------------------------------------------------------------
+
+
+def test_delete_a_draft_with_its_quiz_question(admin, db):
+    lesson = _lesson(db, None)
+    question = QuizQuestion(lesson=lesson, prompt="?")
+    question.options = [QuizOption(text="A", is_correct=True, position=0)]
+    db.add(question)
+    db.commit()
+    lesson_id = lesson.id
+
+    response = _delete(admin, lesson)
+
+    assert response.status_code == 204
+    db.expire_all()
+    assert db.get(Lesson, lesson_id) is None
+    assert db.query(QuizQuestion).count() == 0
+    assert db.query(QuizOption).count() == 0
+    assert admin.get(_url(lesson_id)).status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("status", "published_at"),
+    [
+        (LessonStatus.PUBLISHED, datetime.now(UTC)),
+        (LessonStatus.WITHDRAWN, datetime.now(UTC)),
+        # Not possible yet, but a draft that was once published keeps its history.
+        (LessonStatus.DRAFT, datetime.now(UTC)),
+    ],
+)
+def test_a_lesson_that_was_ever_published_cannot_be_deleted(admin, db, status, published_at):
+    lesson = _lesson(db, None, status=status, published_at=published_at)
+    assert _loaded(admin, lesson)["deletable"] is False
+
+    response = _delete(admin, lesson)
+
+    assert response.status_code == 409
+    assert _code(response) == "lesson_not_deletable"
+    assert admin.get(_url(lesson)).status_code == 200
+
+
+def test_delete_from_an_out_of_date_editor_is_refused(admin, db):
+    lesson = _lesson(db, None, "Title")
+    loaded = _loaded(admin, lesson)["updated_at"]
+    _save(admin, lesson, loaded, title="Edited elsewhere")
+
+    response = _delete(admin, lesson, loaded)
+
+    assert response.status_code == 409
+    assert _code(response) == "lesson_out_of_date"
+    assert admin.get(_url(lesson)).status_code == 200
+
+
+def test_delete_an_unknown_lesson_is_not_found(admin):
+    response = _delete(admin, uuid.uuid4(), "2026-01-01T00:00:00Z")
+    assert response.status_code == 404
+    assert _code(response) == "lesson_not_found"
+
+
+def test_delete_needs_the_last_updated_time(admin, db):
+    lesson = _lesson(db, None)
+    assert admin.delete(_url(lesson)).status_code == 422
+
+
+def test_deleting_a_topics_only_lesson_lets_the_topic_be_deleted(admin, db):
+    topic = _topic(db, "Singlish")
+    lesson = _lesson(db, topic)
+    assert admin.delete(f"/api/admin/topics/{topic.id}").status_code == 409
+
+    _delete(admin, lesson)
+
+    assert admin.delete(f"/api/admin/topics/{topic.id}").status_code == 204
+
+
+# --- Users never see drafts (AC5) ---------------------------------------------------------
+
+
+def test_a_new_draft_changes_nobodys_progress(admin, db, make_user):
+    topic = _topic(db, "Singlish")
+    published = _lesson(db, topic, "Published", status=LessonStatus.PUBLISHED)
+    user = make_user(**USER)
+    db.add(LessonCompletion(user_id=user.id, lesson_id=published.id, answered_correctly=True))
+    db.commit()
+    assert admin.post("/api/auth/sign-in", json=USER).status_code == 200
+    before = admin.get("/api/progress").json()
+
+    draft = admin.post(URL, json={"title": "Draft", "topic_id": str(topic.id)}).json()
+    _save(admin, draft["id"], content="Still a draft")
+    # A draft in a topic with no published lessons must not add a circle either.
+    other = _topic(db, "Hawker", position=1)
+    admin.post(URL, json={"title": "Draft", "topic_id": str(other.id)})
+
+    after = admin.get("/api/progress").json()
+    assert after == before
+    assert after["available"] == 1
+
+
+# --- Access -------------------------------------------------------------------------------
+
+SOME_ID = "00000000-0000-0000-0000-000000000001"
+ROUTES = [
+    ("post", URL, {}),
+    ("get", f"{URL}/{SOME_ID}", None),
+    ("patch", f"{URL}/{SOME_ID}", {"updated_at": "2026-01-01T00:00:00Z"}),
+    ("delete", f"{URL}/{SOME_ID}?updated_at=2026-01-01T00:00:00Z", None),
+]
+
+
+@pytest.mark.parametrize(("method", "path", "body"), ROUTES)
+def test_signed_out_requests_are_refused(client, method, path, body):
+    response = client.request(method, path, json=body)
+    assert response.status_code == 401
+    assert _code(response) == "not_signed_in"
+
+
+@pytest.mark.parametrize(("method", "path", "body"), ROUTES)
+def test_a_normal_user_session_is_refused(client, make_user, method, path, body):
+    # As for every admin route: a user session gets the same 401 as no session at all.
+    make_user(**USER)
+    assert client.post("/api/auth/sign-in", json=USER).status_code == 200
+    response = client.request(method, path, json=body)
+    assert response.status_code == 401
+    assert _code(response) == "not_signed_in"
