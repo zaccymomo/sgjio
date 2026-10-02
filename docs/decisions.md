@@ -16,6 +16,8 @@ Several Sprint 1 stories leave a value open for the team to decide. The setup ta
 | Can topics be deleted?                  | SCRUM-57           | **Only if the topic has no lessons.** Otherwise it is **archived**: hidden from users, lessons and progress kept, restorable | `Topic.archived_at` in `api/app/models.py`                                    |
 | Order of topics and circles             | SCRUM-43, SCRUM-66 | **Set by administrators**; users' circles follow it, ties broken by name (was alphabetical)                                  | `Topic.position`, `api/app/progress.py`                                       |
 | Admin landing page: which view opens    | SCRUM-66 AC3       | **Topic order**, remembered per browser. "Recently updated" is one click away (differs from AC3)                             | `admin/src/pages/ContentPage.tsx`                                             |
+| Profile choices                         | SCRUM-14           | **Fixed lists** of 20 interests, 24 languages and 28 neighbourhoods (planning areas), not free text, so matching can compare | `api/app/profile_options.py`                                                  |
+| Can onboarding be skipped?              | SCRUM-14           | **Yes**, "Skip for now" goes home; Settings then offers "Set up". Continue still requires every field (AC2)                  | `web/src/pages/ProfileSetupPage.tsx`                                          |
 
 Already fixed by the stories, and built as written:
 
