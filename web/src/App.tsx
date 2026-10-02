@@ -6,7 +6,7 @@ import { ComingSoonPage } from "./pages/ComingSoonPage";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { HomePage } from "./pages/HomePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
-import { ProfileSetupPage } from "./pages/ProfileSetupPage";
+import { EditProfilePage, ProfileSetupPage } from "./pages/ProfileSetupPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
@@ -61,6 +61,8 @@ export function App() {
                 element={<ComingSoonPage title="Integration portfolio" module="Module 3" />}
               />
               <Route path="settings" element={<SettingsPage />} />
+              {/* The one profile editor, reached from Settings (SCRUM-14 AC4, SCRUM-41 AC5) */}
+              <Route path="settings/profile" element={<EditProfilePage />} />
             </Route>
           </Route>
 

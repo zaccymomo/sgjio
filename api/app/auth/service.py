@@ -83,6 +83,26 @@ class RegisterResult:
         return self.user is not None
 
 
+def new_password_problem(password: str, password_confirmation: str) -> FieldProblem | None:
+    """Why a new password is refused, or None. Shared by registration (SCRUM-61 AC4-AC5)
+    and the reset-password form (SCRUM-63 AC4, SCRUM-69 AC4)."""
+    if password != password_confirmation:
+        return FieldProblem(
+            field="password_confirmation",
+            code="password_mismatch",
+            message="The passwords do not match.",
+        )
+    failures = password_rule_failures(password)
+    if failures:
+        return FieldProblem(
+            field="password",
+            code="weak_password",
+            message=" ".join(failures),
+            failures=failures,
+        )
+    return None
+
+
 # Registration does say when an email is already in use, because the person needs to be
 # offered the sign-in page instead (AC2). Sign-in and "forgot password" deliberately do
 # not (SCRUM-62 AC2, SCRUM-63), so those pages cannot be used to check who has an account.
@@ -110,27 +130,9 @@ def register(
     """
     email = normalise_email(email)
 
-    if password != password_confirmation:
-        # AC5
-        return RegisterResult(
-            problem=FieldProblem(
-                field="password_confirmation",
-                code="password_mismatch",
-                message="The passwords do not match.",
-            )
-        )
-
-    failures = password_rule_failures(password)
-    if failures:
-        # AC4
-        return RegisterResult(
-            problem=FieldProblem(
-                field="password",
-                code="weak_password",
-                message=" ".join(failures),
-                failures=failures,
-            )
-        )
+    problem = new_password_problem(password, password_confirmation)
+    if problem is not None:
+        return RegisterResult(problem=problem)
 
     if db.scalar(select(User.id).where(User.email == email)) is not None:
         return RegisterResult(problem=EMAIL_TAKEN)
