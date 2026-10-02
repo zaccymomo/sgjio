@@ -1,47 +1,37 @@
 """Topic management for administrators (SCRUM-57), and the one rule users depend on.
 
-Routes stay thin: they call these functions and turn a TopicProblem into an HTTP error.
+Routes stay thin: they call these functions and turn a ContentProblem into an HTTP error.
 
 - names are trimmed by the request schema, 1-80 characters, and unique ignoring case
   (SCRUM-57 AC4). Archived topics still reserve their name and can still be renamed.
 - a topic is archived (hidden from users, lessons and progress kept) or, only when it has
   no lessons of any status, deleted. Deleting never falls back to archiving.
+- order (SCRUM-66): a new topic goes to the end, and so does a restored one, so the order
+  administrators set only ever covers active topics. A reorder must list every active
+  topic exactly once, and say which order it replaces; a page that was out of date is
+  refused rather than guessed at.
 """
 
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, case, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import Lesson, LessonStatus, Topic
+from app.problems import ContentProblem, check_reorder, topic_not_found
 
 
-class TopicProblem(Exception):
-    """A rule the request broke. `status_code` is the HTTP status the route answers with."""
-
-    def __init__(self, code: str, message: str, status_code: int, field: str | None = None):
-        super().__init__(message)
-        self.code = code
-        self.message = message
-        self.status_code = status_code
-        self.field = field
-
-
-def _not_found() -> TopicProblem:
-    return TopicProblem("topic_not_found", "That topic does not exist.", 404)
-
-
-def _name_taken() -> TopicProblem:
-    return TopicProblem(
+def _name_taken() -> ContentProblem:
+    return ContentProblem(
         "topic_name_taken", "A topic with this name already exists.", 409, field="name"
     )
 
 
-def _not_empty() -> TopicProblem:
-    return TopicProblem(
+def _not_empty() -> ContentProblem:
+    return ContentProblem(
         "topic_not_empty",
         "This topic has lessons, so it cannot be deleted. Archive it instead.",
         409,
@@ -53,6 +43,7 @@ class TopicSummary:
     id: uuid.UUID
     name: str
     archived_at: datetime | None
+    position: int
     lesson_count: int
     published_count: int
 
@@ -68,7 +59,7 @@ def visible_to_users(query: Select) -> Select:
 def _get(db: Session, topic_id: uuid.UUID) -> Topic:
     topic = db.get(Topic, topic_id)
     if topic is None:
-        raise _not_found()
+        raise topic_not_found()
     return topic
 
 
@@ -87,6 +78,7 @@ def _summary_query() -> Select:
             Topic.id,
             Topic.name,
             Topic.archived_at,
+            Topic.position,
             func.count(Lesson.id).label("lesson_count"),
             func.count(Lesson.id)
             .filter(Lesson.status == LessonStatus.PUBLISHED)
@@ -94,7 +86,7 @@ def _summary_query() -> Select:
         )
         .outerjoin(Lesson, Lesson.topic_id == Topic.id)
         .group_by(Topic.id)
-        .order_by(func.lower(Topic.name))
+        .order_by(Topic.position, Topic.created_at, Topic.id)
     )
 
 
@@ -103,14 +95,23 @@ def _summary(db: Session, topic_id: uuid.UUID) -> TopicSummary:
 
 
 def list_topics(db: Session) -> list[TopicSummary]:
-    """Every topic, archived included, with lesson counts over every status."""
+    """Every topic, archived included, in order, with lesson counts over every status."""
     return [TopicSummary(*row) for row in db.execute(_summary_query()).all()]
+
+
+def next_topic_position(db: Session) -> int:
+    """One past the highest position of any topic, archived ones included.
+
+    Counting archived topics means a restored topic lands after every position in use,
+    so it never ties with an active topic.
+    """
+    return db.scalar(select(func.coalesce(func.max(Topic.position) + 1, 0)))
 
 
 def create_topic(db: Session, name: str) -> TopicSummary:
     if _name_in_use(db, name):
         raise _name_taken()
-    topic = Topic(name=name)
+    topic = Topic(name=name, position=next_topic_position(db))
     db.add(topic)
     _commit_name(db)
     return _summary(db, topic.id)
@@ -144,10 +145,15 @@ def archive_topic(db: Session, topic_id: uuid.UUID) -> TopicSummary:
 
 
 def restore_topic(db: Session, topic_id: uuid.UUID) -> TopicSummary:
-    """Idempotent: restoring an active topic changes nothing."""
+    """Idempotent: restoring an active topic changes nothing, not even its position.
+
+    A restored topic goes to the end of the list rather than back to its old place, which
+    other topics may have moved into since.
+    """
     topic = _get(db, topic_id)
     if topic.archived_at is not None:
         topic.archived_at = None
+        topic.position = next_topic_position(db)
         db.commit()
     return _summary(db, topic.id)
 
@@ -164,3 +170,40 @@ def delete_topic(db: Session, topic_id: uuid.UUID) -> None:
         # A lesson was linked after the check; lessons.topic_id is ON DELETE RESTRICT.
         db.rollback()
         raise _not_empty() from None
+
+
+def reorder_topics(
+    db: Session, ids: list[uuid.UUID], previous_ids: list[uuid.UUID]
+) -> list[TopicSummary]:
+    """Put the active topics in the order `ids`, replacing the order `previous_ids`.
+
+    See check_reorder for what is refused. The active topics are locked first, so two
+    reorders, or a reorder and an archive, run one after the other instead of interleaving.
+    """
+    current = list(
+        db.scalars(
+            select(Topic.id)
+            .where(Topic.archived_at.is_(None))
+            .order_by(Topic.position, Topic.created_at, Topic.id)
+            .with_for_update()
+        )
+    )
+    try:
+        check_reorder(ids, previous_ids, current)
+    except ContentProblem:
+        db.rollback()
+        raise
+    if ids:
+        db.execute(
+            update(Topic)
+            .where(Topic.id.in_(ids))
+            # Setting updated_at to itself stops the ORM's onupdate from bumping it:
+            # moving a topic is not editing it.
+            .values(
+                position=case({topic_id: n for n, topic_id in enumerate(ids)}, value=Topic.id),
+                updated_at=Topic.updated_at,
+            )
+            .execution_options(synchronize_session=False)
+        )
+    db.commit()
+    return list_topics(db)
