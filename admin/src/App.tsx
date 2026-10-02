@@ -2,7 +2,8 @@ import { AdminLayout, AuthProvider, Button, RequireAuth, useAuth } from "@sgjio/
 import { useState } from "react";
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from "react-router-dom";
 
-import { LessonsPage } from "./pages/LessonsPage";
+import { ContentPage } from "./pages/ContentPage";
+import { LessonPlaceholderPage } from "./pages/LessonPlaceholderPage";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { SignInPage } from "./pages/SignInPage";
 
@@ -50,7 +51,10 @@ export function App() {
           {/* Administrators only: anyone else is sent to /sign-in?next=... */}
           <Route element={<RequireAuth />}>
             <Route element={<SignedInLayout />}>
-              <Route index element={<LessonsPage />} />
+              <Route index element={<ContentPage />} />
+              <Route path="/lessons/:id" element={<LessonPlaceholderPage />} />
+              {/* Topics used to have their own page; they now live on the content page. */}
+              <Route path="/topics" element={<Navigate to="/" replace />} />
             </Route>
           </Route>
 

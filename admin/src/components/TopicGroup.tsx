@@ -1,0 +1,232 @@
+import { cn } from "@sgjio/ui";
+import { Archive, ArchiveRestore, ChevronRight, FileText, Pencil, Trash2 } from "lucide-react";
+import { useId } from "react";
+
+import type { LessonSummary, Topic } from "../lib/content";
+import { lessonTitle, type Group } from "../lib/filter";
+import { formatDate, plural, topicSummary } from "../lib/format";
+import { DragHandle } from "./DragHandle";
+import { LessonRow } from "./LessonRow";
+import { lessonMenuGroups, moveItems } from "./menuItems";
+import { RowMenu, type MenuItem } from "./RowMenu";
+import { SortableList, type Reorder } from "./SortableList";
+
+export type TopicActions = {
+  rename: (topic: Topic) => void;
+  archive: (topic: Topic) => void;
+  remove: (topic: Topic) => void;
+  restore: (topic: Topic) => void;
+};
+
+/** Takes the drag handle's place where there is none, so names and titles line up. */
+const handleSpace = <span className="w-8 shrink-0" aria-hidden />;
+
+/**
+ * A topic as a collapsible row: a white header, which opens to show its lessons, in order,
+ * on a grey panel and indented, so they read as belonging to it. Every row has a drag
+ * handle and a ⋯ menu, which holds the topic's actions and Move up and Move down.
+ *
+ * Also used for the lessons with no topic (`group.topic` is null: no name to edit, never
+ * dragged) and for archived topics (no reordering, and Restore instead of Archive).
+ */
+export function TopicGroup({
+  group,
+  expanded,
+  onToggle,
+  reorder,
+  lessonReorder,
+  actions,
+  busy,
+}: {
+  group: Group;
+  expanded: boolean;
+  onToggle: () => void;
+  /** How the topic itself is reordered. Absent for the no-topic group and archived topics. */
+  reorder?: Reorder;
+  /** How its lessons are reordered. Absent when they cannot be (archived topics). */
+  lessonReorder?: {
+    disabled: boolean;
+    onReorder: (ids: string[], previousIds: string[]) => void;
+    onDragChange: (dragging: boolean) => void;
+  };
+  actions?: TopicActions;
+  /** A change to this topic is running. */
+  busy?: boolean;
+}) {
+  const panelId = useId();
+  const { topic, lessons, allLessons } = group;
+  const name = topic?.name ?? "No topic";
+  const archived = topic?.archived_at != null;
+
+  const meta = topic
+    ? [archived && `Archived ${formatDate(topic.archived_at!)}`, topicSummary(topic)]
+        .filter(Boolean)
+        .join(" · ")
+    : `Drafts not yet in a topic · ${plural(allLessons.length, "lesson")}`;
+
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-lg border border-line bg-white",
+        archived && "border-dashed",
+      )}
+    >
+      <div className="flex items-center gap-1 p-1">
+        {reorder ? <DragHandle reorder={reorder} /> : handleSpace}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          aria-controls={panelId}
+          className={cn(
+            "flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2 text-left hover:bg-surface",
+            "focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand",
+          )}
+        >
+          <ChevronRight
+            className={cn(
+              "size-4 shrink-0 text-muted transition-transform",
+              expanded && "rotate-90",
+            )}
+            aria-hidden
+          />
+          <span className="flex min-w-0 flex-1 flex-col gap-x-4 sm:flex-row sm:items-center sm:justify-between">
+            <span
+              className={cn(
+                "text-sm font-semibold break-words",
+                topic && !archived ? "text-ink" : "text-muted",
+              )}
+            >
+              {name}
+            </span>
+            <span className="shrink-0 text-caption text-muted">{meta}</span>
+          </span>
+        </button>
+        {topic && actions && (
+          <RowMenu
+            name={name}
+            groups={topicMenuGroups(topic, actions, reorder, busy)}
+            moveKey={reorder?.moveKey}
+          />
+        )}
+      </div>
+
+      {expanded && (
+        <div id={panelId} className="border-t border-line bg-surface">
+          {allLessons.length === 0 ? (
+            <p className="py-3 pr-4 pl-12 text-sm text-muted">
+              No lessons in this topic yet. Lessons are added with the lesson editor, which is
+              coming soon.
+            </p>
+          ) : (
+            <>
+              {lessons.length < allLessons.length && (
+                <p className="pt-2 pr-4 pl-12 text-caption text-muted">
+                  Showing {lessons.length} of {plural(allLessons.length, "lesson")}
+                </p>
+              )}
+              {lessonReorder ? (
+                <SortableList
+                  items={lessons}
+                  getId={(lesson) => lesson.id}
+                  getLabel={lessonTitle}
+                  disabled={lessonReorder.disabled}
+                  onReorder={lessonReorder.onReorder}
+                  onDragChange={lessonReorder.onDragChange}
+                  className={lessonListClass}
+                  itemClassName="bg-surface"
+                  renderItem={(lesson, lessonControls) => (
+                    <LessonRow
+                      lesson={lesson}
+                      handle={<DragHandle reorder={lessonControls} />}
+                      menu={
+                        <RowMenu
+                          name={lessonTitle(lesson)}
+                          groups={lessonMenuGroups(lesson, lessonControls)}
+                          moveKey={lessonControls.moveKey}
+                        />
+                      }
+                    />
+                  )}
+                  renderOverlay={(lesson) => <LessonOverlay lesson={lesson} />}
+                />
+              ) : (
+                <ul className={lessonListClass}>
+                  {lessons.map((lesson) => (
+                    <li key={lesson.id}>
+                      <LessonRow
+                        lesson={lesson}
+                        handle={handleSpace}
+                        menu={
+                          <RowMenu name={lessonTitle(lesson)} groups={lessonMenuGroups(lesson)} />
+                        }
+                      />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Indented so lesson titles begin to the right of the topic's name, with dividers that start
+// there too. On desktop each lesson's handle sits under the topic's chevron; on a phone the
+// indent is smaller, to leave room for the title.
+const lessonListClass = "ml-4 divide-y divide-line sm:ml-10";
+
+/**
+ * Rename, Move up, Move down, then Archive, or Delete while the topic has no lessons. An
+ * archived topic offers Rename, Restore, and Delete if it is empty.
+ */
+function topicMenuGroups(
+  topic: Topic,
+  actions: TopicActions,
+  reorder: Reorder | undefined,
+  busy: boolean | undefined,
+): MenuItem[][] {
+  const empty = topic.lesson_count === 0;
+  const rename: MenuItem = {
+    label: "Rename",
+    icon: Pencil,
+    onSelect: () => actions.rename(topic),
+    disabled: busy,
+  };
+  const remove: MenuItem = {
+    label: "Delete",
+    icon: Trash2,
+    onSelect: () => actions.remove(topic),
+    disabled: busy,
+    danger: true,
+  };
+
+  if (topic.archived_at !== null) {
+    const restore: MenuItem = {
+      label: "Restore",
+      icon: ArchiveRestore,
+      onSelect: () => actions.restore(topic),
+      disabled: busy,
+    };
+    return [[rename, restore], empty ? [remove] : []];
+  }
+
+  const archive: MenuItem = {
+    label: "Archive",
+    icon: Archive,
+    onSelect: () => actions.archive(topic),
+    disabled: busy,
+  };
+  return [[rename, ...(reorder ? moveItems(reorder) : [])], [empty ? remove : archive]];
+}
+
+function LessonOverlay({ lesson }: { lesson: LessonSummary }) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-md border border-line bg-white px-4 py-3 text-sm text-ink shadow-lg">
+      <FileText className="size-4 shrink-0 text-subtle" aria-hidden />
+      {lessonTitle(lesson)}
+    </div>
+  );
+}
