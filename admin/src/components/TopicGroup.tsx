@@ -1,5 +1,13 @@
 import { cn } from "@sgjio/ui";
-import { Archive, ArchiveRestore, ChevronRight, FileText, Pencil, Trash2 } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  ChevronRight,
+  FilePlus,
+  FileText,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { useId } from "react";
 
 import type { LessonSummary, Topic } from "../lib/content";
@@ -16,6 +24,8 @@ export type TopicActions = {
   archive: (topic: Topic) => void;
   remove: (topic: Topic) => void;
   restore: (topic: Topic) => void;
+  /** Open the lesson editor with this topic chosen (SCRUM-64). */
+  addLesson: (topic: Topic) => void;
 };
 
 /** Takes the drag handle's place where there is none, so names and titles line up. */
@@ -114,10 +124,18 @@ export function TopicGroup({
       {expanded && (
         <div id={panelId} className="border-t border-line bg-surface">
           {allLessons.length === 0 ? (
-            <p className="py-3 pr-4 pl-12 text-sm text-muted">
-              No lessons in this topic yet. Lessons are added with the lesson editor, which is
-              coming soon.
-            </p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 pr-4 pl-12 text-sm text-muted">
+              <p>No lessons in this topic yet.</p>
+              {topic && !archived && actions && (
+                <button
+                  type="button"
+                  onClick={() => actions.addLesson(topic)}
+                  className="rounded-sm font-semibold text-ink underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-brand"
+                >
+                  Add a lesson
+                </button>
+              )}
+            </div>
           ) : (
             <>
               {lessons.length < allLessons.length && (
@@ -179,8 +197,8 @@ export function TopicGroup({
 const lessonListClass = "ml-4 divide-y divide-line sm:ml-10";
 
 /**
- * Rename, Move up, Move down, then Archive, or Delete while the topic has no lessons. An
- * archived topic offers Rename, Restore, and Delete if it is empty.
+ * Add lesson, Rename, Move up, Move down, then Archive, or Delete while the topic has no
+ * lessons. An archived topic offers Rename, Restore, and Delete if it is empty.
  */
 function topicMenuGroups(
   topic: Topic,
@@ -213,13 +231,19 @@ function topicMenuGroups(
     return [[rename, restore], empty ? [remove] : []];
   }
 
+  const addLesson: MenuItem = {
+    label: "Add lesson",
+    icon: FilePlus,
+    onSelect: () => actions.addLesson(topic),
+    disabled: busy,
+  };
   const archive: MenuItem = {
     label: "Archive",
     icon: Archive,
     onSelect: () => actions.archive(topic),
     disabled: busy,
   };
-  return [[rename, ...(reorder ? moveItems(reorder) : [])], [empty ? remove : archive]];
+  return [[addLesson, rename, ...(reorder ? moveItems(reorder) : [])], [empty ? remove : archive]];
 }
 
 function LessonOverlay({ lesson }: { lesson: LessonSummary }) {

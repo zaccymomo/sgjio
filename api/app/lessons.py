@@ -1,4 +1,5 @@
-"""The administrators' list of lessons and their order (SCRUM-66).
+"""The administrators' lessons: the list and its order (SCRUM-66), and writing drafts
+(SCRUM-64).
 
 Routes stay thin: they call these functions and turn a ContentProblem into an HTTP error.
 
@@ -12,6 +13,15 @@ Routes stay thin: they call these functions and turn a ContentProblem into an HT
   than guessed at.
 - reordering never changes a lesson's "last updated" time, which the list sorts by
   (SCRUM-66 AC3): moving a lesson is not editing it.
+- a lesson is created as a draft at the end of its topic, and every field may be empty:
+  required fields are checked only when publishing (SCRUM-56, SCRUM-70).
+- only drafts are edited here; published lessons are edited or withdrawn (SCRUM-52).
+- an edit or delete names the "last updated" time the editor loaded, and is refused if the
+  lesson has changed since, so one save never silently overwrites another.
+- only a lesson that has never been published can be deleted: deleting a lesson deletes
+  everyone's completions of it, which published lessons must keep (SCRUM-52 AC4).
+- a lesson can be moved into any active topic, but not into an archived one. A lesson that
+  is already in an archived topic keeps saving there.
 """
 
 import uuid
@@ -22,7 +32,16 @@ from sqlalchemy import ColumnElement, case, func, select, update
 from sqlalchemy.orm import Session
 
 from app.models import Lesson, LessonStatus, Topic
-from app.problems import ContentProblem, check_reorder, topic_not_found
+from app.problems import (
+    ContentProblem,
+    check_reorder,
+    lesson_not_deletable,
+    lesson_not_draft,
+    lesson_not_found,
+    lesson_out_of_date,
+    topic_archived,
+    topic_not_found,
+)
 
 
 @dataclass(frozen=True)
@@ -33,6 +52,44 @@ class LessonSummary:
     status: LessonStatus
     updated_at: datetime
     position: int
+
+
+@dataclass(frozen=True)
+class LessonDetail:
+    """One lesson as the editor needs it, body included."""
+
+    id: uuid.UUID
+    title: str
+    content: str
+    topic_id: uuid.UUID | None
+    status: LessonStatus
+    published_at: datetime | None
+    withdrawn_at: datetime | None
+    position: int
+    created_at: datetime
+    updated_at: datetime
+    deletable: bool
+
+
+def _deletable(lesson: Lesson) -> bool:
+    """A draft that has never been published. Lives here so the page does not repeat it."""
+    return lesson.status == LessonStatus.DRAFT and lesson.published_at is None
+
+
+def _detail(lesson: Lesson) -> LessonDetail:
+    return LessonDetail(
+        id=lesson.id,
+        title=lesson.title,
+        content=lesson.content,
+        topic_id=lesson.topic_id,
+        status=lesson.status,
+        published_at=lesson.published_at,
+        withdrawn_at=lesson.withdrawn_at,
+        position=lesson.position,
+        created_at=lesson.created_at,
+        updated_at=lesson.updated_at,
+        deletable=_deletable(lesson),
+    )
 
 
 def _in_group(topic_id: uuid.UUID | None) -> ColumnElement[bool]:
@@ -113,3 +170,94 @@ def reorder_lessons(
         )
     db.commit()
     return list_lessons(db)
+
+
+# --- Writing drafts (SCRUM-64) ------------------------------------------------------------
+
+
+def _check_topic(db: Session, topic_id: uuid.UUID) -> None:
+    """A topic a lesson may be put in: one that exists and is not archived."""
+    topic = db.get(Topic, topic_id)
+    if topic is None:
+        raise topic_not_found(field="topic_id")
+    if topic.archived_at is not None:
+        raise topic_archived(field="topic_id")
+
+
+def get_lesson(db: Session, lesson_id: uuid.UUID) -> LessonDetail:
+    lesson = db.get(Lesson, lesson_id)
+    if lesson is None:
+        raise lesson_not_found()
+    return _detail(lesson)
+
+
+def create_lesson(
+    db: Session, title: str = "", content: str = "", topic_id: uuid.UUID | None = None
+) -> LessonDetail:
+    """A new draft, at the end of its topic (or of the lessons with no topic)."""
+    if topic_id is not None:
+        _check_topic(db, topic_id)
+    lesson = Lesson(
+        title=title,
+        content=content,
+        topic_id=topic_id,
+        status=LessonStatus.DRAFT,
+        position=next_lesson_position(db, topic_id),
+    )
+    db.add(lesson)
+    db.commit()
+    return _detail(lesson)
+
+
+def update_lesson(
+    db: Session, lesson_id: uuid.UUID, expected_updated_at: datetime, changes: dict
+) -> LessonDetail:
+    """Change a draft's `title`, `content` or `topic_id`: whichever `changes` holds.
+
+    A save that changes nothing leaves "last updated" alone, since the ORM only writes
+    (and only bumps updated_at) when a value differs. A new topic puts the lesson at the
+    end of that topic; the lessons it leaves keep their positions, gap and all.
+    """
+    try:
+        lesson = db.get(Lesson, lesson_id, with_for_update=True)
+        if lesson is None:
+            raise lesson_not_found()
+        # Checked before the date, since a lesson published meanwhile has a new date too,
+        # and "not a draft" is the more useful thing to say.
+        if lesson.status != LessonStatus.DRAFT:
+            raise lesson_not_draft()
+        if lesson.updated_at != expected_updated_at:
+            raise lesson_out_of_date()
+        if "topic_id" in changes and changes["topic_id"] != lesson.topic_id:
+            topic_id = changes["topic_id"]
+            if topic_id is not None:
+                _check_topic(db, topic_id)
+            # Worked out before the move, so the lesson does not count itself.
+            position = next_lesson_position(db, topic_id)
+            lesson.topic_id = topic_id
+            lesson.position = position
+        for field in ("title", "content"):
+            if field in changes and changes[field] != getattr(lesson, field):
+                setattr(lesson, field, changes[field])
+    except ContentProblem:
+        db.rollback()
+        raise
+    db.commit()
+    return _detail(lesson)
+
+
+def delete_lesson(db: Session, lesson_id: uuid.UUID, expected_updated_at: datetime) -> None:
+    """Delete a lesson that has never been published, with its quiz question."""
+    try:
+        lesson = db.get(Lesson, lesson_id, with_for_update=True)
+        if lesson is None:
+            raise lesson_not_found()
+        if not _deletable(lesson):
+            raise lesson_not_deletable()
+        if lesson.updated_at != expected_updated_at:
+            raise lesson_out_of_date()
+    except ContentProblem:
+        db.rollback()
+        raise
+    db.delete(lesson)
+    db.commit()

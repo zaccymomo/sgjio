@@ -1,4 +1,4 @@
-"""Errors the content-management logic raises (SCRUM-57, SCRUM-66).
+"""Errors the content-management logic raises (SCRUM-57, SCRUM-66, SCRUM-64).
 
 Routes catch a ContentProblem and answer with {"detail": {"code", "message", "field"?}},
 the shape the front end reads through ApiError.
@@ -18,8 +18,46 @@ class ContentProblem(Exception):
         self.field = field
 
 
-def topic_not_found() -> ContentProblem:
-    return ContentProblem("topic_not_found", "That topic does not exist.", 404)
+def topic_not_found(field: str | None = None) -> ContentProblem:
+    """`field` is set when the topic came from a form field rather than the URL."""
+    return ContentProblem("topic_not_found", "That topic does not exist.", 404, field=field)
+
+
+def topic_archived(field: str | None = None) -> ContentProblem:
+    return ContentProblem(
+        "topic_archived",
+        "That topic is archived. Choose another topic, or restore it first.",
+        409,
+        field=field,
+    )
+
+
+def lesson_not_found() -> ContentProblem:
+    return ContentProblem("lesson_not_found", "That lesson no longer exists.", 404)
+
+
+def lesson_not_draft() -> ContentProblem:
+    return ContentProblem(
+        "lesson_not_draft",
+        "Only drafts can be edited here. Published lessons are edited or withdrawn instead.",
+        409,
+    )
+
+
+def lesson_not_deletable() -> ContentProblem:
+    return ContentProblem(
+        "lesson_not_deletable",
+        "This lesson has been published, so it cannot be deleted. Withdraw it instead.",
+        409,
+    )
+
+
+def lesson_out_of_date() -> ContentProblem:
+    return ContentProblem(
+        "lesson_out_of_date",
+        "This lesson was changed in another tab or by another administrator since you opened it.",
+        409,
+    )
 
 
 def order_out_of_date() -> ContentProblem:
