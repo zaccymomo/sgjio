@@ -9,6 +9,10 @@ Creates:
   something to show while SCRUM-15 (answering a quiz) is still to be built
 
 Every lesson is short enough to read in under two minutes (SCRUM-6 AC3).
+
+Topics and lessons get a position only when the seed creates them, appended after anything
+already there, so a fresh database gets the Figma order and re-seeding never undoes an
+order an administrator has set (SCRUM-66).
 """
 
 from datetime import UTC, datetime
@@ -18,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import normalise_email
 from app.config import get_settings
+from app.lessons import next_lesson_position
 from app.models import (
     Lesson,
     LessonCompletion,
@@ -31,7 +36,9 @@ from app.models import (
     UserType,
 )
 from app.security import hash_password
+from app.topics import next_topic_position
 
+# In the Figma home screen's order, which is the order a fresh database starts in.
 TOPICS = [
     "Singlish",
     "Hawker & Food",
@@ -568,11 +575,12 @@ def _get_or_create_user(
     return user, True
 
 
-def _create_lesson(spec: dict, topic: Topic) -> Lesson:
+def _create_lesson(spec: dict, topic: Topic, position: int) -> Lesson:
     lesson = Lesson(
         title=spec["title"],
         content=spec["content"],
         topic=topic,
+        position=position,
         status=LessonStatus.PUBLISHED,
         published_at=datetime.now(UTC),
     )
@@ -653,19 +661,26 @@ def seed(db: Session) -> list[str]:
         log.append(f"user account {user.email}")
 
     topics: dict[str, Topic] = {}
+    next_position = next_topic_position(db)
     for name in TOPICS:
         topic = db.scalar(select(Topic).where(func.lower(Topic.name) == name.lower()))
         if topic is None:
-            topic = Topic(name=name)
+            topic = Topic(name=name, position=next_position)
+            next_position += 1
             db.add(topic)
             log.append(f"topic {name}")
         topics[name] = topic
     db.flush()
 
     added = 0
+    next_lesson: dict[str, int] = {}
     for spec in LESSONS:
         if db.scalar(select(Lesson).where(Lesson.title == spec["title"])) is None:
-            db.add(_create_lesson(spec, topics[spec["topic"]]))
+            topic = topics[spec["topic"]]
+            if spec["topic"] not in next_lesson:
+                next_lesson[spec["topic"]] = next_lesson_position(db, topic.id)
+            db.add(_create_lesson(spec, topic, next_lesson[spec["topic"]]))
+            next_lesson[spec["topic"]] += 1
             added += 1
     if added:
         log.append(f"{added} published lesson(s) with quizzes")

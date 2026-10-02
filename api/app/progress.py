@@ -57,8 +57,9 @@ def _topic_rows(user_id: uuid.UUID) -> Select:
         .join(Lesson, published_lessons)
         .outerjoin(LessonCompletion, this_users_completions)
         .group_by(Topic.id, Topic.name)
-        # Alphabetical, so the circles do not move around between visits.
-        .order_by(Topic.name)
+        # In the order administrators set (SCRUM-66), so the circles stay put between
+        # visits; the name breaks any tie.
+        .order_by(Topic.position, Topic.name)
     )
     return visible_to_users(query)
 

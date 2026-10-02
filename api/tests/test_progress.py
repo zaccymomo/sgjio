@@ -13,8 +13,8 @@ from app.models import Lesson, LessonCompletion, LessonStatus, Topic
 USER = {"email": "user@example.com", "password": "Password123"}
 
 
-def _topic(db, name: str) -> Topic:
-    topic = Topic(name=name)
+def _topic(db, name: str, position: int = 0) -> Topic:
+    topic = Topic(name=name, position=position)
     db.add(topic)
     db.commit()
     return topic
@@ -76,13 +76,28 @@ def test_a_topic_whose_only_lessons_are_drafts_has_no_circle(client, db, make_us
     assert client.get("/api/progress").json()["topics"] == []
 
 
-def test_topics_come_back_in_a_stable_order(client, db, make_user):
+def test_circles_follow_the_order_administrators_set(client, db, make_user):
     _sign_in(client, make_user)
-    for name in ["Workplace", "Festivals", "Singlish"]:
-        _lesson(db, _topic(db, name), f"{name} lesson")
+    for position, name in enumerate(["Workplace", "Festivals", "Singlish"]):
+        _lesson(db, _topic(db, name, position), f"{name} lesson")
 
     topics = client.get("/api/progress").json()["topics"]
-    assert [topic["name"] for topic in topics] == ["Festivals", "Singlish", "Workplace"]
+    assert [topic["name"] for topic in topics] == ["Workplace", "Festivals", "Singlish"]
+
+
+def test_circles_in_the_same_position_fall_back_to_name(client, db, make_user):
+    _sign_in(client, make_user)
+    for name in ["Workplace", "Festivals", "Singlish"]:
+        _lesson(db, _topic(db, name, position=3), f"{name} lesson")
+    _lesson(db, _topic(db, "Hawker & Food", position=9), "Hawker lesson")
+
+    topics = client.get("/api/progress").json()["topics"]
+    assert [topic["name"] for topic in topics] == [
+        "Festivals",
+        "Singlish",
+        "Workplace",
+        "Hawker & Food",
+    ]
 
 
 # --- Archived topics are hidden (SCRUM-57) -------------------------------------------------

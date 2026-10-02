@@ -16,7 +16,7 @@ from pydantic import (
 )
 
 from app.auth import normalise_email
-from app.models import UserRole, UserType
+from app.models import LessonStatus, UserRole, UserType
 
 # Email syntax check for registration. Built once: TypeAdapter compiles a validator.
 _EMAIL = TypeAdapter(EmailStr)
@@ -127,5 +127,49 @@ class TopicOut(BaseModel):
     id: uuid.UUID
     name: str
     archived_at: datetime | None
+    position: int
     lesson_count: int
     published_count: int
+
+
+# --- Content order (SCRUM-66) -------------------------------------------------------------
+
+# Far more than the portal will ever hold, but a bound on what one request can send.
+MAX_ORDER_IDS = 1000
+
+
+class LessonSummaryOut(BaseModel):
+    """A lesson as the admin portal lists it. The body is left out to keep the list light."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    topic_id: uuid.UUID | None
+    status: LessonStatus
+    updated_at: datetime
+    position: int
+
+
+class OrderRequest(BaseModel):
+    """A list's ids in the new order, and in the order the page showed before the move.
+
+    The second list is how the server notices a page that is out of date (check_reorder).
+    """
+
+    ids: list[uuid.UUID] = Field(max_length=MAX_ORDER_IDS)
+    previous_ids: list[uuid.UUID] = Field(max_length=MAX_ORDER_IDS)
+
+
+class TopicOrderRequest(OrderRequest):
+    """Every active topic, in the new order and in the order the page showed."""
+
+
+class LessonOrderRequest(OrderRequest):
+    """Every lesson's id in one topic, in the new order and in the order the page showed.
+
+    `topic_id` is required but may be null, meaning the lessons with no topic. Requiring it
+    means a request that forgets it is refused instead of reordering the wrong group.
+    """
+
+    topic_id: uuid.UUID | None
