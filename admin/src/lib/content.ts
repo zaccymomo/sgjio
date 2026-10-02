@@ -36,6 +36,7 @@ const TOPICS = "/api/admin/topics";
 const LESSONS = "/api/admin/lessons";
 
 export const topicApi = {
+  list: (signal?: AbortSignal) => apiFetch<Topic[]>(TOPICS, { signal }),
   create: (name: string) => apiFetch<Topic>(TOPICS, { method: "POST", body: { name } }),
   rename: (id: string, name: string) =>
     apiFetch<Topic>(`${TOPICS}/${id}`, { method: "PATCH", body: { name } }),
@@ -76,12 +77,14 @@ export type Notice = { tone: "success" | "error" | "info"; message: string };
  * - the reorder functions move things on screen at once, then save. If the save fails they
  *   put the old order back; if the list was out of date they load the latest one instead.
  *   While a save runs, `saving` is true and the page disables reordering.
+ *
+ * `initialNotice` is a message another page sent along, e.g. "deleted" from the editor.
  */
-export function useContent() {
+export function useContent(initialNotice: Notice | null = null) {
   const { refresh: recheckSession } = useAuth();
   const [state, setState] = useState<State>({ status: "loading" });
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(initialNotice);
   // A drag or a save in progress. A quiet refresh then would move rows under the pointer.
   const busy = useRef(false);
 
