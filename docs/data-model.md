@@ -30,7 +30,8 @@ erDiagram
     }
     topics {
         uuid id PK
-        string name UK "unique ignoring case"
+        string name UK "unique ignoring case, archived topics included"
+        timestamptz archived_at "null = active"
     }
     lessons {
         uuid id PK
@@ -94,6 +95,7 @@ erDiagram
 - **Tokens are stored hashed.** The raw session and reset tokens only exist in the browser cookie or the emailed link. A copy of the database cannot be used to sign in.
 - **A lesson belongs to one topic.** This keeps the progress-circle arithmetic simple, as assumed in SCRUM-56. A draft may have no topic yet; publishing requires one.
 - **Withdrawn lessons are kept, not deleted** (`status = withdrawn`), so users' history still shows lessons they completed (SCRUM-52 AC4).
+- **Topics are archived, or deleted only when empty** (SCRUM-57). `archived_at` is a nullable timestamp: empty means active. Archiving hides the topic from users, including its progress circle and the overall figure, but keeps its lessons and everyone's completions, so restoring brings it all back. A topic with no lessons of any status can be deleted outright; otherwise the administrator must archive it. Archived topics keep reserving their name, so the unique index stays as is, and they can still be renamed. A timestamp was chosen over a flag or status column because there are only two states and the date is useful to show.
 - **Enumerations are stored as text with a CHECK constraint**, not native Postgres enums, so adding a value later is a simple migration.
 - **Completion is one row per user per lesson** (`lesson_completions`, SCRUM-16). It is written the first time the quiz is answered, right or wrong (AC3), and the unique constraint on `(user_id, lesson_id)` is what makes completion count once however many times the quiz is retaken (AC5, AC6).
 - **Correctness is a column on that row, not a second table.** `answered_correctly` holds the _best_ result so far, so a later wrong answer never clears an earlier correct one (SCRUM-16 AC5). Completion feeds the progress circles; correctness feeds tiers (SCRUM-27).

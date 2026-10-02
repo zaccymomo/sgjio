@@ -13,6 +13,7 @@ Several Sprint 1 stories leave a value open for the team to decide. The setup ta
 | How are administrators created?         | SCRUM-68           | Seeded, or `python -m app.cli create-admin`                                                                                  | `api/app/cli.py`                                                              |
 | Can a lesson be in more than one topic? | SCRUM-56           | **No, exactly one** (as the story assumes)                                                                                   | `Lesson.topic_id` in `api/app/models.py`                                      |
 | Removed lessons: withdrawn or deleted?  | SCRUM-52           | **Withdrawn** (kept for users' history), as criterion 4 assumes                                                              | `LessonStatus.WITHDRAWN`                                                      |
+| Can topics be deleted?                  | SCRUM-57           | **Only if the topic has no lessons.** Otherwise it is **archived**: hidden from users, lessons and progress kept, restorable | `Topic.archived_at` in `api/app/models.py`                                    |
 
 Already fixed by the stories, and built as written:
 
