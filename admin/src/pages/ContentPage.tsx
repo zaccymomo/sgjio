@@ -1,6 +1,7 @@
 import { Alert, ApiError, Button, ErrorState, Spinner, cn } from "@sgjio/ui";
 import { ChevronRight, GripVertical, Plus, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import { ContentToolbar, type View } from "../components/ContentToolbar";
 import { LessonRow } from "../components/LessonRow";
@@ -48,7 +49,13 @@ function messageOf(error: unknown, fallback: string): string {
  * and topics are created, renamed, archived, restored and deleted (SCRUM-57).
  */
 export function ContentPage() {
-  const content = useContent();
+  const location = useLocation();
+  const navigate = useNavigate();
+  // A message the lesson editor sent along, e.g. after deleting a draft.
+  const [passedNotice] = useState(
+    () => (location.state as { notice?: Notice } | null)?.notice ?? null,
+  );
+  const content = useContent(passedNotice);
   const { state, notice, setNotice, retry } = content;
   const [view, setView] = useState<View>(readView);
   const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
@@ -67,6 +74,13 @@ export function ContentPage() {
       headingRef.current?.focus();
     }
   });
+
+  // Shown once: clear it from history, so going back or reloading does not show it again.
+  useEffect(() => {
+    if ((location.state as { notice?: Notice } | null)?.notice) {
+      navigate(location.pathname + location.search, { replace: true, state: null });
+    }
+  }, [location, navigate]);
 
   // Success messages clear themselves; errors stay until dismissed or replaced.
   useEffect(() => {
@@ -161,6 +175,7 @@ export function ContentPage() {
     archive: (topic) => openConfirm("archive", topic),
     remove: (topic) => openConfirm("delete", topic),
     restore: (topic) => void restore(topic),
+    addLesson: (topic) => navigate(`/lessons/new?${new URLSearchParams({ topic: topic.id })}`),
   };
 
   return (
@@ -174,23 +189,20 @@ export function ContentPage() {
             Topics appear as progress circles on users&rsquo; home page, in the order shown here.
           </p>
         </div>
-        <div className="flex flex-col gap-1.5 sm:items-end">
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              className="flex-1 sm:flex-none"
-              onClick={() => setNameDialog({ mode: "create" })}
-              disabled={!data}
-            >
-              <Plus className="size-4" aria-hidden />
-              New topic
-            </Button>
-            <Button className="flex-1 sm:flex-none" disabled>
-              <Plus className="size-4" aria-hidden />
-              New lesson
-            </Button>
-          </div>
-          <p className="text-caption text-subtle">New lesson arrives with the lesson editor.</p>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            className="flex-1 sm:flex-none"
+            onClick={() => setNameDialog({ mode: "create" })}
+            disabled={!data}
+          >
+            <Plus className="size-4" aria-hidden />
+            New topic
+          </Button>
+          <Button className="flex-1 sm:flex-none" onClick={() => navigate("/lessons/new")}>
+            <Plus className="size-4" aria-hidden />
+            New lesson
+          </Button>
         </div>
       </div>
 
@@ -564,7 +576,7 @@ function RecentList({
     ) : (
       // SCRUM-66 AC6
       <EmptyCard title="No lessons yet">
-        <p>Lessons are created with New lesson, which arrives with the lesson editor.</p>
+        <p>Create one with New lesson.</p>
       </EmptyCard>
     );
   }
