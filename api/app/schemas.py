@@ -82,6 +82,35 @@ class SignInResponse(BaseModel):
     user: UserOut
 
 
+class PasswordResetRequest(BaseModel):
+    """An email submitted from either "Forgot password" page.
+
+    This deliberately accepts any non-empty string rather than validating email syntax.
+    Reset requests must look the same whether an account exists, is an administrator, or
+    is not, so the endpoint must not return a revealing validation error.
+    """
+
+    email: str = Field(min_length=1, max_length=254)
+
+
+class PasswordResetTokenStatus(BaseModel):
+    """Whether an emailed reset link can still be used."""
+
+    valid: bool
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """A one-time token and replacement password from a reset form."""
+
+    token: str = Field(min_length=1, max_length=256)
+    password: str = Field(min_length=1, max_length=256)
+    password_confirmation: str = Field(min_length=1, max_length=256)
+
+
+class PasswordResetConfirmResponse(BaseModel):
+    message: str
+
+
 class ErrorDetail(BaseModel):
     """Shape of `detail` in every error response the front ends need to understand."""
 
