@@ -8,10 +8,16 @@ accounts are made with `python -m app.cli create-admin` (SCRUM-68).
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.auth.deps import require_admin, require_user
+from app.auth.reset import (
+    check_reset_token,
+    consume_reset_token,
+    request_password_reset,
+    set_new_password,
+)
 from app.auth.service import register, sign_in
 from app.auth.sessions import (
     COOKIE_NAMES,
@@ -22,11 +28,26 @@ from app.auth.sessions import (
 )
 from app.db import get_db
 from app.models import AuthScope, User
-from app.schemas import RegisterRequest, RegisterResponse, SignInRequest, SignInResponse, UserOut
+from app.schemas import (
+    PasswordResetConfirmRequest,
+    PasswordResetConfirmResponse,
+    PasswordResetRequest,
+    PasswordResetTokenStatus,
+    RegisterRequest,
+    RegisterResponse,
+    SignInRequest,
+    SignInResponse,
+    UserOut,
+)
+from app.security import password_rule_failures
 
 INVALID_CREDENTIALS = {
     "code": "invalid_credentials",
     "message": "The email or password is incorrect.",
+}
+INVALID_RESET_TOKEN = {
+    "code": "invalid_reset_token",
+    "message": "This password reset link is no longer valid. Request a new one.",
 }
 
 # An email already in use is a conflict; everything else registration refuses is the shape
@@ -122,5 +143,62 @@ def build_auth_router(scope: AuthScope) -> APIRouter:
     @router.get("/me", response_model=UserOut, responses={401: {"description": "Signed out"}})
     def me_route(user: User = Depends(guard)) -> User:
         return user
+
+    @router.post("/password-reset/request", status_code=status.HTTP_204_NO_CONTENT)
+    def password_reset_request_route(
+        body: PasswordResetRequest, db: Session = Depends(get_db)
+    ) -> None:
+        """Request a one-time reset email without revealing account membership.
+
+        For the admin portal this only sends mail to administrator accounts. The response
+        is identical for every submitted email (SCRUM-69 AC2).
+        """
+        request_password_reset(db, body.email, scope)
+
+    @router.get("/password-reset/validate", response_model=PasswordResetTokenStatus)
+    def password_reset_validate_route(
+        token: str = Query(min_length=1, max_length=256), db: Session = Depends(get_db)
+    ) -> PasswordResetTokenStatus:
+        """Let the reset page explain an expired or used link before showing its form."""
+        return PasswordResetTokenStatus(valid=check_reset_token(db, token, scope) is not None)
+
+    @router.post(
+        "/password-reset/confirm",
+        response_model=PasswordResetConfirmResponse,
+        responses={400: {"description": "The reset link is expired, used, or invalid"}},
+    )
+    def password_reset_confirm_route(
+        body: PasswordResetConfirmRequest, db: Session = Depends(get_db)
+    ) -> PasswordResetConfirmResponse:
+        """Replace a password exactly once, enforcing the shared password policy."""
+        # Check password input first. A malformed submission must not consume a valid link.
+        if body.password != body.password_confirmation:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={
+                    "code": "password_mismatch",
+                    "message": "The passwords do not match.",
+                    "field": "password_confirmation",
+                },
+            )
+        failures = password_rule_failures(body.password)
+        if failures:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={
+                    "code": "weak_password",
+                    "message": " ".join(failures),
+                    "field": "password",
+                    "failures": failures,
+                },
+            )
+
+        # Consuming is deliberately last: it makes the token single-use and handles two
+        # browser tabs racing to submit the same link.
+        user = consume_reset_token(db, body.token, scope)
+        if user is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=INVALID_RESET_TOKEN)
+        set_new_password(db, user, body.password)
+        return PasswordResetConfirmResponse(message="Your password has been reset.")
 
     return router
