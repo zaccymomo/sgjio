@@ -9,11 +9,18 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app import topics
+from app import lessons, topics
 from app.auth.deps import require_admin
 from app.db import get_db
 from app.models import User
-from app.schemas import TopicOut, TopicRequest
+from app.problems import ContentProblem
+from app.schemas import (
+    LessonOrderRequest,
+    LessonSummaryOut,
+    TopicOrderRequest,
+    TopicOut,
+    TopicRequest,
+)
 
 router = APIRouter(dependencies=[Depends(require_admin)])
 
@@ -28,9 +35,10 @@ def admin_ping(admin: User = Depends(require_admin)) -> dict:
 
 NOT_FOUND = {404: {"description": "No topic with that id (topic_not_found)"}}
 NAME_TAKEN = {409: {"description": "Another topic has that name (topic_name_taken)"}}
+OUT_OF_DATE = {409: {"description": "The page's list is out of date (order_out_of_date)"}}
 
 
-def _refuse(problem: topics.TopicProblem) -> HTTPException:
+def _refuse(problem: ContentProblem) -> HTTPException:
     detail = {"code": problem.code, "message": problem.message}
     if problem.field:
         detail["field"] = problem.field
@@ -43,6 +51,20 @@ def list_topics(db: Session = Depends(get_db)) -> list[topics.TopicSummary]:
     return topics.list_topics(db)
 
 
+# Declared before the /topics/{topic_id} routes, so "order" is never read as a topic id.
+@router.put("/topics/order", response_model=list[TopicOut], responses=OUT_OF_DATE)
+def reorder_topics(
+    body: TopicOrderRequest, db: Session = Depends(get_db)
+) -> list[topics.TopicSummary]:
+    """Set the order of the active topics (SCRUM-66), which is also the order of users'
+    circles. List every active topic exactly once, plus the order the page showed; a
+    page that was out of date gets 409 order_out_of_date. Returns every topic, in order."""
+    try:
+        return topics.reorder_topics(db, body.ids, body.previous_ids)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
 @router.post(
     "/topics",
     response_model=TopicOut,
@@ -52,7 +74,7 @@ def list_topics(db: Session = Depends(get_db)) -> list[topics.TopicSummary]:
 def create_topic(body: TopicRequest, db: Session = Depends(get_db)) -> topics.TopicSummary:
     try:
         return topics.create_topic(db, body.name)
-    except topics.TopicProblem as problem:
+    except ContentProblem as problem:
         raise _refuse(problem) from None
 
 
@@ -62,7 +84,7 @@ def rename_topic(
 ) -> topics.TopicSummary:
     try:
         return topics.rename_topic(db, topic_id, body.name)
-    except topics.TopicProblem as problem:
+    except ContentProblem as problem:
         raise _refuse(problem) from None
 
 
@@ -71,7 +93,7 @@ def archive_topic(topic_id: uuid.UUID, db: Session = Depends(get_db)) -> topics.
     """Hide the topic from users, keeping its lessons and progress. Safe to repeat."""
     try:
         return topics.archive_topic(db, topic_id)
-    except topics.TopicProblem as problem:
+    except ContentProblem as problem:
         raise _refuse(problem) from None
 
 
@@ -80,7 +102,7 @@ def restore_topic(topic_id: uuid.UUID, db: Session = Depends(get_db)) -> topics.
     """Show an archived topic to users again. Safe to repeat."""
     try:
         return topics.restore_topic(db, topic_id)
-    except topics.TopicProblem as problem:
+    except ContentProblem as problem:
         raise _refuse(problem) from None
 
 
@@ -95,5 +117,32 @@ def restore_topic(topic_id: uuid.UUID, db: Session = Depends(get_db)) -> topics.
 def delete_topic(topic_id: uuid.UUID, db: Session = Depends(get_db)) -> None:
     try:
         topics.delete_topic(db, topic_id)
-    except topics.TopicProblem as problem:
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+# --- Lessons (SCRUM-66) -------------------------------------------------------------------
+
+
+@router.get("/lessons", response_model=list[LessonSummaryOut])
+def list_lessons(db: Session = Depends(get_db)) -> list[lessons.LessonSummary]:
+    """Every lesson of every status, without its body, in topic order then lesson order.
+    Lessons with no topic come last."""
+    return lessons.list_lessons(db)
+
+
+@router.put(
+    "/lessons/order",
+    response_model=list[LessonSummaryOut],
+    responses={**NOT_FOUND, **OUT_OF_DATE},
+)
+def reorder_lessons(
+    body: LessonOrderRequest, db: Session = Depends(get_db)
+) -> list[lessons.LessonSummary]:
+    """Set the order of one topic's lessons, or of those with no topic (`topic_id: null`).
+    List every lesson in that group exactly once, plus the order the page showed; a page
+    that was out of date gets 409 order_out_of_date. Returns every lesson, in order."""
+    try:
+        return lessons.reorder_lessons(db, body.topic_id, body.ids, body.previous_ids)
+    except ContentProblem as problem:
         raise _refuse(problem) from None

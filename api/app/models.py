@@ -147,6 +147,10 @@ class Topic(Base):
     otherwise. An archived topic is hidden from users but keeps its lessons, their
     completions and its name (the unique index below still covers it). A topic with no
     lessons at all can be deleted instead.
+
+    `position` is the order administrators set (SCRUM-66), which is also the order of
+    the circles users see. It is a sort key, not unique: reads break ties by `created_at`,
+    so a gap or a duplicate can never break a page.
     """
 
     __tablename__ = "topics"
@@ -158,6 +162,8 @@ class Topic(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     name: Mapped[str] = mapped_column(String(80), nullable=False)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Defaults to 0 so rows built directly (tests, scripts) still work; the API appends.
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
 
@@ -169,9 +175,13 @@ class Lesson(Base):
 
     `topic_id` may be empty while a lesson is a draft; publishing requires it (SCRUM-56).
     Each lesson belongs to exactly one topic (the assumption in SCRUM-56).
+
+    `position` orders lessons within their topic, and lessons with no topic among
+    themselves (SCRUM-66). Like `Topic.position` it is a sort key, not unique.
     """
 
     __tablename__ = "lessons"
+    __table_args__ = (Index("ix_lessons_topic_id_position", "topic_id", "position"),)
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     title: Mapped[str] = mapped_column(String(200), nullable=False, default="")
@@ -184,8 +194,10 @@ class Lesson(Base):
     )
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = _created_at()
-    # Indexed because the admin lesson list sorts by it (SCRUM-66 AC3).
+    # Indexed because the admin lesson list sorts by it (SCRUM-66 AC3). Reordering
+    # deliberately leaves it alone: moving a lesson is not editing it.
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
