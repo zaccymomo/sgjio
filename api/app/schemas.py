@@ -177,8 +177,9 @@ class LessonOrderRequest(OrderRequest):
 
 
 # --- Lessons (SCRUM-64) -------------------------------------------------------------------
-# What a lesson "is" lives here and in admin/src/components/LessonForm.tsx. A change to the
-# lesson's fields should touch these two places, not every route and page.
+# What a lesson "is" lives here and, in the admin portal, in admin/src/lib/lessons.ts and
+# admin/src/components/LessonForm.tsx. A change to the lesson's fields should touch these,
+# not every route and page.
 
 # Matches lessons.title (String(200)).
 MAX_LESSON_TITLE = 200

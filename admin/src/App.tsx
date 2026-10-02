@@ -1,9 +1,17 @@
 import { AdminLayout, AuthProvider, Button, RequireAuth, useAuth } from "@sgjio/ui";
 import { useState } from "react";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from "react-router-dom";
+import {
+  Navigate,
+  Outlet,
+  Route,
+  RouterProvider,
+  createBrowserRouter,
+  createRoutesFromElements,
+  useNavigate,
+} from "react-router-dom";
 
 import { ContentPage } from "./pages/ContentPage";
-import { LessonPlaceholderPage } from "./pages/LessonPlaceholderPage";
+import { LessonEditorPage } from "./pages/LessonEditorPage";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { SignInPage } from "./pages/SignInPage";
 
@@ -38,29 +46,41 @@ function SignedInLayout() {
   );
 }
 
-export function App() {
+/** Admin sessions are separate from main-app sessions (see api/app/auth). */
+function Root() {
   return (
-    <BrowserRouter>
-      {/* Admin sessions are separate from main-app sessions (see api/app/auth). */}
-      <AuthProvider basePath="/api/admin/auth">
-        <Routes>
-          <Route path="/sign-in" element={<SignInPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-
-          {/* Administrators only: anyone else is sent to /sign-in?next=... */}
-          <Route element={<RequireAuth />}>
-            <Route element={<SignedInLayout />}>
-              <Route index element={<ContentPage />} />
-              <Route path="/lessons/:id" element={<LessonPlaceholderPage />} />
-              {/* Topics used to have their own page; they now live on the content page. */}
-              <Route path="/topics" element={<Navigate to="/" replace />} />
-            </Route>
-          </Route>
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+    <AuthProvider basePath="/api/admin/auth">
+      <Outlet />
+    </AuthProvider>
   );
+}
+
+// A data router (createBrowserRouter) rather than <BrowserRouter> as in the main app, because
+// the lesson editor's unsaved-changes warning needs useBlocker, which only works with one.
+// The routes are still written as JSX, so they read the same as the main app's.
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<Root />}>
+      <Route path="/sign-in" element={<SignInPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+      {/* Administrators only: anyone else is sent to /sign-in?next=... */}
+      <Route element={<RequireAuth />}>
+        <Route element={<SignedInLayout />}>
+          <Route index element={<ContentPage />} />
+          {/* /lessons/new for a lesson not saved yet (SCRUM-64). */}
+          <Route path="/lessons/:id" element={<LessonEditorPage />} />
+          {/* Topics used to have their own page; they now live on the content page. */}
+          <Route path="/topics" element={<Navigate to="/" replace />} />
+        </Route>
+      </Route>
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Route>,
+  ),
+);
+
+export function App() {
+  return <RouterProvider router={router} />;
 }
