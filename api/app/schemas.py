@@ -2,12 +2,14 @@
 
 import uuid
 from datetime import datetime
+from typing import Annotated
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     EmailStr,
     Field,
+    StringConstraints,
     TypeAdapter,
     ValidationError,
     field_validator,
@@ -106,3 +108,24 @@ class ProgressOut(BaseModel):
     topics: list[TopicProgressOut]
     completed: int
     available: int
+
+
+TopicName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+
+
+class TopicRequest(BaseModel):
+    """Create or rename a topic (SCRUM-57). The name is trimmed before the length check."""
+
+    name: TopicName
+
+
+class TopicOut(BaseModel):
+    """A topic as the admin portal lists it. Counts cover lessons of every status."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    archived_at: datetime | None
+    lesson_count: int
+    published_count: int

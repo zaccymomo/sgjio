@@ -85,6 +85,45 @@ def test_topics_come_back_in_a_stable_order(client, db, make_user):
     assert [topic["name"] for topic in topics] == ["Festivals", "Singlish", "Workplace"]
 
 
+# --- Archived topics are hidden (SCRUM-57) -------------------------------------------------
+
+
+def _set_archived(db, topic: Topic, archived: bool) -> None:
+    topic.archived_at = datetime.now(UTC) if archived else None
+    db.commit()
+
+
+def test_an_archived_topic_has_no_circle_and_the_totals_drop(client, db, make_user):
+    user = _sign_in(client, make_user)
+    singlish = _topic(db, "Singlish")
+    workplace = _topic(db, "Workplace")
+    _complete(db, user, _lesson(db, singlish, "One"))
+    _lesson(db, singlish, "Two")
+    _complete(db, user, _lesson(db, workplace, "Three"))
+    _set_archived(db, singlish, True)
+
+    body = client.get("/api/progress").json()
+    assert [topic["name"] for topic in body["topics"]] == ["Workplace"]
+    assert (body["completed"], body["available"]) == (1, 1)
+
+
+def test_restoring_a_topic_brings_back_its_circle_and_progress(client, db, make_user):
+    user = _sign_in(client, make_user)
+    singlish = _topic(db, "Singlish")
+    _complete(db, user, _lesson(db, singlish, "One"))
+    _lesson(db, singlish, "Two")
+    _set_archived(db, singlish, True)
+    assert client.get("/api/progress").json()["available"] == 0
+
+    _set_archived(db, singlish, False)
+
+    body = client.get("/api/progress").json()
+    assert [(t["name"], t["completed"], t["available"]) for t in body["topics"]] == [
+        ("Singlish", 1, 2)
+    ]
+    assert (body["completed"], body["available"]) == (1, 2)
+
+
 # --- The two figures (SCRUM-16 AC7) --------------------------------------------------------
 
 
