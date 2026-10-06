@@ -43,7 +43,6 @@ INVALID_CREDENTIALS = {
     "code": "invalid_credentials",
     "message": "The email or password is incorrect.",
 }
-
 # A used, expired, cancelled or made-up link all look the same to the reader (SCRUM-63 AC6).
 RESET_LINK_INVALID = {
     "code": "reset_link_invalid",
