@@ -226,6 +226,7 @@ class LessonSummaryOut(BaseModel):
     status: LessonStatus
     updated_at: datetime
     position: int
+    deletable: bool
 
 
 class OrderRequest(BaseModel):

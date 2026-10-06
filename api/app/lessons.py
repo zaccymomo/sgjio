@@ -52,6 +52,7 @@ class LessonSummary:
     status: LessonStatus
     updated_at: datetime
     position: int
+    deletable: bool
 
 
 @dataclass(frozen=True)
@@ -106,6 +107,9 @@ def list_lessons(db: Session) -> list[LessonSummary]:
             Lesson.status,
             Lesson.updated_at,
             Lesson.position,
+            ((Lesson.status == LessonStatus.DRAFT) & Lesson.published_at.is_(None)).label(
+                "deletable"
+            ),
         )
         .outerjoin(Topic, Lesson.topic_id == Topic.id)
         .order_by(

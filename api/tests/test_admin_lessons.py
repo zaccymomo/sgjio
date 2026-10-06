@@ -76,10 +76,37 @@ def test_list_shows_what_the_admin_page_needs_and_no_body(admin, db):
 
     [row] = admin.get(URL).json()
 
-    assert set(row) == {"id", "title", "topic_id", "status", "updated_at", "position"}
+    assert set(row) == {
+        "id",
+        "title",
+        "topic_id",
+        "status",
+        "updated_at",
+        "position",
+        "deletable",
+    }
     assert row["id"] == str(lesson.id)
     assert row["topic_id"] == str(topic.id)
     assert row["status"] == "draft"
+    assert row["deletable"] is True
+
+
+def test_list_marks_only_never_published_drafts_as_deletable(admin, db):
+    draft = _lesson(db, None, "Draft", status=LessonStatus.DRAFT)
+    published = _lesson(db, None, "Published", status=LessonStatus.PUBLISHED)
+    withdrawn = _lesson(db, None, "Withdrawn", status=LessonStatus.WITHDRAWN)
+    previously_published_draft = _lesson(db, None, "Old draft", status=LessonStatus.DRAFT)
+    previously_published_draft.published_at = datetime.now(UTC)
+    db.commit()
+
+    deletable = {row["title"]: row["deletable"] for row in admin.get(URL).json()}
+
+    assert deletable == {
+        draft.title: True,
+        published.title: False,
+        withdrawn.title: False,
+        previously_published_draft.title: False,
+    }
 
 
 def test_list_is_in_topic_order_then_lesson_order(admin, db):
