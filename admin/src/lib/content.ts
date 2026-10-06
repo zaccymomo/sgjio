@@ -28,6 +28,8 @@ export type LessonSummary = {
   status: LessonStatus;
   updated_at: string;
   position: number;
+  /** A draft that has never been published. Only these can be deleted. */
+  deletable: boolean;
 };
 
 export type Content = { topics: Topic[]; lessons: LessonSummary[] };

@@ -78,7 +78,7 @@ export const lessonApi = {
       method: "PATCH",
       body: { ...fields, title: fields.title.trim(), updated_at: lesson.updated_at },
     }),
-  remove: (lesson: Lesson) =>
+  remove: (lesson: Pick<Lesson, "id" | "updated_at">) =>
     apiFetch<void>(
       `${LESSONS}/${lesson.id}?${new URLSearchParams({ updated_at: lesson.updated_at })}`,
       { method: "DELETE" },
