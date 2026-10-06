@@ -4,7 +4,10 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "rea
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { ContentToolbar, type View } from "../components/ContentToolbar";
+import { ConfirmLessonDeleteDialog } from "../components/LessonDialogs";
 import { LessonRow } from "../components/LessonRow";
+import { lessonMenuGroups, type LessonActions } from "../components/menuItems";
+import { RowMenu } from "../components/RowMenu";
 import { SortableList } from "../components/SortableList";
 import {
   ConfirmTopicDialog,
@@ -13,9 +16,23 @@ import {
   type NameDialogState,
 } from "../components/TopicDialogs";
 import { TopicGroup, type TopicActions } from "../components/TopicGroup";
-import { topicApi, useContent, type Content, type Notice, type Topic } from "../lib/content";
-import { NO_FILTERS, viewContent, type ContentView, type Filters } from "../lib/filter";
+import {
+  topicApi,
+  useContent,
+  type Content,
+  type LessonSummary,
+  type Notice,
+  type Topic,
+} from "../lib/content";
+import {
+  lessonTitle,
+  NO_FILTERS,
+  viewContent,
+  type ContentView,
+  type Filters,
+} from "../lib/filter";
 import { plural, topicSummary } from "../lib/format";
+import { lessonApi } from "../lib/lessons";
 
 const VIEW_KEY = "sgjio-admin-content-view";
 const NO_TOPIC = "none";
@@ -62,6 +79,9 @@ export function ContentPage() {
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [lessonToDelete, setLessonToDelete] = useState<LessonSummary | null>(null);
+  const [lessonDeleteBusy, setLessonDeleteBusy] = useState(false);
+  const [lessonDeleteError, setLessonDeleteError] = useState<string | null>(null);
   const [busyTopicId, setBusyTopicId] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   // After archiving, deleting or restoring, the button that was used has gone; put focus
@@ -154,6 +174,41 @@ export function ContentPage() {
     setNameDialog(null);
   }
 
+  async function deleteLesson() {
+    if (!lessonToDelete) return;
+    const lesson = data?.lessons.find(({ id }) => id === lessonToDelete.id) ?? lessonToDelete;
+    setLessonDeleteBusy(true);
+    setLessonDeleteError(null);
+    try {
+      await content.run(() => lessonApi.remove(lesson));
+      setNotice({ tone: "success", message: `“${lessonTitle(lesson)}” is deleted.` });
+      focusHeadingNext.current = true;
+      setLessonToDelete(null);
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "lesson_not_found") {
+        setLessonToDelete(null);
+        setNotice({ tone: "info", message: "That lesson had already been deleted." });
+      } else if (error instanceof ApiError && error.code === "lesson_not_deletable") {
+        setLessonToDelete(null);
+        setNotice({
+          tone: "info",
+          message: "That lesson has been published, so it can't be deleted.",
+        });
+      } else if (error instanceof ApiError && error.code === "lesson_out_of_date") {
+        setLessonToDelete(null);
+        setNotice({
+          tone: "info",
+          message:
+            "That draft changed since you opened the list. Open it and check it before deleting.",
+        });
+      } else {
+        setLessonDeleteError(messageOf(error, "Something went wrong. Please try again."));
+      }
+    } finally {
+      setLessonDeleteBusy(false);
+    }
+  }
+
   async function restore(topic: Topic) {
     setBusyTopicId(topic.id);
     try {
@@ -176,6 +231,13 @@ export function ContentPage() {
     remove: (topic) => openConfirm("delete", topic),
     restore: (topic) => void restore(topic),
     addLesson: (topic) => navigate(`/lessons/new?${new URLSearchParams({ topic: topic.id })}`),
+  };
+  const lessonActions: LessonActions = {
+    edit: (lesson) => navigate(`/lessons/${lesson.id}`),
+    remove: (lesson) => {
+      setLessonDeleteError(null);
+      setLessonToDelete(lesson);
+    },
   };
 
   return (
@@ -225,6 +287,7 @@ export function ContentPage() {
           }}
           content={content}
           actions={actions}
+          lessonActions={lessonActions}
           busyTopicId={busyTopicId}
           onCreateTopic={() => setNameDialog({ mode: "create" })}
           notice={notice}
@@ -240,6 +303,13 @@ export function ContentPage() {
         onCancel={() => setConfirm(null)}
         onConfirm={() => void confirmAction()}
       />
+      <ConfirmLessonDeleteDialog
+        lesson={lessonToDelete}
+        busy={lessonDeleteBusy}
+        error={lessonDeleteError}
+        onCancel={() => setLessonToDelete(null)}
+        onConfirm={() => void deleteLesson()}
+      />
     </div>
   );
 }
@@ -250,6 +320,7 @@ function ContentBody({
   onViewChange,
   content,
   actions,
+  lessonActions,
   busyTopicId,
   onCreateTopic,
   notice,
@@ -260,6 +331,7 @@ function ContentBody({
   onViewChange: (view: View) => void;
   content: ReturnType<typeof useContent>;
   actions: TopicActions;
+  lessonActions: LessonActions;
   busyTopicId: string | null;
   onCreateTopic: () => void;
   notice: Notice | null;
@@ -334,6 +406,7 @@ function ContentBody({
         <RecentList
           contentView={contentView}
           topics={data.topics}
+          lessonActions={lessonActions}
           filtering={filtering}
           onClear={() => setFilters(NO_FILTERS)}
         />
@@ -342,6 +415,7 @@ function ContentBody({
           contentView={contentView}
           content={content}
           actions={actions}
+          lessonActions={lessonActions}
           busyTopicId={busyTopicId}
           expansion={expansion}
           onClear={() => setFilters(NO_FILTERS)}
@@ -407,6 +481,7 @@ function TopicOrder({
   contentView,
   content,
   actions,
+  lessonActions,
   busyTopicId,
   expansion,
   onClear,
@@ -415,6 +490,7 @@ function TopicOrder({
   contentView: ContentView;
   content: ReturnType<typeof useContent>;
   actions: TopicActions;
+  lessonActions: LessonActions;
   busyTopicId: string | null;
   expansion: Expansion;
   onClear: () => void;
@@ -494,6 +570,7 @@ function TopicOrder({
               reorder={reorder}
               lessonReorder={lessonReorder(group.topic!.id)}
               actions={actions}
+              lessonActions={lessonActions}
               busy={busyTopicId === group.topic!.id}
             />
           )}
@@ -508,6 +585,7 @@ function TopicOrder({
           expanded={expansion.isOpen(NO_TOPIC)}
           onToggle={() => expansion.toggle(NO_TOPIC)}
           lessonReorder={lessonReorder(null)}
+          lessonActions={lessonActions}
         />
       )}
 
@@ -543,6 +621,7 @@ function TopicOrder({
                       expanded={expansion.isOpen(group.topic!.id)}
                       onToggle={() => expansion.toggle(group.topic!.id)}
                       actions={actions}
+                      lessonActions={lessonActions}
                       busy={busyTopicId === group.topic!.id}
                     />
                   </li>
@@ -559,11 +638,13 @@ function TopicOrder({
 function RecentList({
   contentView,
   topics,
+  lessonActions,
   filtering,
   onClear,
 }: {
   contentView: ContentView;
   topics: Topic[];
+  lessonActions: LessonActions;
   filtering: boolean;
   onClear: () => void;
 }) {
@@ -594,7 +675,16 @@ function RecentList({
             : "No topic";
           return (
             <li key={lesson.id}>
-              <LessonRow lesson={lesson} topicLabel={topicLabel} />
+              <LessonRow
+                lesson={lesson}
+                topicLabel={topicLabel}
+                menu={
+                  <RowMenu
+                    name={lessonTitle(lesson)}
+                    groups={lessonMenuGroups(lesson, undefined, lessonActions)}
+                  />
+                }
+              />
             </li>
           );
         })}

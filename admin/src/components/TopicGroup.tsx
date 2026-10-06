@@ -15,7 +15,7 @@ import { lessonTitle, type Group } from "../lib/filter";
 import { formatDate, plural, topicSummary } from "../lib/format";
 import { DragHandle } from "./DragHandle";
 import { LessonRow } from "./LessonRow";
-import { lessonMenuGroups, moveItems } from "./menuItems";
+import { lessonMenuGroups, moveItems, type LessonActions } from "./menuItems";
 import { RowMenu, type MenuItem } from "./RowMenu";
 import { SortableList, type Reorder } from "./SortableList";
 
@@ -46,6 +46,7 @@ export function TopicGroup({
   reorder,
   lessonReorder,
   actions,
+  lessonActions,
   busy,
 }: {
   group: Group;
@@ -60,6 +61,7 @@ export function TopicGroup({
     onDragChange: (dragging: boolean) => void;
   };
   actions?: TopicActions;
+  lessonActions?: LessonActions;
   /** A change to this topic is running. */
   busy?: boolean;
 }) {
@@ -160,7 +162,7 @@ export function TopicGroup({
                       menu={
                         <RowMenu
                           name={lessonTitle(lesson)}
-                          groups={lessonMenuGroups(lesson, lessonControls)}
+                          groups={lessonMenuGroups(lesson, lessonControls, lessonActions)}
                           moveKey={lessonControls.moveKey}
                         />
                       }
@@ -176,7 +178,10 @@ export function TopicGroup({
                         lesson={lesson}
                         handle={handleSpace}
                         menu={
-                          <RowMenu name={lessonTitle(lesson)} groups={lessonMenuGroups(lesson)} />
+                          <RowMenu
+                            name={lessonTitle(lesson)}
+                            groups={lessonMenuGroups(lesson, undefined, lessonActions)}
+                          />
                         }
                       />
                     </li>
