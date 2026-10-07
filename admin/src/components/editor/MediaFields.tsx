@@ -90,7 +90,7 @@ function FileButtons({
   const button =
     "inline-flex h-8 items-center gap-1.5 rounded-sm px-2.5 text-xs font-semibold text-muted hover:bg-surface hover:text-ink focus-visible:outline-2 focus-visible:outline-brand disabled:opacity-50";
   return (
-    <div className="flex gap-1">
+    <div className="flex flex-wrap gap-1">
       <button
         type="button"
         className={button}
@@ -165,9 +165,10 @@ export function ImageField({
     );
   }
   return (
-    <div className="flex flex-col gap-2.5 rounded-lg border border-line p-3">
-      <div className="flex items-start gap-3">
-        <div className="w-36 shrink-0 overflow-hidden rounded-md">
+    <div className="@container flex flex-col gap-2.5 rounded-lg border border-line p-3">
+      {/* Beside the thumbnail when there is room; below it in a narrow column. */}
+      <div className="flex flex-col gap-3 @xs:flex-row @xs:items-start">
+        <div className="w-full shrink-0 overflow-hidden rounded-md @xs:w-36">
           <CardImage asset={asset} alt={image.alt} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
