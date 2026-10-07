@@ -6,7 +6,8 @@ import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 
-from app.models import Lesson, LessonVersion, Topic, User
+from app.lesson_doc import LessonDoc, correct_option
+from app.models import Lesson, LessonStatus, LessonVersion, Topic, User
 from app.seed import TOPICS, seed
 
 
@@ -21,10 +22,11 @@ def test_seed_creates_admin_user_topics_and_sample_lesson(db):
     assert created, "first run should create data"
     assert db.scalar(select(func.count()).select_from(User)) == 2
     assert sorted(t.name for t in db.scalars(select(Topic))) == sorted(TOPICS)
-    lesson = db.scalar(select(Lesson))
-    questions = [card["question"] for card in lesson.draft["cards"] if card["question"]]
+    lesson = db.scalar(select(Lesson).where(Lesson.status == LessonStatus.PUBLISHED))
+    doc = LessonDoc.model_validate(lesson.draft)
+    questions = [card.question for card in doc.cards if card.question]
     assert questions
-    assert all(sum(o["correct"] for o in q["options"]) == 1 for q in questions)
+    assert all(correct_option(question) is not None for question in questions)
     assert [version.number for version in lesson.versions] == [1]
 
 

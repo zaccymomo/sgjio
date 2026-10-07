@@ -1,0 +1,34 @@
+title: Living Close to Your Neighbours
+summary: Noise, corridors and life in an HDB block.
+topic: Public Etiquette
+cards:
+  - image: { file: cover.png, alt: "An HDB block of flats with a clear corridor" }
+    text: |-
+      About eight in ten residents live in HDB flats, so noise and shared space matter.
+
+  - text: |-
+      Keep drilling and heavy work to **weekday daytime hours**, and avoid Sundays and public holidays.
+
+  - text: |-
+      Corridors are shared and must stay clear: they're fire escape routes. And never throw anything from a window. "Killer litter" is a serious offence.
+
+  - text: |-
+      Where do neighbour disputes in HDB blocks usually go first?
+    question:
+      options:
+        - text: "The town council or Community Mediation Centre"
+          correct: true
+        - text: "The police"
+          why_not: "The police aren't the usual first step for neighbour disputes."
+        - text: "The Housing and Development Board directly"
+        - text: "A civil court claim"
+      explanation: |-
+        The town council or the Community Mediation Centre handles most neighbour disputes; the police are not the usual first step.
+
+  - text: |-
+      Your corridor is an escape route, so keep it {{blank}}.
+    question:
+      options:
+        - text: "clear"
+      explanation: |-
+        Corridors are fire escape routes, and the town council can issue warnings for clutter.

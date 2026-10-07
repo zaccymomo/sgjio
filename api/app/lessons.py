@@ -103,7 +103,7 @@ class LessonDetail:
 # --- Reading -------------------------------------------------------------------------------
 
 
-def _latest_version(db: Session, lesson_id: uuid.UUID) -> LessonVersion | None:
+def latest_version(db: Session, lesson_id: uuid.UUID) -> LessonVersion | None:
     return db.scalar(
         select(LessonVersion)
         .where(LessonVersion.lesson_id == lesson_id)
@@ -124,7 +124,7 @@ def _detail(db: Session, lesson: Lesson) -> LessonDetail:
     doc = LessonDoc.model_validate(lesson.draft)
     facts = media.facts_for(db, doc)
     topic = lesson.topic
-    latest = _latest_version(db, lesson.id)
+    latest = latest_version(db, lesson.id)
     return LessonDetail(
         id=lesson.id,
         key=lesson.key,
@@ -339,7 +339,7 @@ def update_lesson(
         if "topic_id" in changes and changes["topic_id"] != lesson.topic_id:
             topic_id = changes["topic_id"]
             if topic_id is None:
-                if _latest_version(db, lesson.id) is not None:
+                if latest_version(db, lesson.id) is not None:
                     raise topic_required()
             else:
                 _check_topic(db, topic_id)
@@ -354,7 +354,7 @@ def update_lesson(
         for field in ("title", "summary"):
             if field in changes and changes[field] != getattr(lesson, field):
                 setattr(lesson, field, changes[field])
-        changed = _differs_from(lesson, _latest_version(db, lesson.id))
+        changed = _differs_from(lesson, latest_version(db, lesson.id))
         if changed != lesson.has_unpublished_changes:
             lesson.has_unpublished_changes = changed
     except (ContentProblem, ValueError):
@@ -371,7 +371,7 @@ def delete_lesson(db: Session, lesson_id: uuid.UUID, expected_updated_at: dateti
         lesson = db.get(Lesson, lesson_id, with_for_update=True)
         if lesson is None:
             raise lesson_not_found()
-        if _latest_version(db, lesson.id) is not None:
+        if latest_version(db, lesson.id) is not None:
             raise lesson_not_deletable()
         if lesson.updated_at != expected_updated_at:
             raise lesson_out_of_date()
@@ -407,7 +407,7 @@ def publish_lesson(
         blockers = blockers_of(db, lesson)
         if blockers:
             raise lesson_has_blockers(blockers)
-        latest = _latest_version(db, lesson.id)
+        latest = latest_version(db, lesson.id)
         new_version = latest is None or _differs_from(lesson, latest)
         if not new_version and lesson.status == LessonStatus.PUBLISHED:
             db.rollback()
@@ -442,7 +442,7 @@ def discard_changes(
     """Put the draft back to the latest version."""
     try:
         lesson = _for_change(db, lesson_id, expected_updated_at)
-        latest = _latest_version(db, lesson.id)
+        latest = latest_version(db, lesson.id)
         if latest is None:
             raise lesson_status_conflict(
                 "This lesson has never been published, so there is nothing to go back to."
@@ -486,7 +486,7 @@ def restore_lesson(
     draft since stay in the draft."""
     try:
         lesson = _for_change(db, lesson_id, expected_updated_at)
-        if lesson.status != LessonStatus.WITHDRAWN or _latest_version(db, lesson.id) is None:
+        if lesson.status != LessonStatus.WITHDRAWN or latest_version(db, lesson.id) is None:
             raise lesson_status_conflict("Only a withdrawn lesson can be restored.")
         lesson.status = LessonStatus.PUBLISHED
         lesson.published_at = datetime.now(UTC)

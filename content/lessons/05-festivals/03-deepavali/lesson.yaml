@@ -1,0 +1,43 @@
+title: Deepavali
+summary: The festival of lights, and how to be a good guest.
+topic: Festivals
+cards:
+  - image: { file: cover.png, alt: "A lit clay oil lamp on a colourful kolam pattern" }
+    text: |-
+      Deepavali, the festival of lights, marks the triumph of light over darkness. It falls in October or November.
+
+  - text: |-
+      Little India is lit up for weeks beforehand, and it's worth seeing in the evening.
+
+  - text: |-
+      Homes are cleaned, decorated with **kolam** patterns at the entrance, and opened to visitors.
+
+  - audio: { file: happy-deepavali.mp3, transcript: "Happy Deepavali!" }
+    text: |-
+      If you're invited, dress brightly rather than in black or white, and greet your hosts with *"Happy Deepavali"*.
+
+  - text: |-
+      What is a suitable gift when invited to a Hindu colleague's home for Deepavali?
+    question:
+      options:
+        - text: "Sweets or fruit"
+          correct: true
+        - text: "A leather wallet"
+          why_not: "Leather is best avoided as a gift."
+        - text: "A meat hamper"
+          why_not: "Many Hindu households are vegetarian."
+        - text: "Something wrapped in black"
+          why_not: "Bright colours suit the occasion."
+      explanation: |-
+        Sweets or fruit suit the occasion. Many Hindu households are vegetarian, so meat-based gifts and leather items are avoided.
+
+  - text: |-
+      For a Deepavali visit, choose clothes that are {{blank}}.
+    question:
+      options:
+        - text: "bright"
+          correct: true
+        - text: "all black"
+          why_not: "Black is best avoided for a celebration."
+      explanation: |-
+        Bright colours suit the festival of lights; black and white are best avoided.

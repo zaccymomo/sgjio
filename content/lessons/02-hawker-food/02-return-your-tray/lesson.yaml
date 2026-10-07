@@ -1,0 +1,36 @@
+title: Return Your Tray
+summary: Clearing your table is required, and the racks are sorted for a reason.
+topic: Hawker & Food
+cards:
+  - image: { file: cover.png, alt: "A tray return rack with stacked trays" }
+    text: |-
+      Since 2021, clearing your own table at hawker centres, coffee shops and food courts is **required**, not optional. Repeat offenders can be fined.
+
+  - text: |-
+      Look for the tray return racks near the entrance or along a wall. Put leftovers and tissues in the bin first.
+
+  - text: |-
+      Most racks have **separate points for halal and non-halal** crockery, clearly labelled. Muslim diners and stallholders need their utensils kept apart.
+
+  - text: |-
+      Cleaners still work the tables, but they're there to wipe them down, not to carry your plates away.
+
+  - text: |-
+      Why do tray return racks have separate halal and non-halal points?
+    question:
+      options:
+        - text: "To keep halal and non-halal crockery separate"
+          correct: true
+        - text: "To sort plates by which stall they came from"
+        - text: "To separate plastic from ceramic for recycling"
+        - text: "To divide the work between two cleaning companies"
+      explanation: |-
+        Crockery used for non-halal food is kept apart from halal crockery, so Muslim diners and stallholders are not affected by cross-contamination.
+
+  - text: |-
+      Finished your chicken rice? Take your tray to the {{blank}}.
+    question:
+      options:
+        - text: "tray return rack"
+      explanation: |-
+        Returning your tray is expected at every hawker centre, coffee shop and food court.

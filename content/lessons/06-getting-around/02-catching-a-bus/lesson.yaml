@@ -1,0 +1,43 @@
+title: Catching a Bus
+summary: Buses only stop if you ask them to.
+topic: Getting Around
+cards:
+  - image: { file: cover.png, alt: "A person at a bus stop with a hand out as a bus approaches" }
+    text: |-
+      Buses in Singapore **don't stop automatically**. If you don't signal, your bus may drive straight past.
+
+  - text: |-
+      As your bus approaches, **put your hand out**. On board, press the bell once, well before your stop.
+
+  - text: |-
+      Your bus is approaching the stop. What do you need to do?
+    question:
+      options:
+        - text: "Put your hand out to signal the driver"
+          correct: true
+        - text: "Stand at the front of the queue and wait"
+          why_not: "Without a signal, the bus may not stop."
+        - text: "Press the bell at the stop"
+          why_not: "The bell is inside the bus, for getting off."
+        - text: "Nothing, every bus stops at every stop"
+      explanation: |-
+        Singapore buses stop on request. Putting your hand out signals the driver; without it the bus may drive past.
+
+  - text: |-
+      Board at the front and get off through the middle doors where there are two. Tap your card at both.
+
+  - text: |-
+      Bus numbers ending in **e** are express services that skip stops. Live arrival times are on most stop panels and in apps.
+
+  - text: |-
+      Bus 10e is an {{blank}} service, so check it stops where you need.
+    question:
+      options:
+        - text: "express"
+          correct: true
+        - text: "evening"
+          why_not: "The e means express. It runs during the day too."
+        - text: "electric"
+          why_not: "The e says how it runs its route, not what powers it."
+      explanation: |-
+        An **e** marks an express service, which skips some stops.

@@ -1,0 +1,38 @@
+title: Queueing Is Not Optional
+summary: Single file, for everything.
+topic: Public Etiquette
+cards:
+  - image: { file: cover.png, alt: "People queueing in single file beside an MRT door" }
+    text: |-
+      Singapore queues for everything: bus doors, lifts, hawker stalls, taxi stands. Cutting in draws an immediate, public objection.
+
+  - text: |-
+      At MRT doors, arrows on the platform show where to stand: **at the sides**, leaving the middle clear for people getting off.
+
+  - text: |-
+      The MRT doors open and you're waiting at the platform markings. What comes first?
+    question:
+      shuffle: false
+      options:
+        - text: "Let passengers off before boarding"
+          correct: true
+        - text: "Board quickly to get a seat"
+          why_not: "This blocks the doors, and it's the breach locals notice most."
+        - text: "Board at the same time, keeping to one side"
+        - text: "Wait for staff to signal"
+      explanation: |-
+        Passengers leaving the train go first. Boarding before they're off blocks the doors and is the most commonly criticised breach.
+
+  - text: |-
+      At lifts, people stand aside from the doors rather than crowding them. A bag or umbrella on the floor can be holding someone's place.
+
+  - text: |-
+      Waiting for the train, you stand {{blank}} the doors until passengers have got off.
+    question:
+      options:
+        - text: "beside"
+          correct: true
+        - text: "in front of"
+          why_not: "Standing in front of the doors blocks people getting off."
+      explanation: |-
+        Standing beside the doors keeps the way clear for passengers leaving the train.

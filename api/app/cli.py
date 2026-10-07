@@ -4,15 +4,17 @@ python -m app.cli seed
 python -m app.cli create-admin --email someone@example.com --name "Their Name"
 python -m app.cli send-reset --email admin@sgjio.example.com --scope admin
 python -m app.cli prune-media
+python -m app.cli import-lessons [folder] [--publish]
 """
 
 import argparse
 import getpass
 import sys
+from pathlib import Path
 
 from sqlalchemy import select
 
-from app import media
+from app import content_import, media
 from app.auth import normalise_email
 from app.auth.reset import request_password_reset
 from app.config import get_settings
@@ -72,6 +74,26 @@ def cmd_send_reset(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_import_lessons(args: argparse.Namespace) -> int:
+    """Load lessons from files (content/README.md), so they can be written without the admin
+    portal. Safe to run again: unchanged files change nothing."""
+    root = Path(args.folder) if args.folder else get_settings().content_dir
+    if not root.is_dir():
+        print(f"There is no folder {root}.", file=sys.stderr)
+        return 1
+    with SessionLocal() as db:
+        results = content_import.import_folder(db, root, publish=args.publish)
+    if not results:
+        print(f"No lesson files found under {root}.")
+    failed = False
+    for result in results:
+        print(result.describe())
+        for problem in result.problems:
+            print(f"    {problem}")
+        failed = failed or result.action == "failed"
+    return 1 if failed else 0
+
+
 def cmd_prune_media(_: argparse.Namespace) -> int:
     """Delete uploaded images and audio that no lesson uses (SCRUM-19)."""
     with SessionLocal() as db:
@@ -96,6 +118,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--email", required=True)
     p.add_argument("--scope", choices=[s.value for s in AuthScope], default="app")
     p.set_defaults(func=cmd_send_reset)
+
+    p = sub.add_parser("import-lessons", help="load lessons from files in content/")
+    p.add_argument("folder", nargs="?", help="defaults to content/lessons")
+    p.add_argument("--publish", action="store_true", help="publish new and changed lessons")
+    p.set_defaults(func=cmd_import_lessons)
 
     sub.add_parser(
         "prune-media", help="delete uploaded images and audio that no lesson uses"

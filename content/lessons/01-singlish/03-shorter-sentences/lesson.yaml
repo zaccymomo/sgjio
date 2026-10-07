@@ -1,0 +1,43 @@
+title: Why Sentences Sound Shorter
+summary: Singlish grammar is a system, not a string of mistakes.
+topic: Singlish
+cards:
+  - image: { file: cover.png, alt: "A hawker stall with a sign saying sold out" }
+    text: |-
+      Singlish often drops words English speakers expect, because its grammar borrows from Chinese dialects and Malay. It's a consistent system, not broken English.
+
+  - text: |-
+      Subjects disappear when they're obvious. *"Went already"* means "I already went".
+
+  - audio: { file: sold-out.mp3, transcript: "Sorry, sold out already." }
+    text: |-
+      **Already** marks something as done, where British English would change the tense: *"I eat already"* means "I have eaten".
+
+  - text: |-
+      **Got** says that something exists: *"Got queue or not?"* means "Is there a queue?"
+
+  - text: |-
+      You want to know if there's a queue at the chicken rice stall. You ask: *"{{blank}} queue or not?"*
+    question:
+      options:
+        - text: "Got"
+          correct: true
+        - text: "Already"
+          why_not: "Already marks something as finished, not whether it exists."
+        - text: "Can"
+          why_not: '"Can queue or not?" asks whether queueing is allowed.'
+      explanation: |-
+        **Got** marks existence, so *"Got queue or not?"* asks whether there's a queue.
+
+  - text: |-
+      A hawker tells you *"Sold out already"*. What does "already" do here?
+    question:
+      options:
+        - text: "Marks the action as completed"
+          correct: true
+        - text: "Means it happened unusually early"
+          why_not: "It says nothing about timing, only that it's done."
+        - text: "Adds politeness"
+        - text: "Asks you to confirm"
+      explanation: |-
+        "Already" marks the action as complete, the way a perfect tense does in British English: the stall has sold out.
