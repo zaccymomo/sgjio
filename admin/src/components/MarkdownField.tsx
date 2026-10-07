@@ -1,21 +1,34 @@
-import { Alert, cn } from "@sgjio/ui";
-import { Bold, Heading2, List, ListOrdered, type LucideIcon } from "lucide-react";
+import { cn } from "@sgjio/ui";
+import { BLANK_TOKEN, hasBlank } from "@sgjio/ui/lesson";
+import {
+  Bold,
+  Italic,
+  List,
+  ListOrdered,
+  RectangleHorizontal,
+  type LucideIcon,
+} from "lucide-react";
 import { useId, useRef, type KeyboardEvent } from "react";
 
 import { plural } from "../lib/format";
-import { applyEdit, formatEdit, type Format } from "../lib/markdownEdits";
-import { READING_LIMIT_MINUTES, readingTime } from "../lib/readingTime";
+import { applyEdit, formatEdit, insertEdit, type Edit, type Format } from "../lib/markdownEdits";
+import { countWords } from "../lib/words";
 
 const BUTTONS: { format: Format; label: string; icon: LucideIcon; shortcut?: string }[] = [
-  { format: "heading", label: "Heading", icon: Heading2 },
   { format: "bold", label: "Bold", icon: Bold, shortcut: "Ctrl+B" },
+  {
+    format: "italic",
+    label: "Italic, for Singlish and Malay words",
+    icon: Italic,
+    shortcut: "Ctrl+I",
+  },
   { format: "bullets", label: "Bulleted list", icon: List },
   { format: "numbers", label: "Numbered list", icon: ListOrdered },
 ];
 
 /**
- * The lesson's text, written in Markdown, with buttons for headings, bold and lists
- * (SCRUM-64 AC3) and the estimated reading time (AC4).
+ * Text written in Markdown, with buttons for bold, italics and lists (SCRUM-64 AC3) and, for
+ * a card's text, for the blank its question fills (SCRUM-19).
  *
  * The buttons insert the Markdown, so what is saved is exactly what is shown. They go
  * through the browser's own editing where it can, so Undo still works after using them.
@@ -25,23 +38,35 @@ export function MarkdownField({
   value,
   onChange,
   error,
-  readOnly,
+  hint,
+  rows = 5,
+  blank,
+  wordLimit,
+  maxLength,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   error?: string;
-  readOnly?: boolean;
+  hint?: string;
+  rows?: number;
+  /** Offer "Insert blank" (a card's text): at most one per card. */
+  blank?: boolean;
+  /** Show the word count, warning above this many. */
+  wordLimit?: number;
+  maxLength?: number;
+  placeholder?: string;
 }) {
   const id = useId();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const reading = readingTime(value);
   const messageId = `${id}-message`;
+  const words = countWords(value.replace(/\{\{\s*blank\s*\}\}/g, " "));
+  const hasOne = hasBlank(value);
 
-  function format(kind: Format) {
+  function apply(edit: Edit) {
     const textarea = textareaRef.current;
-    if (!textarea || readOnly) return;
-    const edit = formatEdit(kind, textarea.value, textarea.selectionStart, textarea.selectionEnd);
+    if (!textarea) return;
     textarea.focus();
     textarea.setSelectionRange(edit.from, edit.to);
     // execCommand is deprecated but is still the only way to change a field's text and keep
@@ -52,12 +77,31 @@ export function MarkdownField({
     requestAnimationFrame(() => textarea.setSelectionRange(edit.selectionStart, edit.selectionEnd));
   }
 
+  function format(kind: Format) {
+    const textarea = textareaRef.current;
+    if (textarea)
+      apply(formatEdit(kind, textarea.value, textarea.selectionStart, textarea.selectionEnd));
+  }
+
+  function insertBlank() {
+    const textarea = textareaRef.current;
+    if (textarea && !hasOne)
+      apply(
+        insertEdit(BLANK_TOKEN, textarea.value, textarea.selectionStart, textarea.selectionEnd),
+      );
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "b") {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+    if (key === "b" || key === "i") {
       event.preventDefault();
-      format("bold");
+      format(key === "b" ? "bold" : "italic");
     }
   }
+
+  const toolbarButton =
+    "flex h-8 items-center justify-center gap-1.5 rounded-sm px-2 text-muted hover:bg-white hover:text-ink focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -66,7 +110,7 @@ export function MarkdownField({
       </label>
       <div
         className={cn(
-          "overflow-hidden rounded-sm border bg-white transition-colors focus-within:ring-2",
+          "overflow-hidden rounded-md border bg-white transition-colors focus-within:ring-2",
           error
             ? "border-danger focus-within:ring-danger/20"
             : "border-line focus-within:border-ink focus-within:ring-ink/10",
@@ -76,7 +120,7 @@ export function MarkdownField({
           role="toolbar"
           aria-label="Formatting"
           aria-controls={id}
-          className="flex flex-wrap gap-0.5 border-b border-line bg-surface p-1"
+          className="flex flex-wrap items-center gap-0.5 border-b border-line bg-surface p-1"
         >
           {BUTTONS.map(({ format: kind, label: name, icon: Icon, shortcut }) => (
             <button
@@ -85,14 +129,31 @@ export function MarkdownField({
               onClick={() => format(kind)}
               // Keep the selection in the text while the button is pressed.
               onMouseDown={(event) => event.preventDefault()}
-              disabled={readOnly}
               aria-label={name}
               title={shortcut ? `${name} (${shortcut})` : name}
-              className="flex size-9 items-center justify-center rounded-sm text-muted hover:bg-white hover:text-ink focus-visible:outline-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-60"
+              className={cn(toolbarButton, "w-8 px-0")}
             >
               <Icon className="size-4" aria-hidden />
             </button>
           ))}
+          {blank && (
+            <>
+              <span className="mx-1 h-5 w-px bg-line" aria-hidden />
+              <button
+                type="button"
+                onClick={insertBlank}
+                onMouseDown={(event) => event.preventDefault()}
+                disabled={hasOne}
+                title={
+                  hasOne ? "A card can have one blank" : "Insert a blank for the question to fill"
+                }
+                className={cn(toolbarButton, "text-xs font-semibold")}
+              >
+                <RectangleHorizontal className="size-4" aria-hidden />
+                Insert blank
+              </button>
+            </>
+          )}
         </div>
         <textarea
           ref={textareaRef}
@@ -100,29 +161,26 @@ export function MarkdownField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={handleKeyDown}
-          readOnly={readOnly}
-          rows={16}
+          rows={rows}
+          maxLength={maxLength}
           aria-invalid={error ? true : undefined}
           aria-describedby={messageId}
-          placeholder={
-            "## A heading\n\nWrite the lesson here. Use **bold** for key words.\n\n- A point\n- Another point"
-          }
-          className="block min-h-64 w-full resize-y bg-white px-3 py-2.5 text-sm leading-relaxed text-ink outline-none placeholder:text-subtle"
+          placeholder={placeholder}
+          className="block w-full resize-y bg-white px-3 py-2.5 text-sm leading-relaxed text-ink outline-none placeholder:text-subtle"
         />
       </div>
-      <div id={messageId} className="flex flex-col gap-2">
-        {error && <p className="text-xs text-danger">{error}</p>}
-        <p className="text-xs text-muted">
-          {reading.words === 0
-            ? "No text yet."
-            : `About ${reading.minutes} min read · ${plural(reading.words, "word")}`}
-        </p>
-        {/* SCRUM-64 AC4: a warning, never a block. */}
-        {reading.overLimit && (
-          <Alert tone="info">
-            Lessons should take under {READING_LIMIT_MINUTES} minutes to read. This one takes about{" "}
-            {reading.minutes}. You can still save it.
-          </Alert>
+      <div id={messageId} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+        <p className={cn("text-xs", error ? "text-danger" : "text-muted")}>{error ?? hint}</p>
+        {wordLimit !== undefined && (
+          <p
+            className={cn(
+              "shrink-0 text-xs tabular-nums",
+              words > wordLimit ? "font-semibold text-amber-700" : "text-subtle",
+            )}
+          >
+            {plural(words, "word")}
+            {words > wordLimit && ` · cards read best under ${wordLimit}`}
+          </p>
         )}
       </div>
     </div>

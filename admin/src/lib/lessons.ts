@@ -1,24 +1,25 @@
 import { apiFetch } from "@sgjio/ui";
-import type { Assets, Issue, LessonDoc, LessonStats } from "@sgjio/ui/lesson";
+import type { Asset, Assets, Issue, LessonDoc, LessonStats } from "@sgjio/ui/lesson";
 
 import type { LessonStatus } from "./content";
 
 /**
- * What a lesson is, as the editor saves it (SCRUM-64). Mirrors LessonFields in
- * api/app/schemas.py; together with components/LessonForm.tsx these are the places to change
- * when the lesson design changes. `topic_id: null` means no topic yet.
+ * What the editor changes (SCRUM-19, SCRUM-64): the draft's title, summary and cards, and
+ * the lesson's topic. Mirrors LessonFields in api/app/schemas.py. `topic_id: null` means no
+ * topic yet.
  */
-export type LessonFields = {
+export type Draft = {
   title: string;
+  summary: string;
   topic_id: string | null;
+  doc: LessonDoc;
 };
 
 /** One lesson as GET /api/admin/lessons/{id} returns it: the draft, with everything the
  * editor shows about it. */
-export type Lesson = LessonFields & {
+export type Lesson = Draft & {
   id: string;
   key: string | null;
-  summary: string;
   status: LessonStatus;
   published_at: string | null;
   withdrawn_at: string | null;
@@ -27,10 +28,10 @@ export type Lesson = LessonFields & {
   updated_at: string;
   /** Never published. Only these can be deleted. */
   deletable: boolean;
+  /** The draft differs from what users see: there is something to publish. */
   has_unpublished_changes: boolean;
   /** The latest published version, or null if never published. */
   version: { number: number; published_at: string } | null;
-  doc: LessonDoc;
   /** What still stops it being published (blockers), and what is worth a look (warnings). */
   issues: Issue[];
   stats: LessonStats;
@@ -38,51 +39,59 @@ export type Lesson = LessonFields & {
   assets: Assets;
 };
 
-/** Same limit as the API (MAX_LESSON_TITLE in schemas.py). */
+/** Same limits as the API (schemas.py and lesson_doc.py). */
 export const MAX_TITLE = 200;
+export const MAX_SUMMARY = 160;
+export const MAX_CARD_TEXT = 1500;
+export const MAX_OPTIONS = 4;
+export const MAX_OPTION_TEXT = 160;
+export const CARD_WORD_LIMIT = 50;
 
-export type LessonFieldErrors = Partial<Record<keyof LessonFields, string>>;
-
-export function emptyLesson(topicId: string | null = null): LessonFields {
-  return { title: "", topic_id: topicId };
+export function draftOf(lesson: Lesson): Draft {
+  return {
+    title: lesson.title,
+    summary: lesson.summary,
+    topic_id: lesson.topic_id,
+    doc: lesson.doc,
+  };
 }
 
-export function fieldsOf(lesson: Lesson): LessonFields {
-  return { title: lesson.title, topic_id: lesson.topic_id };
-}
-
-/** Whether saving `a` would change `b`. Titles are trimmed on save, so compare them so. */
-export function sameFields(a: LessonFields, b: LessonFields): boolean {
-  return a.title.trim() === b.title.trim() && a.topic_id === b.topic_id;
-}
-
-/**
- * What can be checked before saving. Empty fields are fine in a draft: they are required
- * only when publishing (SCRUM-56, SCRUM-70).
- */
-export function lessonFieldErrors(fields: LessonFields): LessonFieldErrors {
-  const errors: LessonFieldErrors = {};
-  const title = fields.title.trim();
-  if (title.length > MAX_TITLE) {
-    errors.title = `Use ${MAX_TITLE} characters or fewer. This title has ${title.length}.`;
-  }
-  return errors;
+/** Whether saving `a` would change `b`. Titles and summaries are trimmed on save. */
+export function sameDraft(a: Draft, b: Draft): boolean {
+  return (
+    a.title.trim() === b.title.trim() &&
+    a.summary.trim() === b.summary.trim() &&
+    a.topic_id === b.topic_id &&
+    JSON.stringify(a.doc) === JSON.stringify(b.doc)
+  );
 }
 
 const LESSONS = "/api/admin/lessons";
 
+function body(draft: Draft) {
+  return { ...draft, title: draft.title.trim(), summary: draft.summary.trim() };
+}
+
 /**
- * Saves and deletes send the `updated_at` the editor loaded. If the lesson has changed
- * since, the server refuses with lesson_out_of_date rather than overwrite that change.
+ * Every change sends the `updated_at` the editor last had. If the lesson has changed since,
+ * in another tab or by another administrator, the server refuses with lesson_out_of_date
+ * rather than overwrite that change.
  */
 export const lessonApi = {
   get: (id: string, signal?: AbortSignal) => apiFetch<Lesson>(`${LESSONS}/${id}`, { signal }),
-  create: (fields: LessonFields) =>
-    apiFetch<Lesson>(LESSONS, { method: "POST", body: { ...fields, title: fields.title.trim() } }),
-  update: (lesson: Lesson, fields: LessonFields) =>
+  create: (draft: Draft) => apiFetch<Lesson>(LESSONS, { method: "POST", body: body(draft) }),
+  save: (lesson: Pick<Lesson, "id" | "updated_at">, draft: Draft) =>
     apiFetch<Lesson>(`${LESSONS}/${lesson.id}`, {
       method: "PATCH",
-      body: { ...fields, title: fields.title.trim(), updated_at: lesson.updated_at },
+      body: { ...body(draft), updated_at: lesson.updated_at },
+    }),
+  change: (
+    lesson: Pick<Lesson, "id" | "updated_at">,
+    action: "publish" | "discard" | "withdraw" | "restore",
+  ) =>
+    apiFetch<Lesson>(`${LESSONS}/${lesson.id}/${action}`, {
+      method: "POST",
+      body: { updated_at: lesson.updated_at },
     }),
   remove: (lesson: Pick<Lesson, "id" | "updated_at">) =>
     apiFetch<void>(
@@ -90,3 +99,10 @@ export const lessonApi = {
       { method: "DELETE" },
     ),
 };
+
+/** Upload an image or audio file for a card. The same file uploaded twice is stored once. */
+export function uploadMedia(file: File): Promise<Asset> {
+  const form = new FormData();
+  form.append("file", file);
+  return apiFetch<Asset>("/api/admin/media", { method: "POST", body: form });
+}

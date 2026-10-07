@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 
 import type { LessonSummary } from "../lib/content";
 import { lessonTitle } from "../lib/filter";
-import { formatDateTime, formatRelative } from "../lib/format";
+import { formatDateTime, formatRelative, plural } from "../lib/format";
 import { StatusBadge } from "./StatusBadge";
 
 /**
@@ -37,7 +37,18 @@ export function LessonRow({
       {handle}
       <div className="flex min-w-0 flex-1 flex-col gap-x-4 gap-y-1 py-2 sm:flex-row sm:items-center">
         <div className="flex min-w-0 flex-1 gap-2.5">
-          <FileText className="mt-0.5 hidden size-4 shrink-0 text-subtle sm:block" aria-hidden />
+          {lesson.cover_asset_id ? (
+            <img
+              src={`/api/media/${lesson.cover_asset_id}`}
+              alt=""
+              loading="lazy"
+              className="hidden h-9 w-12 shrink-0 rounded-sm bg-surface object-contain sm:block"
+            />
+          ) : (
+            <span className="hidden h-9 w-12 shrink-0 items-center justify-center rounded-sm bg-surface sm:flex">
+              <FileText className="size-4 text-subtle" aria-hidden />
+            </span>
+          )}
           <div className="flex min-w-0 flex-col gap-0.5">
             <Link
               to={`/lessons/${lesson.id}`}
@@ -49,7 +60,15 @@ export function LessonRow({
             >
               {lessonTitle(lesson)}
             </Link>
-            {topicLabel && <p className="text-caption text-muted">{topicLabel}</p>}
+            <p className="text-caption text-muted">
+              {topicLabel && <>{topicLabel} · </>}
+              {plural(lesson.cards, "card")} · {plural(lesson.questions, "question")}
+              {lesson.status === "published" && lesson.has_unpublished_changes && (
+                <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-px text-2xs font-bold text-amber-800">
+                  Unpublished changes
+                </span>
+              )}
+            </p>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">

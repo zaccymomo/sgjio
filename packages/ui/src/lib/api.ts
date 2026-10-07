@@ -18,6 +18,8 @@ export class ApiError extends Error {
   readonly field?: string;
   /** One message per rule broken, e.g. each password rule (SCRUM-61 AC4). */
   readonly failures: string[];
+  /** Everything else the API said about the error, e.g. the `issues` that block publishing. */
+  readonly details: Record<string, unknown>;
 
   constructor(
     status: number,
@@ -28,6 +30,7 @@ export class ApiError extends Error {
       blockedUntil?: Date;
       field?: string;
       failures?: string[];
+      details?: Record<string, unknown>;
     } = {},
   ) {
     super(message);
@@ -38,11 +41,13 @@ export class ApiError extends Error {
     this.blockedUntil = extra.blockedUntil;
     this.field = extra.field;
     this.failures = extra.failures ?? [];
+    this.details = extra.details ?? {};
   }
 }
 
 type ApiOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  /** Sent as JSON, or as it is if it is FormData (a file upload). */
   body?: unknown;
   signal?: AbortSignal;
 };
@@ -55,8 +60,12 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
       method,
       signal,
       credentials: "same-origin",
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      // The browser sets the type, with its boundary, for FormData.
+      headers:
+        body === undefined || body instanceof FormData
+          ? undefined
+          : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
@@ -104,6 +113,7 @@ function toApiError(status: number, data: unknown): ApiError {
       blockedUntil: blocked_until ? new Date(blocked_until) : undefined,
       field,
       failures,
+      details: detail as Record<string, unknown>,
     });
   }
 
