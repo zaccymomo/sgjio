@@ -9,14 +9,15 @@ import { AUDIO_TYPES, IMAGE_TYPES, useUpload } from "../../lib/media";
 function DropZone({
   icon: Icon,
   title,
-  hint,
+  hints,
   accept,
   onFile,
   uploading,
 }: {
   icon: LucideIcon;
   title: string;
-  hint: string;
+  /** How to add a file, then what kind: one short line each, so side-by-side slots line up. */
+  hints: [string, string];
   accept: string;
   onFile: (file: File) => void;
   uploading: string | null;
@@ -41,7 +42,7 @@ function DropZone({
       onDragLeave={() => setOver(false)}
       onDrop={drop}
       className={cn(
-        "flex min-h-32 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors",
+        "flex min-h-32 cursor-pointer flex-col items-center justify-start gap-1.5 rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors",
         over ? "border-brand bg-brand-soft" : "border-line bg-surface hover:border-ink/30",
       )}
     >
@@ -54,7 +55,11 @@ function DropZone({
         <>
           <Icon className="size-6 text-subtle" aria-hidden />
           <span className="text-sm font-semibold text-ink">{title}</span>
-          <span className="text-xs text-muted">{hint}</span>
+          <span className="text-xs text-muted">
+            {hints[0]}
+            <br />
+            {hints[1]}
+          </span>
         </>
       )}
       <input
@@ -155,7 +160,7 @@ export function ImageField({
         <DropZone
           icon={ImagePlus}
           title="Add an image"
-          hint="Drop, paste or choose · JPEG, PNG or WebP · 4:3 looks best"
+          hints={["Drop, paste or choose", "JPEG, PNG or WebP · 4:3 is best"]}
           accept={IMAGE_TYPES}
           onFile={(file) => void upload(file)}
           uploading={uploading}
@@ -228,7 +233,7 @@ export function AudioField({
         <DropZone
           icon={Mic}
           title="Add audio"
-          hint="Drop or choose · MP3, M4A, WAV or Ogg · under 20 seconds"
+          hints={["Drop or choose", "MP3, M4A, WAV or Ogg · under 20s"]}
           accept={AUDIO_TYPES}
           onFile={(file) => void upload(file)}
           uploading={uploading}

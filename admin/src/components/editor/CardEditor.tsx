@@ -1,6 +1,6 @@
 import { Spinner } from "@sgjio/ui";
 import { BLANK_TOKEN, hasBlank, type Asset, type Card, type Issue } from "@sgjio/ui/lesson";
-import { Copy, HelpCircle, RectangleHorizontal, Trash2 } from "lucide-react";
+import { Copy, HelpCircle, RectangleHorizontal, Trash2, type LucideIcon } from "lucide-react";
 import type { ClipboardEvent } from "react";
 
 import { newQuestion } from "../../lib/cards";
@@ -133,33 +133,64 @@ export function CardEditor({
           onRemove={() => onChange({ question: null })}
         />
       ) : (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line p-3">
-          <span className="text-xs text-muted">Check understanding:</span>
-          <button
-            type="button"
-            onClick={() =>
-              onChange({
-                question: newQuestion(),
-                text: blank
-                  ? card.text
-                  : `${card.text.trimEnd()}${card.text.trim() ? " " : ""}${BLANK_TOKEN}`,
-              })
-            }
-            className="inline-flex h-8 items-center gap-1.5 rounded-sm bg-white px-2.5 text-xs font-semibold text-ink shadow-sm ring-1 ring-line hover:ring-ink/30"
-          >
-            <RectangleHorizontal className="size-3.5" aria-hidden />
-            Add fill-the-blank question
-          </button>
-          <button
-            type="button"
-            onClick={() => onChange({ question: newQuestion(4) })}
-            className="inline-flex h-8 items-center gap-1.5 rounded-sm bg-white px-2.5 text-xs font-semibold text-ink shadow-sm ring-1 ring-line hover:ring-ink/30"
-          >
-            <HelpCircle className="size-3.5" aria-hidden />
-            Add multiple-choice question
-          </button>
-        </div>
+        <section
+          aria-labelledby={`check-${card.id}`}
+          className="@container flex flex-col gap-2 rounded-lg border border-dashed border-line p-3"
+        >
+          <h3 id={`check-${card.id}`} className="text-xs font-semibold text-ink">
+            Check understanding
+          </h3>
+          {/* Side by side when there is room; one per row on a phone. */}
+          <div className="grid gap-2 @md:grid-cols-2">
+            <QuestionChoice
+              icon={RectangleHorizontal}
+              title="Add fill-the-blank question"
+              hint="Learners fill a gap in the text."
+              onClick={() =>
+                onChange({
+                  question: newQuestion(),
+                  text: blank
+                    ? card.text
+                    : `${card.text.trimEnd()}${card.text.trim() ? " " : ""}${BLANK_TOKEN}`,
+                })
+              }
+            />
+            <QuestionChoice
+              icon={HelpCircle}
+              title="Add multiple-choice question"
+              hint="Learners pick from up to 4 answers."
+              onClick={() => onChange({ question: newQuestion(4) })}
+            />
+          </div>
+        </section>
       )}
     </div>
+  );
+}
+
+/** One kind of question a card can add, with what it asks the learner to do. */
+function QuestionChoice({
+  icon: Icon,
+  title,
+  hint,
+  onClick,
+}: {
+  icon: LucideIcon;
+  title: string;
+  hint: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-start gap-2.5 rounded-md bg-white px-3 py-2.5 text-left shadow-sm ring-1 ring-line hover:ring-ink/30 focus-visible:outline-2 focus-visible:outline-brand"
+    >
+      <Icon className="mt-0.5 size-4 shrink-0 text-muted" aria-hidden />
+      <span className="flex flex-col gap-0.5">
+        <span className="text-xs font-semibold text-ink">{title}</span>
+        <span className="text-xs text-muted">{hint}</span>
+      </span>
+    </button>
   );
 }
