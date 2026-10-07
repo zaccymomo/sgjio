@@ -8,13 +8,14 @@ SGJio is an IS4301 team project: a **web app** (not a mobile app) that helps int
 
 ## Repository layout
 
-| Path           | What                                                                                            |
-| -------------- | ----------------------------------------------------------------------------------------------- |
-| `web/`         | Main app, React 19 + TS + Vite, port 5173                                                       |
-| `admin/`       | Admin portal for content administrators, port 5174                                              |
-| `packages/ui/` | Shared tokens (`src/theme.css`), components, `apiFetch`, `AuthProvider`/`RequireAuth`/`useAuth` |
-| `api/`         | FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL 16, port 8000, docs at `/api/docs`                |
-| `docs/`        | `data-model.md` (ERD), `decisions.md` (proposed defaults for open story decisions)              |
+| Path           | What                                                                                                                                                       |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `web/`         | Main app, React 19 + TS + Vite, port 5173                                                                                                                  |
+| `admin/`       | Admin portal for content administrators, port 5174                                                                                                         |
+| `packages/ui/` | Shared tokens (`src/theme.css`), components, `apiFetch`, `AuthProvider`/`RequireAuth`/`useAuth`; `@sgjio/ui/lesson` is the lesson deck both front ends use |
+| `api/`         | FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL 16, port 8000, docs at `/api/docs`                                                                           |
+| `docs/`        | `data-model.md` (ERD), `decisions.md` (proposed defaults for open story decisions)                                                                         |
+| `content/`     | Lesson files the seed loads (`README.md` explains the format, `STYLE.md` the look)                                                                         |
 
 Both Vite servers proxy `/api` to FastAPI, so there is one origin and no CORS.
 
@@ -25,11 +26,12 @@ The developer uses Anaconda. **Always run Python tools with `python -m`** from `
 ```bash
 docker compose up -d                                   # Postgres + Mailpit (http://localhost:8025)
 cd api && python -m uvicorn app.main:app --reload      # API
-python -m pytest                                       # 44 tests, uses the sgjio_test database
+python -m pytest                                       # 335 tests, uses the sgjio_test database
 python -m ruff check . && python -m ruff format .
 python -m alembic revision --autogenerate -m "..."     # then READ the generated file
 python -m alembic upgrade head
-python -m app.cli seed | create-admin | send-reset
+python -m app.cli seed | create-admin | send-reset | prune-media
+python -m app.cli import-lessons [folder] [--publish]   # load lesson files (content/README.md)
 npm run dev:web | dev:admin                            # from repo root
 npm run lint && npm run format && npm run typecheck && npm run build
 ```
@@ -58,6 +60,9 @@ Seed logins: main app `newcomer@sgjio.example.com` / `UserPass123`; admin `admin
 ## Product rules that stories depend on
 
 - **Home page = portfolio (SCRUM-43):** one progress circle per topic with ≥1 published lesson, filled by _lessons completed / lessons available_ ("8 / 12"), empty "Not started", visibly distinct when complete; plus one overall figure; selecting a circle opens the topic's lesson list (SCRUM-53). A suggested next lesson from the weakest topic (SCRUM-6). **No daily streaks, no weekly lessons, no separate score, no leaderboard.** Keep the home screen minimal (the Integration Hub was removed).
-- **Progress rules live in SCRUM-16:** answering a lesson's single quiz question completes it whether right or wrong; correctness is stored separately and the best result is kept; only currently published lessons count, so completed can never exceed available. Circles show completion; correctness feeds tiers (SCRUM-27).
-- Lessons: under 2 minutes to read, exactly one topic, one single-choice quiz question at the end. Statuses Draft / Published / Withdrawn; withdrawn lessons are kept for users' history.
+- **Progress rules live in SCRUM-16:** finishing a lesson completes it whether its answers were right or wrong; correctness is stored separately and the best result is kept; only currently published lessons count, so completed can never exceed available. Circles show completion; correctness feeds tiers (SCRUM-27). Today `lesson_completions.answered_correctly` still holds one right-or-wrong result per lesson; the learner side of the card decks will replace it with the score described below.
+- **Lessons are decks of cards (SCRUM-19).** A card has Markdown text (bold, italics, lists, and at most one `{{blank}}`), an optional image and/or audio, and an optional question: 1 to 4 options, exactly one correct, an explanation, optional "why not" notes on wrong options, shuffled unless the author says not. A one-option question is a tap that fills the blank and isn't scored. A lesson needs at least one question to publish, belongs to exactly one topic, and should read in under 2 minutes. The document's rules live in `api/app/lesson_doc.py` (issues: blockers vs warnings); the shared types in `packages/ui/src/lesson/types.ts`.
+- **Drafts and versions (SCRUM-52).** Editors always change a lesson's draft; publishing copies it into a numbered `lesson_versions` row, which is what users see. Statuses Draft / Published / Withdrawn; withdrawn lessons, and every version, are kept for users' history. Topic and position are not versioned.
+- **Learners see the newest version** when they start or retake a lesson. Agreed for the learner side (not built yet): a lesson is complete when its deck is finished; the score is first-try correct answers out of the scored questions; the best percentage is kept, and a tie keeps the most recent; "mastered" means all correct. Answers are checked on the server, and the learner's copy of a lesson never contains which option is right.
+- **Media** (images, audio) is uploaded once, stored in Postgres (`media_assets`) and served publicly at `/api/media/{id}`; lessons refer to it by id. Images become WebP at most 1600px wide.
 - Open decisions and the defaults chosen are in `docs/decisions.md`. Don't change them silently; flag it.
