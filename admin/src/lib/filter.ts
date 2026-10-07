@@ -50,7 +50,7 @@ export function normalise(text: string): string {
   return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
 }
 
-export function lessonTitle(lesson: LessonSummary): string {
+export function lessonTitle(lesson: Pick<LessonSummary, "title">): string {
   return lesson.title.trim() || UNTITLED;
 }
 

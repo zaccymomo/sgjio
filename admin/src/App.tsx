@@ -1,5 +1,12 @@
-import { AdminLayout, AuthProvider, Button, RequireAuth, useAuth } from "@sgjio/ui";
-import { useState } from "react";
+import {
+  AdminLayout,
+  AuthProvider,
+  Button,
+  FullPageSpinner,
+  RequireAuth,
+  useAuth,
+} from "@sgjio/ui";
+import { lazy, Suspense, useState } from "react";
 import {
   Navigate,
   Outlet,
@@ -14,6 +21,11 @@ import { ContentPage } from "./pages/ContentPage";
 import { LessonEditorPage } from "./pages/LessonEditorPage";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { SignInPage } from "./pages/SignInPage";
+
+// Pages with the lesson deck load it only when opened, so the rest of the portal stays light.
+const LessonPreviewPage = lazy(() =>
+  import("./pages/LessonPreviewPage").then((module) => ({ default: module.LessonPreviewPage })),
+);
 
 function SignedInLayout() {
   const { user, signOut } = useAuth();
@@ -67,6 +79,15 @@ const router = createBrowserRouter(
 
       {/* Administrators only: anyone else is sent to /sign-in?next=... */}
       <Route element={<RequireAuth />}>
+        {/* Full screen, without the portal's header (SCRUM-65). */}
+        <Route
+          path="/lessons/:id/preview"
+          element={
+            <Suspense fallback={<FullPageSpinner />}>
+              <LessonPreviewPage />
+            </Suspense>
+          }
+        />
         <Route element={<SignedInLayout />}>
           <Route index element={<ContentPage />} />
           {/* /lessons/new for a lesson not saved yet (SCRUM-64). */}

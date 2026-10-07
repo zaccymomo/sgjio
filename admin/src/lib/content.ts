@@ -20,16 +20,25 @@ export const STATUS_LABELS: Record<LessonStatus, string> = {
   withdrawn: "Withdrawn",
 };
 
-/** A lesson as /api/admin/lessons returns it: no body, just what the list shows. */
+/** A lesson as /api/admin/lessons returns it: no cards, just what the list shows. */
 export type LessonSummary = {
   id: string;
   title: string;
+  summary: string;
   topic_id: string | null;
   status: LessonStatus;
   updated_at: string;
   position: number;
-  /** A draft that has never been published. Only these can be deleted. */
+  /** Never published. Only these can be deleted. */
   deletable: boolean;
+  /** The draft differs from what users see: there is something to publish. */
+  has_unpublished_changes: boolean;
+  /** The latest published version, or null if never published. */
+  version: number | null;
+  cards: number;
+  questions: number;
+  /** The first image in the deck, served at /api/media/{id}. */
+  cover_asset_id: string | null;
 };
 
 export type Content = { topics: Topic[]; lessons: LessonSummary[] };
