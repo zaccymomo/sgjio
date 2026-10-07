@@ -10,6 +10,7 @@ This repository holds three parts that run side by side:
 | `admin/`       | Admin portal for content administrators (React)      | http://localhost:5174                       |
 | `api/`         | Backend shared by both (FastAPI + PostgreSQL)        | http://localhost:8000 · docs at `/api/docs` |
 | `packages/ui/` | Shared design tokens, components and sign-in helpers | used by `web` and `admin`                   |
+| `content/`     | The lessons SGJio starts with, as files              | loaded by the seed                          |
 
 ## Tech stack
 
@@ -33,7 +34,7 @@ source .venv/bin/activate          # Windows: .venv\Scripts\activate
 python -m pip install -r requirements-dev.txt
 cp .env.example .env               # Windows: copy .env.example .env
 python -m alembic upgrade head     # create the tables
-python -m app.cli seed             # admin account, demo user, topics, a sample lesson
+python -m app.cli seed             # admin account, demo user, topics and the lessons in content/
 cd ..
 
 # 3. Front ends
@@ -129,7 +130,7 @@ docker compose exec db psql -U sgjio -d sgjio
 | `\x`                    | switch to one field per line, for long lesson text |
 | `\q`                    | quit                                               |
 
-After seeding you should find 2 users, 6 topics and 18 published lessons, each with a quiz question and four options, plus some completed lessons for the Newcomer account so the landing page circles have something to show. [`docs/data-model.md`](docs/data-model.md) explains how the tables relate.
+After seeding you should find 2 users, 6 topics and 18 published lessons, each a deck of cards with illustrations and questions (plus a draft "Card gallery"), their images and audio in `media_assets`, and some completed lessons for the Newcomer account so the landing page circles have something to show. [`docs/data-model.md`](docs/data-model.md) explains how the tables relate.
 
 ## Everyday commands
 
@@ -143,6 +144,7 @@ After seeding you should find 2 users, 6 topics and 18 published lessons, each w
 | New database migration    | `cd api && python -m alembic revision --autogenerate -m "what changed"`               |
 | Apply migrations          | `cd api && python -m alembic upgrade head`                                            |
 | Add an administrator      | `cd api && python -m app.cli create-admin --email you@example.com --name "Your Name"` |
+| Load lessons from files   | `cd api && python -m app.cli import-lessons --publish` (see `content/README.md`)      |
 
 The API tests use a separate `sgjio_test` database, so they never touch your data.
 

@@ -8,8 +8,9 @@ erDiagram
     users ||--o{ auth_sessions : "signed in on"
     users ||--o{ password_reset_tokens : "requested"
     topics ||--o{ lessons : "contains"
-    lessons ||--o| quiz_questions : "ends with"
-    quiz_questions ||--|{ quiz_options : "offers"
+    lessons ||--o{ lesson_versions : "published as"
+    users ||--o{ lesson_versions : "published"
+    users ||--o{ media_assets : "uploaded"
     users ||--o{ lesson_completions : "completed"
     lessons ||--o{ lesson_completions : "completed by"
 
@@ -36,27 +37,42 @@ erDiagram
     }
     lessons {
         uuid id PK
-        string title
-        text content "Markdown"
-        uuid topic_id FK "may be empty while a draft"
+        string key UK "set for lessons loaded from content/"
+        string title "the draft's"
+        string summary "the draft's"
+        jsonb draft "the working copy: a deck of cards"
+        bool has_unpublished_changes
+        uuid topic_id FK "may be empty until first published"
         string status "draft | published | withdrawn"
-        timestamptz published_at
+        timestamptz published_at "when it last went live"
         timestamptz withdrawn_at
         int position "order within its topic"
         timestamptz updated_at "indexed: admin list sorts by it"
     }
-    quiz_questions {
+    lesson_versions {
         uuid id PK
-        uuid lesson_id FK,UK "one question per lesson"
-        text prompt
-        text explanation "shown after answering"
+        uuid lesson_id FK "unique with number"
+        int number "1, 2, 3 per lesson"
+        string title
+        string summary
+        jsonb doc "the deck as published"
+        timestamptz published_at
+        uuid published_by FK
     }
-    quiz_options {
+    media_assets {
         uuid id PK
-        uuid question_id FK
-        string text
-        bool is_correct "at most one true per question"
-        int position
+        string kind "image | audio"
+        string mime
+        string sha256 UK "of the file as uploaded"
+        bytea data "the file itself"
+        int size
+        int width "images"
+        int height "images"
+        int duration_ms "audio"
+        string placeholder "tiny blurred copy, data: URL"
+        string color "main colour, #rrggbb"
+        string filename
+        uuid created_by FK
     }
     lesson_completions {
         uuid id PK
@@ -100,7 +116,7 @@ erDiagram
 - **Topics are archived, or deleted only when empty** (SCRUM-57). `archived_at` is a nullable timestamp: empty means active. Archiving hides the topic from users, including its progress circle and the overall figure, but keeps its lessons and everyone's completions, so restoring brings it all back. A topic with no lessons of any status can be deleted outright; otherwise the administrator must archive it. Archived topics keep reserving their name, so the unique index stays as is, and they can still be renamed. A timestamp was chosen over a flag or status column because there are only two states and the date is useful to show.
 - **Topics and lessons have a `position`** (SCRUM-66). Administrators drag topics into order, and that is also the order of users' progress circles. Lessons are ordered within their topic, and lessons with no topic are ordered as one group of their own. A position is only a sort key: there is no unique constraint, and every read breaks ties by `created_at`, so a gap or a duplicate can never break a page. New topics and lessons go to the end, and so does a restored topic. Reordering always rewrites a whole topic list or a whole lesson group at once (see `docs/decisions.md`).
 - **Enumerations are stored as text with a CHECK constraint**, not native Postgres enums, so adding a value later is a simple migration.
-- **Completion is one row per user per lesson** (`lesson_completions`, SCRUM-16). It is written the first time the quiz is answered, right or wrong (AC3), and the unique constraint on `(user_id, lesson_id)` is what makes completion count once however many times the quiz is retaken (AC5, AC6).
+- **Completion is one row per user per lesson** (`lesson_completions`, SCRUM-16). It is written the first time a lesson is completed, however its answers went (AC3), and the unique constraint on `(user_id, lesson_id)` is what makes completion count once however many times it is retaken (AC5, AC6). The learner side of the card decks (not built yet) will add a table of attempts, one per finished deck, holding each answer and the score, against the version taken.
 - **Correctness is a column on that row, not a second table.** `answered_correctly` holds the _best_ result so far, so a later wrong answer never clears an earlier correct one (SCRUM-16 AC5). Completion feeds the progress circles; correctness feeds tiers (SCRUM-27).
 - **A completion row outlives withdrawal.** Withdrawing a lesson leaves the row in place, so the user's history keeps it (SCRUM-52 AC4), while the progress query filters on `status = published` so the circle's two figures both shrink and `completed` can never exceed `available` (SCRUM-16 AC8).
 - **Individual attempts are not stored.** Only the completion and the best result are. A full attempt history would be a separate table; SCRUM-42 and SCRUM-44 will say whether one is needed.
@@ -111,7 +127,7 @@ erDiagram
 
 - one administrator and one Newcomer user (see README for the sign-in details)
 - the six topics from the Figma home screen: Singlish, Hawker & Food, Workplace, Public Etiquette, Festivals, Getting Around
-- three published lessons per topic, eighteen in all, each with a four-option quiz question
+- the lessons in `content/lessons` (three per topic, eighteen in all, each a deck of cards with illustrations, some audio and two or three questions), published, plus a draft "Card gallery" showing every kind of card. Running it again only updates lessons whose files changed; see `content/README.md`.
 - some completed lessons for the Newcomer account, chosen so the landing page shows every
   state a progress circle can be in: not started, in progress and complete. These are only
   added when that account has no progress at all, so re-seeding never overwrites real
