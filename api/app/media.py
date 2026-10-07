@@ -5,9 +5,9 @@ Files are uploaded by administrators, processed once, and stored in the database
 carries an `assets` map with what a page needs to show them, so neither front end has to
 look anything up separately.
 
-- images: JPEG, PNG or WebP. Turned the right way up, stripped of EXIF data (which can hold
-  where a photo was taken), shrunk to at most 1600px wide and stored as WebP, with a tiny
-  blurred placeholder and the image's main colour.
+- images: JPEG (including the "MPO" kind many cameras write), PNG or WebP. Turned the right way
+  up, stripped of EXIF data (which can hold where a photo was taken), shrunk to at most 1600px
+  wide and stored as WebP, with a tiny blurred placeholder and the image's main colour.
 - audio: MP3, M4A (AAC), WAV or Ogg, stored as uploaded. Its length is read from the file.
 - uploading a file that is already stored returns the stored asset rather than a copy.
 - files are served publicly at /api/media/{id}: the ids cannot be guessed, lesson media is
@@ -38,7 +38,11 @@ PLACEHOLDER_WIDTH = 24
 # Refuse images that would take too much memory to open (a "decompression bomb").
 Image.MAX_IMAGE_PIXELS = 60_000_000
 
-IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
+# Pillow calls a camera JPEG with extra embedded frames (e.g. Nikon, Samsung) "MPO"; it opens
+# as a normal JPEG and its first frame is the photo.
+IMAGE_FORMATS = {"JPEG", "MPO", "PNG", "WEBP"}
+# Image formats we recognise but do not accept, so the error can name them.
+_HEIC_BRANDS = {b"heic", b"heix", b"hevc", b"mif1", b"msf1", b"heim", b"heis"}
 AUDIO_TYPES = {
     "MP3": "audio/mpeg",
     "MP4": "audio/mp4",
@@ -52,12 +56,13 @@ class MediaReferenceError(ValueError):
     """A card refers to an image or audio file that does not exist, or is the wrong kind."""
 
 
-def _unsupported() -> ContentProblem:
-    return ContentProblem(
-        "media_unsupported",
-        "Upload a JPEG, PNG or WebP image, or MP3, M4A, WAV or Ogg audio.",
-        415,
-    )
+def _unsupported(other_image: str | None = None) -> ContentProblem:
+    """`other_image` names an image format we recognised but do not accept, e.g. "HEIC"."""
+    if other_image:
+        message = f"That looks like a {other_image} image. Save it as a JPEG, PNG or WebP image."
+    else:
+        message = "Upload a JPEG, PNG or WebP image, or MP3, M4A, WAV or Ogg audio."
+    return ContentProblem("media_unsupported", message, 415)
 
 
 def _too_large(what: str, limit: str) -> ContentProblem:
@@ -128,7 +133,7 @@ def _process_image(data: bytes) -> dict:
     try:
         image = Image.open(io.BytesIO(data))
         if image.format not in IMAGE_FORMATS:
-            raise _unsupported()
+            raise _unsupported(image.format)
         image.load()
     except (UnidentifiedImageError, Image.DecompressionBombError, OSError):
         raise ContentProblem(
@@ -173,6 +178,15 @@ def _looks_like_image(data: bytes) -> bool:
     )
 
 
+def _other_image_format(data: bytes) -> str | None:
+    """The name of an image format we do not accept, if the file is one."""
+    if data.startswith((b"GIF87a", b"GIF89a")):
+        return "GIF"
+    if data[4:8] == b"ftyp" and data[8:12] in _HEIC_BRANDS:
+        return "HEIC"
+    return None
+
+
 def store(db: Session, data: bytes, filename: str, created_by: uuid.UUID | None) -> Asset:
     """Process and keep an uploaded file, or return the stored asset if it is the same file.
 
@@ -197,7 +211,7 @@ def store(db: Session, data: bytes, filename: str, created_by: uuid.UUID | None)
         except mutagen.MutagenError:
             audio = None
         if audio is None or getattr(audio, "info", None) is None:
-            raise _unsupported()
+            raise _unsupported(_other_image_format(data))
         if len(data) > settings.media_max_audio_mb * 1024 * 1024:
             raise _too_large("recording", f"{settings.media_max_audio_mb} MB")
         processed = _process_audio(data, audio)

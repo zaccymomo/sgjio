@@ -44,6 +44,15 @@ def _jpeg_with_exif() -> bytes:
     return out.getvalue()
 
 
+def _mpo() -> bytes:
+    """A camera JPEG with a second embedded frame: Pillow reports its format as MPO."""
+    image = Image.new("RGB", (400, 300), (40, 120, 200))
+    out = io.BytesIO()
+    image.save(out, "MPO", save_all=True, append_images=[Image.new("RGB", (80, 60))])
+    assert Image.open(io.BytesIO(out.getvalue())).format == "MPO"
+    return out.getvalue()
+
+
 def _wav(seconds: float = 1.0, rate: int = 8000) -> bytes:
     out = io.BytesIO()
     with wave.open(out, "wb") as recording:
@@ -100,6 +109,13 @@ def test_photos_are_turned_upright_and_lose_their_exif(admin, db):
     assert not stored.getexif()
 
 
+def test_a_camera_jpeg_with_extra_frames_is_accepted(admin):
+    asset = _upload(admin, _mpo(), "DSC_0040.JPG", "image/jpeg")
+
+    assert asset.status_code == 201
+    assert (asset.json()["width"], asset.json()["height"]) == (400, 300)
+
+
 def test_audio_is_stored_as_uploaded_with_its_length(admin, db):
     data = _wav(seconds=1.5)
 
@@ -134,6 +150,20 @@ def test_files_that_are_not_supported_images_or_audio_are_refused(admin, db, dat
     assert response.status_code == status
     assert response.json()["detail"]["code"] == code
     assert db.query(MediaAsset).count() == 0
+
+
+@pytest.mark.parametrize(
+    ("data", "name"),
+    [
+        (b"\x00\x00\x00\x18ftypheic" + b"\x00" * 20, "HEIC"),
+        (b"GIF89a" + b"\x00" * 20, "GIF"),
+    ],
+)
+def test_other_image_formats_are_named_in_the_error(admin, data, name):
+    response = _upload(admin, data)
+
+    assert response.status_code == 415
+    assert name in response.json()["detail"]["message"]
 
 
 def test_files_over_the_limits_are_refused(admin, db, monkeypatch):
