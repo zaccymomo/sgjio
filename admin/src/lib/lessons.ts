@@ -1,4 +1,5 @@
 import { apiFetch } from "@sgjio/ui";
+import type { Assets, Issue, LessonDoc, LessonStats } from "@sgjio/ui/lesson";
 
 import type { LessonStatus } from "./content";
 
@@ -12,17 +13,29 @@ export type LessonFields = {
   topic_id: string | null;
 };
 
-/** One lesson as GET /api/admin/lessons/{id} returns it. */
+/** One lesson as GET /api/admin/lessons/{id} returns it: the draft, with everything the
+ * editor shows about it. */
 export type Lesson = LessonFields & {
   id: string;
+  key: string | null;
+  summary: string;
   status: LessonStatus;
   published_at: string | null;
   withdrawn_at: string | null;
   position: number;
   created_at: string;
   updated_at: string;
-  /** A draft that has never been published. Only these can be deleted. */
+  /** Never published. Only these can be deleted. */
   deletable: boolean;
+  has_unpublished_changes: boolean;
+  /** The latest published version, or null if never published. */
+  version: { number: number; published_at: string } | null;
+  doc: LessonDoc;
+  /** What still stops it being published (blockers), and what is worth a look (warnings). */
+  issues: Issue[];
+  stats: LessonStats;
+  /** The images and audio its cards use, by id. */
+  assets: Assets;
 };
 
 /** Same limit as the API (MAX_LESSON_TITLE in schemas.py). */

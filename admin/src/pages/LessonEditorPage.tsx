@@ -8,7 +8,7 @@ import {
   Spinner,
   useAuth,
 } from "@sgjio/ui";
-import { ChevronLeft, Trash2 } from "lucide-react";
+import { ChevronLeft, Eye, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -403,6 +403,19 @@ function LessonEditor({
                 <span aria-hidden> · </span>
                 Drafts are only visible to administrators.
               </p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            {lesson && (
+              <Button
+                variant="secondary"
+                className="flex-1 sm:flex-none"
+                onClick={() => navigate(`/lessons/${lesson.id}/preview`)}
+                disabled={saving}
+              >
+                <Eye className="size-4" aria-hidden />
+                Preview
+              </Button>
             )}
           </div>
           {editable && (
