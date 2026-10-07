@@ -4,6 +4,7 @@ import {
   Button,
   FullPageSpinner,
   RequireAuth,
+  Spinner,
   useAuth,
 } from "@sgjio/ui";
 import { lazy, Suspense, useState } from "react";
@@ -14,15 +15,18 @@ import {
   RouterProvider,
   createBrowserRouter,
   createRoutesFromElements,
+  useMatch,
   useNavigate,
 } from "react-router-dom";
 
 import { ContentPage } from "./pages/ContentPage";
-import { LessonEditorPage } from "./pages/LessonEditorPage";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { SignInPage } from "./pages/SignInPage";
 
 // Pages with the lesson deck load it only when opened, so the rest of the portal stays light.
+const LessonEditorPage = lazy(() =>
+  import("./pages/LessonEditorPage").then((module) => ({ default: module.LessonEditorPage })),
+);
 const LessonPreviewPage = lazy(() =>
   import("./pages/LessonPreviewPage").then((module) => ({ default: module.LessonPreviewPage })),
 );
@@ -30,6 +34,8 @@ const LessonPreviewPage = lazy(() =>
 function SignedInLayout() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  // The lesson editor works in three panes, side by side.
+  const wide = useMatch("/lessons/:id") !== null;
   const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
@@ -44,6 +50,7 @@ function SignedInLayout() {
 
   return (
     <AdminLayout
+      wide={wide}
       actions={
         <>
           <span className="hidden text-xs text-muted sm:inline">{user?.email}</span>
@@ -53,7 +60,15 @@ function SignedInLayout() {
         </>
       }
     >
-      <Outlet />
+      <Suspense
+        fallback={
+          <div className="flex justify-center py-16 text-brand">
+            <Spinner className="size-6" label="Loading" />
+          </div>
+        }
+      >
+        <Outlet />
+      </Suspense>
     </AdminLayout>
   );
 }
