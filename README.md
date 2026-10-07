@@ -75,13 +75,14 @@ cd api && python -m app.cli send-reset --email admin@sgjio.example.com --scope a
 
 ## After pulling or merging
 
-Someone else's changes may need new packages or new database tables. Run this from the repo root each time you pull or merge `main`:
+Your database is your own (it runs in Docker on your machine), so nobody else's data reaches it. Someone else's changes may need new packages, new database tables or new lessons. Run this from the repo root each time you pull or merge `main`:
 
 ```bash
 npm install
 cd api && source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
 python -m alembic upgrade head     # apply any new migrations
+python -m app.cli seed             # load new or changed lessons from content/
 cd ..
 ```
 
@@ -89,10 +90,16 @@ Then restart `npm run dev:web` / `npm run dev:admin` if they were running. The A
 
 Skipping the migration step leaves your database behind the code, and pages fail with a 500 error. The API terminal then shows `column ... does not exist` or `relation ... does not exist`. To check, run `python -m alembic current` in `api/`: it should end in `(head)`.
 
-Two more things to check:
+Three more things to know:
 
 - **`api/.env.example` changed?** Copy any new settings into your own `api/.env`.
-- **Want the latest demo content?** Run `python -m app.cli seed`. It is safe to run again, because it skips data that is already there.
+- **What the seed does to your data.** It is safe to run again. It adds missing accounts and topics and never touches your progress. Every lesson that has a file in `content/lessons` is reset to match its file and published as a new version if anything differed, so edits you made to one in the admin portal are replaced. Lessons you created yourself are left alone. The first time, it finds your existing lessons by title; a seeded lesson you had renamed is not recognised, and the seed adds a second copy next to it.
+- **Starting over.** If your local data is in a mess, delete it and build it again. This removes everything in your local database, but nobody else's:
+
+  ```bash
+  docker compose down -v && docker compose up -d
+  cd api && python -m alembic upgrade head && python -m app.cli seed
+  ```
 
 ## Looking inside the database
 
