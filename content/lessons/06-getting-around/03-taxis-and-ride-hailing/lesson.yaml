@@ -1,0 +1,33 @@
+title: Taxis and Ride-Hailing
+summary: Fares, surcharges and the tipping question.
+topic: Getting Around
+cards:
+  - image: { file: cover.png, alt: "A taxi beside a phone showing a ride-hailing map pin" }
+    text: |-
+      Ride-hailing apps such as Grab, Gojek and TADA quote a **fixed fare** up front. Street taxis run on the meter.
+
+  - text: |-
+      You can flag a taxi down where it's safe to stop, but not on roads with double yellow lines. In the city centre, use a taxi stand.
+
+  - text: |-
+      Expect surcharges at peak hours, late at night and for airport pickups. They're added automatically and aren't negotiable.
+
+  - text: |-
+      What is the norm on tipping taxi and ride-hailing drivers in Singapore?
+    question:
+      options:
+        - text: "Tipping is not customary"
+          correct: true
+        - text: "Ten per cent is expected"
+        - text: "Round up to the nearest five dollars"
+        - text: "Tip only on airport trips"
+      explanation: |-
+        Tipping is not customary in Singapore. The metered or quoted fare, plus any automatic surcharges, is the full amount.
+
+  - text: |-
+      In the back seat, you still need to wear a {{blank}}.
+    question:
+      options:
+        - text: "seatbelt"
+      explanation: |-
+        Seatbelts are required in the back seat as well as the front.

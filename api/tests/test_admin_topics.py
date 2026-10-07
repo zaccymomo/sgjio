@@ -28,7 +28,7 @@ def _topic(db, name: str, archived: bool = False, position: int = 0) -> Topic:
 
 
 def _lesson(db, topic: Topic, status: LessonStatus) -> Lesson:
-    lesson = Lesson(title="A lesson", content="...", topic=topic, status=status)
+    lesson = Lesson(title="A lesson", topic=topic, status=status)
     db.add(lesson)
     db.commit()
     return lesson

@@ -16,15 +16,15 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
-    Text,
     UniqueConstraint,
     func,
 )
 from sqlalchemy import (
     text as sql_text,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -50,6 +50,11 @@ class LessonStatus(str, enum.Enum):
     DRAFT = "draft"
     PUBLISHED = "published"
     WITHDRAWN = "withdrawn"
+
+
+class MediaKind(str, enum.Enum):
+    IMAGE = "image"
+    AUDIO = "audio"
 
 
 class AuthScope(str, enum.Enum):
@@ -171,27 +176,54 @@ class Topic(Base):
 
 
 class Lesson(Base):
-    """A short lesson ending in one quiz question (SCRUM-58, SCRUM-64).
+    """A short lesson: a deck of cards with at least one question (SCRUM-19, SCRUM-64).
 
-    `topic_id` may be empty while a lesson is a draft; publishing requires it (SCRUM-56).
-    Each lesson belongs to exactly one topic (the assumption in SCRUM-56).
+    The cards are a JSON document (see app/lesson_doc.py). `draft` is the working copy
+    administrators edit; publishing copies it into a new `LessonVersion`, which is what
+    users see. Editing a published lesson therefore never changes what users see until it
+    is published again (SCRUM-52), and every version is kept, so a learner's history can
+    always show the version they answered.
+
+    `title` and `summary` belong to the draft too; each version keeps its own copy.
+    `topic_id` and `position` are not versioned: they place the lesson rather than make it
+    up, so moving a lesson takes effect straight away, like reordering.
+
+    `topic_id` may be empty while a lesson has never been published; publishing requires it
+    (SCRUM-56). Each lesson belongs to exactly one topic (the assumption in SCRUM-56).
 
     `position` orders lessons within their topic, and lessons with no topic among
     themselves (SCRUM-66). Like `Topic.position` it is a sort key, not unique.
+
+    `key` names a lesson loaded from a file in content/, so loading the file again updates
+    that lesson instead of adding another.
     """
 
     __tablename__ = "lessons"
     __table_args__ = (Index("ix_lessons_topic_id_position", "topic_id", "position"),)
 
     id: Mapped[uuid.UUID] = _uuid_pk()
+    key: Mapped[str | None] = mapped_column(String(200), unique=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False, default="")
-    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # One line saying what the lesson is about, for lesson lists and suggestions.
+    summary: Mapped[str] = mapped_column(String(160), nullable=False, default="", server_default="")
+    draft: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+        default=lambda: {"cards": []},
+        server_default=sql_text("""'{"cards": []}'::jsonb"""),
+    )
+    # True when the draft differs from the latest version: there is something to publish.
+    # Always false for a lesson that has never been published.
+    has_unpublished_changes: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sql_text("false")
+    )
     topic_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("topics.id", ondelete="RESTRICT"), index=True
     )
     status: Mapped[LessonStatus] = mapped_column(
         _enum(LessonStatus, "lesson_status"), default=LessonStatus.DRAFT, nullable=False, index=True
     )
+    # When it last went live (published or restored), and when it was last withdrawn.
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -207,55 +239,71 @@ class Lesson(Base):
     )
 
     topic: Mapped[Topic | None] = relationship(back_populates="lessons")
-    question: Mapped["QuizQuestion | None"] = relationship(
-        back_populates="lesson", cascade="all, delete-orphan", uselist=False
+    versions: Mapped[list["LessonVersion"]] = relationship(
+        back_populates="lesson",
+        cascade="all, delete-orphan",
+        order_by="LessonVersion.number",
     )
 
 
-class QuizQuestion(Base):
-    """The single quiz question at the end of a lesson (SCRUM-15)."""
+class LessonVersion(Base):
+    """One published state of a lesson, kept for good (SCRUM-52).
 
-    __tablename__ = "quiz_questions"
+    Numbers count up from 1 per lesson. The latest version is what users see while the
+    lesson is published, and what restoring a withdrawn lesson brings back.
+    """
+
+    __tablename__ = "lesson_versions"
+    __table_args__ = (UniqueConstraint("lesson_id", "number"),)
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     lesson_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("lessons.id", ondelete="CASCADE"), unique=True, nullable=False
+        ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    prompt: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    # Shown after answering: why the correct option is the norm (SCRUM-15 AC6-7).
-    explanation: Mapped[str] = mapped_column(Text, nullable=False, default="")
-    created_at: Mapped[datetime] = _created_at()
-    updated_at: Mapped[datetime] = _updated_at()
-
-    lesson: Mapped[Lesson] = relationship(back_populates="question")
-    options: Mapped[list["QuizOption"]] = relationship(
-        back_populates="question",
-        cascade="all, delete-orphan",
-        order_by="QuizOption.position",
+    number: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    summary: Mapped[str] = mapped_column(String(160), nullable=False, default="")
+    doc: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    published_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
     )
 
+    lesson: Mapped[Lesson] = relationship(back_populates="versions")
 
-class QuizOption(Base):
-    __tablename__ = "quiz_options"
-    __table_args__ = (
-        # Only one option per question can be marked correct (SCRUM-15 AC2).
-        Index(
-            "uq_quiz_options_one_correct",
-            "question_id",
-            unique=True,
-            postgresql_where=sql_text("is_correct"),
-        ),
-    )
+
+class MediaAsset(Base):
+    """An image or audio file a lesson card uses (SCRUM-19).
+
+    The file itself is kept in the database, so media is backed up, reset and moved with
+    everything else and needs no setup. Files never change once stored: a new upload is a
+    new asset, so browsers can cache them for good. Uploading the same file twice gives back
+    the first asset (`sha256` is of the file as uploaded).
+
+    Images are stored as WebP at most 1600px wide, with their EXIF data (which can include
+    where a photo was taken) removed. `placeholder` is a tiny blurred copy to show while the
+    image loads, and `color` its main colour, which the lesson player tints cards with.
+    """
+
+    __tablename__ = "media_assets"
 
     id: Mapped[uuid.UUID] = _uuid_pk()
-    question_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("quiz_questions.id", ondelete="CASCADE"), nullable=False, index=True
+    kind: Mapped[MediaKind] = mapped_column(_enum(MediaKind, "media_kind"), nullable=False)
+    mime: Mapped[str] = mapped_column(String(60), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    # Only loaded when the file is served, never when lessons are listed or edited.
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, deferred=True)
+    size: Mapped[int] = mapped_column(Integer, nullable=False)
+    width: Mapped[int | None] = mapped_column(Integer)
+    height: Mapped[int | None] = mapped_column(Integer)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    placeholder: Mapped[str | None] = mapped_column(String(2000))
+    color: Mapped[str | None] = mapped_column(String(7))
+    filename: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
     )
-    text: Mapped[str] = mapped_column(String(300), nullable=False)
-    is_correct: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-
-    question: Mapped[QuizQuestion] = relationship(back_populates="options")
+    created_at: Mapped[datetime] = _created_at()
 
 
 # --- Progress -----------------------------------------------------------------------------

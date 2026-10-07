@@ -1,9 +1,19 @@
-"""The seed sets the order of what it creates, and never reorders anything (SCRUM-66)."""
+"""The seed sets the order of what it creates, and never reorders anything (SCRUM-66), and
+loads its lessons from content/ (SCRUM-77)."""
 
+import yaml
 from sqlalchemy import select
 
-from app.models import Lesson, Topic
-from app.seed import LESSONS, TOPICS, seed
+from app.config import get_settings
+from app.content_import import find_lesson_files
+from app.models import Lesson, LessonStatus, Topic
+from app.seed import TOPICS, seed
+
+
+def _lesson_files() -> list[dict]:
+    """Every lesson file in content/, in folder order."""
+    root = get_settings().content_dir
+    return [yaml.safe_load(path.read_text()) for path in find_lesson_files(root)]
 
 
 def _topic_order(db) -> list[str]:
@@ -25,7 +35,24 @@ def test_a_fresh_seed_uses_the_figma_order(db):
     seed(db)
     assert _topic_order(db) == TOPICS
     for name in TOPICS:
-        assert _lesson_order(db, name) == [s["title"] for s in LESSONS if s["topic"] == name]
+        assert _lesson_order(db, name) == [
+            f["title"] for f in _lesson_files() if f.get("topic") == name
+        ]
+
+
+def test_the_seed_publishes_the_lessons_in_content(db):
+    seed(db)
+
+    files = _lesson_files()
+    published = [f["title"] for f in files if f.get("publish", True)]
+    drafts = [f["title"] for f in files if not f.get("publish", True)]
+    assert sorted(
+        db.scalars(select(Lesson.title).where(Lesson.status == LessonStatus.PUBLISHED))
+    ) == sorted(published)
+    assert sorted(
+        db.scalars(select(Lesson.title).where(Lesson.status == LessonStatus.DRAFT))
+    ) == sorted(drafts)
+    assert len(published) >= 12  # SCRUM-77 AC1: at least 4 topics with 3 lessons each
 
 
 def test_seeding_again_changes_nothing(db):

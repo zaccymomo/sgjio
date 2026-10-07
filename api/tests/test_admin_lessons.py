@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from app.lessons import next_lesson_position
-from app.models import Lesson, LessonStatus, Topic, UserRole
+from app.models import Lesson, LessonStatus, LessonVersion, Topic, UserRole
 
 ADMIN = {"email": "admin@example.com", "password": "AdminPass123"}
 USER = {"email": "user@example.com", "password": "Password123"}
@@ -37,9 +37,14 @@ def _lesson(
     status: LessonStatus = LessonStatus.PUBLISHED,
     created_at: datetime | None = None,
 ) -> Lesson:
-    lesson = Lesson(title=title, content="Body", topic=topic, status=status, position=position)
+    lesson = Lesson(title=title, topic=topic, status=status, position=position)
     if created_at is not None:
         lesson.created_at = created_at
+    if status != LessonStatus.DRAFT:
+        # Published and withdrawn lessons have been published, so they have a version.
+        lesson.versions.append(
+            LessonVersion(number=1, title=title, doc={"cards": []}, published_at=datetime.now(UTC))
+        )
     db.add(lesson)
     db.commit()
     return lesson
@@ -79,34 +84,72 @@ def test_list_shows_what_the_admin_page_needs_and_no_body(admin, db):
     assert set(row) == {
         "id",
         "title",
+        "summary",
         "topic_id",
         "status",
         "updated_at",
         "position",
         "deletable",
+        "has_unpublished_changes",
+        "version",
+        "cards",
+        "questions",
+        "cover_asset_id",
     }
     assert row["id"] == str(lesson.id)
     assert row["topic_id"] == str(topic.id)
     assert row["status"] == "draft"
     assert row["deletable"] is True
+    assert row["version"] is None
+    assert (row["cards"], row["questions"]) == (0, 0)
+
+
+def test_list_counts_cards_and_questions_and_shows_the_latest_version(admin, db):
+    lesson = _lesson(db, None, "Counted")
+    lesson.draft = {
+        "cards": [
+            {
+                "type": "story",
+                "id": "a",
+                "text": "One",
+                "image": None,
+                "audio": None,
+                "question": None,
+            },
+            {
+                "type": "story",
+                "id": "b",
+                "text": "Two",
+                "image": None,
+                "audio": None,
+                "question": {
+                    "type": "choice",
+                    "id": "q",
+                    "options": [],
+                    "explanation": "",
+                    "shuffle": True,
+                },
+            },
+        ]
+    }
+    lesson.versions.append(
+        LessonVersion(number=2, title="Counted", doc={"cards": []}, published_at=datetime.now(UTC))
+    )
+    db.commit()
+
+    [row] = admin.get(URL).json()
+
+    assert (row["cards"], row["questions"], row["version"]) == (2, 1, 2)
 
 
 def test_list_marks_only_never_published_drafts_as_deletable(admin, db):
     draft = _lesson(db, None, "Draft", status=LessonStatus.DRAFT)
     published = _lesson(db, None, "Published", status=LessonStatus.PUBLISHED)
     withdrawn = _lesson(db, None, "Withdrawn", status=LessonStatus.WITHDRAWN)
-    previously_published_draft = _lesson(db, None, "Old draft", status=LessonStatus.DRAFT)
-    previously_published_draft.published_at = datetime.now(UTC)
-    db.commit()
 
     deletable = {row["title"]: row["deletable"] for row in admin.get(URL).json()}
 
-    assert deletable == {
-        draft.title: True,
-        published.title: False,
-        withdrawn.title: False,
-        previously_published_draft.title: False,
-    }
+    assert deletable == {draft.title: True, published.title: False, withdrawn.title: False}
 
 
 def test_list_is_in_topic_order_then_lesson_order(admin, db):

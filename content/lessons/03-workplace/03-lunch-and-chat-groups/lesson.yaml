@@ -1,0 +1,41 @@
+title: Lunch, Chat Groups and Belonging
+summary: Where a lot of workplace belonging really happens.
+topic: Workplace
+cards:
+  - image: { file: cover.png, alt: "A phone showing a team chat next to a lunch box" }
+    text: |-
+      Much of workplace belonging happens outside meetings.
+
+  - text: |-
+      Teams often go for lunch together, and being asked is how inclusion is offered. Accepting **sometimes** matters more than accepting every time.
+
+  - text: |-
+      Expect the bill to be split evenly rather than itemised.
+
+  - text: |-
+      Most teams also run a WhatsApp or Telegram group. It carries real information alongside the jokes, so being left out really does leave you behind.
+
+  - text: |-
+      You haven't been added to the team chat yet. The best move is to {{blank}}.
+    question:
+      options:
+        - text: "ask to be added"
+          correct: true
+        - text: "wait to be invited"
+          why_not: "People often just forget. Asking is normal and welcome."
+        - text: "start your own group"
+          why_not: "A separate group splits the team's information."
+      explanation: |-
+        Missing the team chat means missing real information, so asking to be added is completely normal.
+
+  - text: |-
+      Your team is ordering a shared lunch. What should you check first?
+    question:
+      options:
+        - text: "Dietary needs such as halal and vegetarian"
+          correct: true
+        - text: "Whether everyone can pay in cash"
+        - text: "Whether the manager is joining"
+        - text: "Whether the restaurant takes reservations"
+      explanation: |-
+        Singapore workplaces are religiously mixed, so checking dietary needs, such as halal for Muslim colleagues and vegetarian for some Hindu and Buddhist colleagues, is the normal first step.

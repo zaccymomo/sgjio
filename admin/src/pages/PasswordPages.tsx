@@ -60,8 +60,8 @@ export function ForgotPasswordPage() {
     >
       {sent ? (
         <Alert tone="success">
-          If an administrator account uses that email, we have sent a password reset link. It is valid
-          for 5 minutes.
+          If an administrator account uses that email, we have sent a password reset link. It is
+          valid for 5 minutes.
         </Alert>
       ) : (
         <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
