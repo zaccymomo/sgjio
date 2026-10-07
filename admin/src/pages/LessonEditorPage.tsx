@@ -748,7 +748,7 @@ function LessonEditor({
       )}
 
       {/* The deck, the card being written, and the card as learners will see it. */}
-      <div className="grid items-start gap-6 lg:grid-cols-[15rem_minmax(0,1fr)] xl:grid-cols-[15rem_minmax(0,1fr)_23rem]">
+      <div className="grid items-start gap-6 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_20rem]">
         <div className="lg:sticky lg:top-40">
           <CardRail
             cards={cards}
@@ -792,7 +792,7 @@ function LessonEditor({
           aria-label="Live preview"
           className="sticky top-40 hidden flex-col items-center gap-2 xl:flex"
         >
-          <div className="h-[min(720px,calc(100dvh-17rem))] w-full max-w-[22rem] overflow-hidden rounded-[40px] border-[9px] border-ink bg-white shadow-xl">
+          <div className="h-[min(640px,calc(100dvh-17rem))] w-full max-w-[19rem] overflow-hidden rounded-[40px] border-[9px] border-ink bg-white shadow-xl">
             <LessonDeck
               variant="embedded"
               lesson={{ title: draft.title, summary: draft.summary, topicName: topic?.name }}
