@@ -243,9 +243,10 @@ export function AudioField({
     );
   }
   return (
-    <div className="flex flex-col gap-2.5 rounded-lg border border-line p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0 flex-1">
+    <div className="@container flex flex-col gap-2.5 rounded-lg border border-line p-3">
+      {/* Beside the player when there is room; below it in a narrow column. */}
+      <div className="flex flex-col gap-2 @sm:flex-row @sm:items-center @sm:justify-between">
+        <div className="min-w-0 @sm:flex-1">
           <AudioPlayer asset={asset} transcript="" autoplay={false} size="pill" />
         </div>
         <FileButtons
