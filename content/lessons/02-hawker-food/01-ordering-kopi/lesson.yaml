@@ -1,0 +1,50 @@
+title: Ordering at a Local Hawker Centre
+summary: Chope a seat first, then order your kopi in code.
+topic: Hawker & Food
+cards:
+  - image: { file: cover.png, alt: "Two cups of kopi on a marble kopitiam table" }
+    text: |-
+      At a busy hawker centre, find a seat **before** you queue. People reserve ("chope") one by leaving a packet of tissues on the table.
+
+  - text: |-
+      Coffee is ordered in code. Plain **kopi** is coffee with condensed milk: sweet and thick.
+
+  - text: |-
+      Add a word to change it:
+
+      - **O**: no milk
+      - **C**: evaporated milk
+      - **Kosong**: no sugar
+      - **Siew dai**: less sugar
+
+  - audio: { file: kopi-o-kosong.mp3, transcript: "Uncle, one kopi-o kosong." }
+    text: |-
+      Put them together and you get orders like this one: black coffee, no sugar.
+
+  - text: |-
+      Black coffee **with** sugar is kopi {{blank}}.
+    question:
+      options:
+        - text: "O"
+          correct: true
+        - text: "C"
+          why_not: "C means evaporated milk, so it still has milk."
+        - text: "kosong"
+          why_not: "Kosong means no sugar, and you want sugar."
+      explanation: |-
+        **O** takes the milk out and keeps the sugar.
+
+  - text: |-
+      You want black coffee with no sugar. What do you ask for?
+    question:
+      options:
+        - text: "Kopi O Kosong"
+          correct: true
+        - text: "Kopi C"
+          why_not: "C adds evaporated milk."
+        - text: "Kopi Siew Dai"
+          why_not: "Siew dai still has milk and some sugar."
+        - text: "Kopi"
+          why_not: "Plain kopi comes with condensed milk."
+      explanation: |-
+        "O" means no milk and "kosong" means no sugar, so black coffee with no sugar is Kopi O Kosong.

@@ -1,35 +1,53 @@
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Alert, ApiError, Button, cn, ErrorState, Spinner, useAuth } from "@sgjio/ui";
 import {
-  Alert,
-  ApiError,
-  Button,
-  Dialog,
-  ErrorState,
-  Placeholder,
-  Spinner,
-  useAuth,
-} from "@sgjio/ui";
-import { ChevronLeft, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+  checkLocally,
+  LessonDeck,
+  readingLabel,
+  toLearnerCards,
+  type Asset,
+  type Card,
+  type Issue,
+} from "@sgjio/ui/lesson";
+import {
+  ArchiveRestore,
+  ChevronLeft,
+  CircleAlert,
+  CloudOff,
+  Ellipsis,
+  Eye,
+  EyeOff,
+  RotateCcw,
+  Send,
+  Trash2,
+  Undo2,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { LessonForm } from "../components/LessonForm";
+import { CardEditor } from "../components/editor/CardEditor";
+import { CardRail } from "../components/editor/CardRail";
+import { ConfirmDialog, IssuesDialog } from "../components/editor/EditorDialogs";
+import { LessonDetails } from "../components/LessonDetails";
+import { LessonPreview } from "../components/LessonPreview";
 import { StatusBadge } from "../components/StatusBadge";
+import {
+  duplicateCard,
+  insertCard,
+  newCard,
+  removeCard,
+  reorderCards,
+  updateCard,
+  type Preset,
+} from "../lib/cards";
 import { topicApi, type Notice, type Topic } from "../lib/content";
 import { lessonTitle } from "../lib/filter";
 import { formatDateTime, formatRelative } from "../lib/format";
-import {
-  emptyLesson,
-  fieldsOf,
-  lessonApi,
-  lessonFieldErrors,
-  sameFields,
-  type Lesson,
-  type LessonFieldErrors,
-  type LessonFields,
-} from "../lib/lessons";
+import { draftOf, lessonApi, type Draft, type Lesson } from "../lib/lessons";
+import { useAutosave, type SaveStatus } from "../lib/useAutosave";
 import { useUnsavedChanges } from "../lib/useUnsavedChanges";
 
-/** The path for a lesson not created yet. Nothing is saved until the first Save draft. */
+/** The path for a lesson not created yet. Nothing is saved until the first change. */
 const NEW = "new";
 
 type Load =
@@ -47,13 +65,12 @@ type Load =
     };
 
 /**
- * Write a lesson and save it as a draft (SCRUM-64), at /lessons/new and /lessons/:id.
+ * Writing a lesson as a deck of cards (SCRUM-19, SCRUM-64), at /lessons/new and /lessons/:id,
+ * and publishing, withdrawing and restoring it (SCRUM-52).
  *
- * A new lesson exists only in the page until its first save, which creates the draft and
- * changes the address to /lessons/:id; that way opening the editor and leaving never
- * leaves an empty draft behind. `/lessons/new?topic=<id>` starts in that topic.
- *
- * Published and withdrawn lessons open read-only: editing and withdrawing them is SCRUM-52.
+ * A new lesson exists only in the page until its first change, which creates it and changes
+ * the address to /lessons/:id; that way opening the editor and leaving never leaves an empty
+ * lesson behind. `/lessons/new?topic=<id>` starts in that topic.
  */
 export function LessonEditorPage() {
   const { id = NEW } = useParams();
@@ -119,18 +136,21 @@ export function LessonEditorPage() {
   // Moving from one lesson to another shows the spinner until the other has loaded.
   const ready = load.status === "ready" && load.lessonId === id ? load : null;
 
+  if (ready) {
+    return (
+      <LessonEditor
+        key={ready.key}
+        initialLesson={ready.lesson}
+        topics={ready.topics}
+        presetTopicId={searchParams.get("topic")}
+        onCreated={handleCreated}
+      />
+    );
+  }
   return (
     <div className="flex flex-col gap-4">
       <BackLink />
-      {ready ? (
-        <LessonEditor
-          key={ready.key}
-          initialLesson={ready.lesson}
-          topics={ready.topics}
-          presetTopicId={searchParams.get("topic")}
-          onCreated={handleCreated}
-        />
-      ) : load.status === "error" ? (
+      {load.status === "error" ? (
         <ErrorState message={load.message} onRetry={retry} />
       ) : load.status === "not-found" ? (
         <section className="flex flex-col items-center gap-3 rounded-lg border border-line bg-white p-6 text-center">
@@ -163,12 +183,63 @@ function BackLink() {
   );
 }
 
-/** A refusal shown above the form, with what the administrator can do about it. */
-type Problem = { message: ReactNode; action?: { label: string; onSelect: () => void } };
+function SaveIndicator({
+  status,
+  lesson,
+  onRetry,
+}: {
+  status: SaveStatus;
+  lesson: Lesson | null;
+  onRetry: () => void;
+}) {
+  if (status === "saving" || status === "pending") {
+    return (
+      <span className="flex items-center gap-1.5 text-xs text-muted" aria-live="polite">
+        <Spinner className="size-3" /> Saving…
+      </span>
+    );
+  }
+  if (status === "error" || status === "conflict" || status === "signed-out") {
+    return (
+      <span
+        className="flex items-center gap-1.5 text-xs font-semibold text-danger"
+        aria-live="polite"
+      >
+        <CloudOff className="size-3.5" aria-hidden />
+        Not saved
+        {status === "error" && (
+          <button type="button" onClick={onRetry} className="underline underline-offset-2">
+            Try again
+          </button>
+        )}
+      </span>
+    );
+  }
+  return (
+    <span className="text-xs text-muted" aria-live="polite">
+      {lesson ? (
+        <span title={`Saved ${formatDateTime(lesson.updated_at)}`}>
+          Saved {formatRelative(lesson.updated_at)}
+        </span>
+      ) : (
+        "Nothing saved yet"
+      )}
+    </span>
+  );
+}
 
-const OUT_OF_DATE =
-  "This draft was changed in another tab or by another administrator since you opened it, " +
-  "so your changes weren't saved. Copy anything you want to keep, then load the latest version.";
+type Action = "publish" | "discard" | "withdraw" | "restore" | "delete";
+
+const DONE: Record<Exclude<Action, "delete">, string> = {
+  publish: "published",
+  discard: "discarded",
+  withdraw: "withdrawn",
+  restore: "restored",
+};
+
+type Toast = { message: string; undo?: () => void };
+
+type MenuAction = { label: string; icon: typeof Trash2; onSelect: () => void; danger?: boolean };
 
 function LessonEditor({
   initialLesson,
@@ -186,342 +257,640 @@ function LessonEditor({
   const navigate = useNavigate();
   const [lesson, setLesson] = useState(initialLesson);
   const [topics, setTopics] = useState(initialTopics);
-  const [saved, setSaved] = useState<LessonFields>(() => {
-    if (initialLesson) return fieldsOf(initialLesson);
+  const [draft, setDraft] = useState<Draft>(() => {
+    if (initialLesson) return draftOf(initialLesson);
     const preset = initialTopics.find(
       (topic) => topic.id === presetTopicId && topic.archived_at === null,
     );
-    return emptyLesson(preset?.id ?? null);
+    return { title: "", summary: "", topic_id: preset?.id ?? null, doc: { cards: [newCard()] } };
   });
-  const [form, setForm] = useState(saved);
-  const [errors, setErrors] = useState<LessonFieldErrors>({});
-  const [problem, setProblem] = useState<Problem | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [assets, setAssets] = useState<Record<string, Asset>>(initialLesson?.assets ?? {});
+  const [selectedId, setSelectedId] = useState<string | null>(draft.doc.cards[0]?.id ?? null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [action, setAction] = useState<Action | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [issuesShown, setIssuesShown] = useState<Issue[] | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const [leaveFailed, setLeaveFailed] = useState(false);
+  // The newest version of the lesson from the server, for actions run after an await.
+  const latest = useRef(initialLesson);
+  // Lets the move to a new lesson's own address through the unsaved-changes guard.
+  const allowNext = useRef<() => void>(() => {});
 
-  const editable = lesson === null || lesson.status === "draft";
-  const dirty = editable && !sameFields(form, saved);
-  const { blocker, allowNavigation } = useUnsavedChanges(dirty);
-
-  function edit(next: LessonFields) {
-    setForm(next);
-    // A field's error goes once that field is changed.
-    setErrors((current) => {
-      const kept = { ...current };
-      for (const key of Object.keys(kept) as (keyof LessonFields)[]) {
-        if (next[key] !== form[key]) delete kept[key];
+  const autosave = useAutosave({
+    lesson,
+    draft,
+    onSaved: (saved, created) => {
+      latest.current = saved;
+      setLesson(saved);
+      setAssets((current) => ({ ...current, ...saved.assets }));
+      if (created) {
+        allowNext.current();
+        onCreated(saved);
       }
-      return kept;
+    },
+  });
+  const { flush, adopt } = autosave;
+
+  // Leaving within the portal: save first, then go. Only ask if the save fails.
+  const { blocker, allowNavigation } = useUnsavedChanges(autosave.dirty);
+  useEffect(() => {
+    allowNext.current = allowNavigation;
+  }, [allowNavigation]);
+  useEffect(() => {
+    if (blocker.state !== "blocked") return;
+    void flush().then((ok) => {
+      if (ok) blocker.proceed?.();
+      else setLeaveFailed(true);
+    });
+  }, [blocker, flush]);
+
+  // A toast fades after a few seconds.
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  const cards = draft.doc.cards;
+  const selectedIndex = Math.max(
+    0,
+    cards.findIndex((card) => card.id === selectedId),
+  );
+  const selected: Card | undefined = cards[selectedIndex];
+  const issues = useMemo(() => lesson?.issues ?? [], [lesson]);
+  const blockers = issues.filter((issue) => issue.severity === "blocker");
+  const topic = topics.find((t) => t.id === draft.topic_id) ?? null;
+  const everPublished = lesson?.version != null;
+  const status = lesson?.status ?? "draft";
+  const changed = Boolean(lesson?.has_unpublished_changes || autosave.dirty);
+  const changesToPublish = !everPublished || status === "withdrawn" || changed;
+  const stopped = autosave.status === "conflict" || autosave.status === "signed-out";
+
+  const learnerCards = useMemo(() => toLearnerCards(draft.doc, null), [draft.doc]);
+  const check = useMemo(() => checkLocally(draft.doc), [draft.doc]);
+  const questionCount = cards.filter((card) => card.question).length;
+
+  function edit(change: Partial<Draft>) {
+    setDraft((current) => ({ ...current, ...change }));
+  }
+
+  function editDoc(change: (doc: Draft["doc"]) => Draft["doc"]) {
+    setDraft((current) => ({ ...current, doc: change(current.doc) }));
+  }
+
+  function addCard(preset: Preset) {
+    const card = newCard(preset);
+    editDoc((doc) => insertCard(doc, card, selectedIndex + 1));
+    setSelectedId(card.id);
+  }
+
+  function duplicate(id: string) {
+    const index = cards.findIndex((card) => card.id === id);
+    const copy = duplicateCard(cards[index]);
+    editDoc((doc) => insertCard(doc, copy, index + 1));
+    setSelectedId(copy.id);
+  }
+
+  function deleteCard(id: string) {
+    const index = cards.findIndex((card) => card.id === id);
+    const removed = cards[index];
+    editDoc((doc) => removeCard(doc, id));
+    const neighbour = cards[index + 1] ?? cards[index - 1];
+    setSelectedId(neighbour?.id ?? null);
+    setToast({
+      message: `Card ${index + 1} deleted.`,
+      undo: () => {
+        editDoc((doc) => insertCard(doc, removed, index));
+        setSelectedId(removed.id);
+        setToast(null);
+      },
     });
   }
 
-  function goToContent(notice: Notice) {
-    allowNavigation();
-    navigate("/", { state: { notice } });
-  }
-
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    if (saving || !editable) return;
-    const fieldErrors = lessonFieldErrors(form);
-    setErrors(fieldErrors);
-    setProblem(null);
-    if (Object.keys(fieldErrors).length > 0) return;
-
-    const sent = form;
-    setSaving(true);
-    try {
-      const result = lesson ? await lessonApi.update(lesson, sent) : await lessonApi.create(sent);
-      const resultFields = fieldsOf(result);
-      setLesson(result);
-      setSaved(resultFields);
-      // Keep anything typed while the save was running.
-      setForm((now) => (sameFields(now, sent) ? resultFields : now));
-      if (!lesson) {
-        allowNavigation();
-        onCreated(result);
-      }
-    } catch (error) {
-      showSaveError(error);
-    } finally {
-      setSaving(false);
+  function goToIssue(issue: Issue) {
+    setIssuesShown(null);
+    if (issue.card_id && cards.some((card) => card.id === issue.card_id)) {
+      setSelectedId(issue.card_id);
     }
   }
 
-  function showSaveError(error: unknown) {
-    if (!(error instanceof ApiError)) {
-      setProblem({
-        message: "Something went wrong, so the lesson wasn't saved. Please try again.",
-      });
-      return;
-    }
-    if (error.status === 401) {
-      // Not re-checking the session here: that would replace the editor with the sign-in
-      // page and lose what was typed.
-      setProblem({
-        message: (
-          <>
-            You&rsquo;ve been signed out, so the lesson wasn&rsquo;t saved.{" "}
-            <a
-              href="/sign-in"
-              target="_blank"
-              rel="noopener"
-              className="font-semibold underline underline-offset-2"
-            >
-              Sign in again in a new tab
-            </a>
-            , then select Save draft again.
-          </>
-        ),
-      });
-      return;
-    }
-    switch (error.code) {
-      case "validation_error": {
-        const { title, content, topic_id } = error.fieldErrors;
-        const fieldErrors = Object.fromEntries(
-          Object.entries({ title, content, topic_id }).filter(([, message]) => message),
-        );
-        setErrors(fieldErrors);
-        if (Object.keys(fieldErrors).length === 0) setProblem({ message: error.message });
-        return;
-      }
-      case "topic_not_found":
-      case "topic_archived":
-        setErrors({ topic_id: error.message });
-        // The topic list is out of date; fetch it so the choice matches what exists.
-        topicApi
-          .list()
-          .then(setTopics)
-          .catch(() => {});
-        return;
-      case "lesson_out_of_date":
-        setProblem({
-          message: OUT_OF_DATE,
-          action: { label: "Load the latest version", onSelect: () => void loadLatest() },
-        });
-        return;
-      case "lesson_not_draft":
-        setProblem({
-          message:
-            "This lesson has been published since you opened it, so it can't be edited here. " +
-            "Copy anything you want to keep, then reload it.",
-          action: { label: "Reload the lesson", onSelect: () => void loadLatest() },
-        });
-        return;
-      case "lesson_not_found":
-        setProblem({
-          message:
-            "This lesson has been deleted since you opened it, so your changes weren't saved. " +
-            "Copy anything you want to keep.",
-        });
-        return;
-      default:
-        setProblem({ message: `The lesson wasn't saved. ${error.message}` });
-    }
-  }
-
-  /** Replace what is on screen with the lesson as it is now on the server. */
   async function loadLatest() {
     if (!lesson) return;
-    setProblem(null);
     try {
-      const [latest, latestTopics] = await Promise.all([lessonApi.get(lesson.id), topicApi.list()]);
-      setLesson(latest);
-      setTopics(latestTopics);
-      setSaved(fieldsOf(latest));
-      setForm(fieldsOf(latest));
-      setErrors({});
+      const [fresh, freshTopics] = await Promise.all([lessonApi.get(lesson.id), topicApi.list()]);
+      latest.current = fresh;
+      setLesson(fresh);
+      setTopics(freshTopics);
+      setDraft(draftOf(fresh));
+      setAssets((current) => ({ ...current, ...fresh.assets }));
+      adopt(fresh);
+      if (!fresh.doc.cards.some((card) => card.id === selectedId)) {
+        setSelectedId(fresh.doc.cards[0]?.id ?? null);
+      }
     } catch (error) {
-      setProblem({
+      setToast({
         message:
           error instanceof ApiError && error.code === "lesson_not_found"
-            ? "This lesson has been deleted since you opened it."
+            ? "This lesson has been deleted."
             : "We couldn't load the latest version. Please try again.",
-        action:
-          error instanceof ApiError && error.code === "lesson_not_found"
-            ? undefined
-            : { label: "Try again", onSelect: () => void loadLatest() },
       });
     }
   }
 
-  async function remove() {
-    if (!lesson) return;
-    setDeleting(true);
-    setDeleteError(null);
-    try {
-      await lessonApi.remove(lesson);
-      goToContent({ tone: "success", message: `“${lessonTitle(lesson)}” is deleted.` });
-    } catch (error) {
-      if (error instanceof ApiError && error.code === "lesson_not_found") {
-        goToContent({ tone: "info", message: "That lesson had already been deleted." });
-      } else if (error instanceof ApiError && error.code === "lesson_out_of_date") {
-        setConfirmingDelete(false);
-        setProblem({
-          message:
-            "This draft was changed in another tab or by another administrator since you " +
-            "opened it, so it wasn't deleted. Load the latest version and check it first.",
-          action: { label: "Load the latest version", onSelect: () => void loadLatest() },
-        });
-      } else {
-        setDeleteError(
-          error instanceof ApiError ? error.message : "Something went wrong. Please try again.",
-        );
-      }
-    } finally {
-      setDeleting(false);
+  /** Publish: save first, then show what blocks it, or ask to confirm. */
+  async function startPublish() {
+    if (!(await flush())) return;
+    const current = latest.current;
+    if (!current) return;
+    if (current.issues.some((issue) => issue.severity === "blocker")) {
+      setIssuesShown(current.issues);
+    } else {
+      openAction("publish");
     }
   }
 
-  const heading = lesson === null ? "New lesson" : editable ? "Edit draft" : "Lesson";
-  const status = saving
-    ? "Saving…"
-    : dirty
-      ? "Unsaved changes"
-      : lesson
-        ? `Saved ${formatRelative(lesson.updated_at)}`
-        : "Not saved yet";
+  async function startAction(next: Action) {
+    if (!(await flush())) return;
+    openAction(next);
+  }
 
-  return (
-    <>
-      <form onSubmit={save} noValidate className="flex flex-col gap-5">
-        {/* Stays at the top while scrolling a long lesson, so Save is always in reach. */}
-        <div className="sticky top-0 z-10 -mx-4 flex flex-col gap-3 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur sm:flex-row sm:items-center sm:justify-between md:-mx-6 md:px-6">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <h1 className="text-2xl font-bold text-ink">{heading}</h1>
-              {lesson && <StatusBadge status={lesson.status} />}
-            </div>
-            {editable && (
-              <p aria-live="polite" className="mt-0.5 text-caption text-muted">
-                <span title={lesson ? `Saved ${formatDateTime(lesson.updated_at)}` : undefined}>
-                  {status}
-                </span>
-                <span aria-hidden> · </span>
-                Drafts are only visible to administrators.
-              </p>
-            )}
-          </div>
-          {editable && (
-            <div className="flex gap-2">
-              {lesson?.deletable && (
-                <Button
-                  variant="secondary"
-                  className="flex-1 sm:flex-none"
-                  onClick={() => {
-                    setDeleteError(null);
-                    setConfirmingDelete(true);
-                  }}
-                  disabled={saving}
-                >
-                  <Trash2 className="size-4" aria-hidden />
-                  Delete
-                </Button>
-              )}
-              <Button
-                type="submit"
-                className="flex-1 sm:flex-none"
-                loading={saving}
-                // An unchanged lesson has nothing to save. A new one can be saved empty.
-                disabled={lesson !== null && !dirty}
-              >
-                Save draft
-              </Button>
-            </div>
-          )}
-        </div>
+  function openAction(next: Action) {
+    setActionError(null);
+    setAction(next);
+  }
 
-        <div className="flex max-w-3xl flex-col gap-5">
-          {problem && (
-            <Alert tone="error">
-              <div className="flex flex-col items-start gap-2">
-                <p>{problem.message}</p>
-                {problem.action && (
-                  <Button variant="secondary" size="sm" onClick={problem.action.onSelect}>
-                    {problem.action.label}
-                  </Button>
-                )}
-              </div>
+  async function runAction() {
+    const current = latest.current;
+    if (!action || !current) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      if (action === "delete") {
+        await lessonApi.remove(current);
+        allowNavigation();
+        const notice: Notice = {
+          tone: "success",
+          message: `“${lessonTitle(current)}” is deleted.`,
+        };
+        navigate("/", { state: { notice } });
+        return;
+      }
+      const result = await lessonApi.change(current, action);
+      latest.current = result;
+      setLesson(result);
+      if (action === "discard") setDraft(draftOf(result));
+      adopt(result);
+      setAction(null);
+      // The topic's published count changes with publishing and withdrawing.
+      topicApi
+        .list()
+        .then(setTopics)
+        .catch(() => {});
+      setToast({
+        message: {
+          publish: `Published${result.version ? ` as version ${result.version.number}` : ""}. Learners now see it.`,
+          discard: "Changes discarded. The draft matches what learners see.",
+          withdraw: "Withdrawn. Learners no longer see it; their progress is kept.",
+          restore: "Restored. Learners see this lesson again.",
+        }[action],
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "lesson_has_blockers") {
+        setAction(null);
+        setIssuesShown((error.details.issues as Issue[] | undefined) ?? []);
+        return;
+      }
+      const verb = action === "delete" ? "deleted" : DONE[action];
+      setActionError(
+        error instanceof ApiError && error.code === "lesson_out_of_date"
+          ? `This lesson was changed in another tab or by another administrator, so it wasn't ${verb}. Load the latest version and try again.`
+          : error instanceof ApiError
+            ? error.message
+            : `Something went wrong, so it wasn't ${verb}. Please try again.`,
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const lastInTopic = status === "published" && topic !== null && topic.published_count <= 1;
+  const title = lessonTitle(draft);
+  const dialogs: Record<Action, { title: string; confirm: string; body: ReactNode }> = {
+    publish: {
+      title: everPublished
+        ? `Publish version ${(lesson?.version?.number ?? 0) + 1}?`
+        : `Publish to ${topic?.name ?? "its topic"}?`,
+      confirm: everPublished ? "Publish changes" : "Publish",
+      body: everPublished ? (
+        <p>
+          Learners who start or retake this lesson will see the new version. Everyone&rsquo;s
+          completions and best scores are kept.
+        </p>
+      ) : (
+        <p>
+          Learners will see it in {topic?.name ?? "its topic"}, and it will count toward their
+          progress there.
+        </p>
+      ),
+    },
+    discard: {
+      title: "Discard your changes?",
+      confirm: "Discard changes",
+      body: (
+        <p>
+          The draft goes back to version {lesson?.version?.number}, which is what learners see. Your
+          changes since then can&rsquo;t be recovered.
+        </p>
+      ),
+    },
+    withdraw: {
+      title: `Withdraw “${title}”?`,
+      confirm: "Withdraw",
+      body: (
+        <>
+          <p>
+            Learners will no longer see it. Anyone who completed it keeps their completion and
+            score, and it stays in their history. You can restore it at any time.
+          </p>
+          {lastInTopic && (
+            <Alert tone="info">
+              This is the last published lesson in {topic?.name}, so the topic will have no content
+              left and disappear from learners&rsquo; home page.
             </Alert>
           )}
-
-          {!editable && (
-            <Placeholder story="SCRUM-52" title="Editing published lessons">
-              This lesson has been {lesson?.status === "withdrawn" ? "withdrawn" : "published"}, so
-              it is shown read-only. Editing and withdrawing published lessons is not available yet.
-            </Placeholder>
-          )}
-
-          <section className="rounded-lg border border-line bg-white p-4 sm:p-6">
-            <LessonForm
-              value={form}
-              onChange={edit}
-              errors={errors}
-              topics={topics}
-              savedTopicId={saved.topic_id}
-              readOnly={!editable}
-            />
-          </section>
-
-          <Placeholder story="SCRUM-19" title="Quiz question">
-            Each lesson ends with a quiz question. Writing it here arrives with the quiz editor.
-          </Placeholder>
-        </div>
-      </form>
-
-      <Dialog
-        open={confirmingDelete}
-        title={lesson ? `Delete “${lessonTitle(lesson)}”?` : ""}
-        onClose={() => setConfirmingDelete(false)}
-        dismissible={!deleting}
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => setConfirmingDelete(false)}
-              disabled={deleting}
-              data-autofocus
-            >
-              Cancel
-            </Button>
-            <Button onClick={() => void remove()} loading={deleting}>
-              Delete draft
-            </Button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-3 text-sm text-muted">
-          {deleteError && <Alert tone="error">{deleteError}</Alert>}
-          <p>
-            This draft has never been published, so no user has seen it. Deleting it can&rsquo;t be
-            undone.
-            {dirty && " Your unsaved changes will be lost too."}
-          </p>
-        </div>
-      </Dialog>
-
-      {/* SCRUM-64 AC6, for leaving within the portal. Closing the tab gets the browser's own. */}
-      <Dialog
-        open={blocker.state === "blocked"}
-        title="Leave without saving?"
-        onClose={() => blocker.reset?.()}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => blocker.reset?.()} data-autofocus>
-              Keep editing
-            </Button>
-            <Button onClick={() => blocker.proceed?.()}>Leave without saving</Button>
-          </>
-        }
-      >
-        <p className="text-sm text-muted">
-          Your changes to this lesson haven&rsquo;t been saved. If you leave now, they&rsquo;ll be
-          lost.
+        </>
+      ),
+    },
+    restore: {
+      title: `Restore “${title}”?`,
+      confirm: "Restore",
+      body: (
+        <p>
+          Learners will see version {lesson?.version?.number} again.
+          {lesson?.has_unpublished_changes && " Your unpublished changes stay in the draft."}
         </p>
-      </Dialog>
-    </>
+      ),
+    },
+    delete: {
+      title: `Delete “${title}”?`,
+      confirm: "Delete lesson",
+      body: (
+        <p>
+          This lesson has never been published, so no learner has seen it. Deleting it can&rsquo;t
+          be undone.
+        </p>
+      ),
+    },
+  };
+
+  const menuItems: MenuAction[] = [];
+  if (everPublished && changed) {
+    menuItems.push({
+      label: "Discard changes",
+      icon: RotateCcw,
+      onSelect: () => void startAction("discard"),
+    });
+  }
+  if (status === "published") {
+    menuItems.push({
+      label: "Withdraw",
+      icon: EyeOff,
+      onSelect: () => void startAction("withdraw"),
+    });
+  }
+  if (status === "withdrawn") {
+    menuItems.push({
+      label: "Restore",
+      icon: ArchiveRestore,
+      onSelect: () => void startAction("restore"),
+    });
+  }
+  if (lesson?.deletable) {
+    menuItems.push({
+      label: "Delete",
+      icon: Trash2,
+      onSelect: () => void startAction("delete"),
+      danger: true,
+    });
+  }
+
+  const cardIssues = selected ? issues.filter((issue) => issue.card_id === selected.id) : [];
+  const titleIssue = issues.find((issue) => issue.code === "missing_title");
+  const topicIssue = issues.find((issue) => issue.code === "missing_topic");
+
+  return (
+    <div className="flex flex-col gap-4">
+      <BackLink />
+
+      {/* The lesson's header: stays at the top while scrolling. */}
+      <header className="sticky top-0 z-20 -mx-4 flex flex-col gap-3 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <LessonDetails
+            title={draft.title}
+            summary={draft.summary}
+            topicId={draft.topic_id}
+            topics={topics}
+            savedTopicId={lesson?.topic_id ?? null}
+            published={everPublished}
+            titleError={titleIssue?.message}
+            topicError={topicIssue?.message}
+            onChange={edit}
+          />
+        </div>
+        <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <StatusBadge status={status} />
+            {lesson?.version && (
+              <span className="text-caption text-muted">Version {lesson.version.number}</span>
+            )}
+            {status === "published" && changed && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-2xs font-bold text-amber-800">
+                Unpublished changes
+              </span>
+            )}
+            <SaveIndicator status={autosave.status} lesson={lesson} onRetry={() => void flush()} />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="hidden text-xs text-muted xl:inline">
+              {lesson ? readingLabel(lesson.stats.reading_seconds) : "Under 1 min"} · {cards.length}{" "}
+              {cards.length === 1 ? "card" : "cards"} · {questionCount}{" "}
+              {questionCount === 1 ? "question" : "questions"}
+            </span>
+            <Button variant="secondary" onClick={() => setPreviewOpen(true)}>
+              <Eye className="size-4" aria-hidden />
+              Preview
+            </Button>
+            <Button
+              onClick={() => void startPublish()}
+              disabled={!lesson || stopped || !changesToPublish}
+              title={
+                blockers.length
+                  ? `${blockers.length} thing${blockers.length === 1 ? "" : "s"} to fix first`
+                  : undefined
+              }
+            >
+              <Send className="size-4" aria-hidden />
+              {!everPublished
+                ? "Publish"
+                : status === "withdrawn"
+                  ? "Publish again"
+                  : changesToPublish
+                    ? "Publish changes"
+                    : "Published"}
+              {blockers.length > 0 && (
+                <span className="ml-0.5 rounded-full bg-white/20 px-1.5 text-2xs font-bold">
+                  {blockers.length}
+                </span>
+              )}
+            </Button>
+            {menuItems.length > 0 && (
+              <DropdownMenu.Root modal={false}>
+                <DropdownMenu.Trigger asChild>
+                  <button
+                    type="button"
+                    aria-label="More actions"
+                    className="flex size-10 items-center justify-center rounded-sm text-muted hover:bg-black/5 hover:text-ink data-[state=open]:bg-black/5"
+                  >
+                    <Ellipsis className="size-5" aria-hidden />
+                  </button>
+                </DropdownMenu.Trigger>
+                <DropdownMenu.Portal>
+                  <DropdownMenu.Content
+                    align="end"
+                    sideOffset={4}
+                    className="z-50 min-w-48 rounded-md border border-line bg-white p-1 shadow-lg"
+                  >
+                    {menuItems.map(({ label, icon: Icon, onSelect, danger }) => (
+                      <DropdownMenu.Item
+                        key={label}
+                        onSelect={onSelect}
+                        className={cn(
+                          "flex cursor-pointer items-center gap-2 rounded-sm px-2.5 py-2 text-sm outline-none data-[highlighted]:bg-surface",
+                          danger ? "text-danger" : "text-ink",
+                        )}
+                      >
+                        <Icon className="size-4" aria-hidden />
+                        {label}
+                      </DropdownMenu.Item>
+                    ))}
+                  </DropdownMenu.Content>
+                </DropdownMenu.Portal>
+              </DropdownMenu.Root>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* What needs saying about the lesson as a whole. */}
+      {stopped && (
+        <Alert tone="error">
+          <div className="flex flex-col items-start gap-2">
+            <p>
+              {autosave.status === "signed-out" ? (
+                <>
+                  You&rsquo;ve been signed out, so your latest changes weren&rsquo;t saved.{" "}
+                  <a
+                    href="/sign-in"
+                    target="_blank"
+                    rel="noopener"
+                    className="font-semibold underline underline-offset-2"
+                  >
+                    Sign in again in a new tab
+                  </a>
+                  , then reload this page.
+                </>
+              ) : (
+                <>
+                  {autosave.message} Copy anything you want to keep, then load the latest version.
+                </>
+              )}
+            </p>
+            {autosave.status === "conflict" && (
+              <Button variant="secondary" size="sm" onClick={() => void loadLatest()}>
+                Load the latest version
+              </Button>
+            )}
+          </div>
+        </Alert>
+      )}
+      {autosave.status === "error" && autosave.message && (
+        <Alert tone="error">{autosave.message}</Alert>
+      )}
+      {status === "published" && lesson?.has_unpublished_changes && !stopped && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900">
+          <span className="flex items-center gap-2">
+            <CircleAlert className="size-4 shrink-0" aria-hidden />
+            Learners see version {lesson.version?.number}. Your changes are a draft until you
+            publish them.
+          </span>
+          <span className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={() => void startAction("discard")}>
+              Discard changes
+            </Button>
+            <Button size="sm" onClick={() => void startPublish()}>
+              Publish changes
+            </Button>
+          </span>
+        </div>
+      )}
+      {status === "withdrawn" && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-white px-4 py-2.5 text-sm text-muted">
+          <span className="flex items-center gap-2">
+            <EyeOff className="size-4 shrink-0" aria-hidden />
+            Withdrawn: learners don&rsquo;t see this lesson. Their progress in it is kept.
+          </span>
+          <Button variant="secondary" size="sm" onClick={() => void startAction("restore")}>
+            Restore
+          </Button>
+        </div>
+      )}
+
+      {/* The deck, the card being written, and the card as learners will see it. */}
+      <div className="grid items-start gap-6 lg:grid-cols-[14rem_minmax(0,1fr)] xl:grid-cols-[14rem_minmax(0,1fr)_20rem]">
+        <div className="lg:sticky lg:top-40">
+          <CardRail
+            cards={cards}
+            assets={assets}
+            issues={issues}
+            selectedId={selected?.id ?? null}
+            onSelect={setSelectedId}
+            onReorder={(ids) => editDoc((doc) => reorderCards(doc, ids))}
+            onAdd={addCard}
+            onDuplicate={duplicate}
+            onDelete={deleteCard}
+          />
+        </div>
+
+        <section aria-label="Card" className="min-w-0">
+          {selected ? (
+            <CardEditor
+              key={selected.id}
+              card={selected}
+              index={selectedIndex}
+              total={cards.length}
+              assets={assets}
+              issues={cardIssues}
+              onChange={(change) => editDoc((doc) => updateCard(doc, selected.id, change))}
+              onAsset={(asset) => setAssets((current) => ({ ...current, [asset.id]: asset }))}
+              onDuplicate={() => duplicate(selected.id)}
+              onDelete={() => deleteCard(selected.id)}
+            />
+          ) : (
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line bg-white p-10 text-center">
+              <p className="text-base font-bold text-ink">This lesson has no cards</p>
+              <p className="text-sm text-muted">
+                A lesson is a deck of short cards, with at least one question.
+              </p>
+              <Button onClick={() => addCard("story")}>Add the first card</Button>
+            </div>
+          )}
+        </section>
+
+        <aside
+          aria-label="Live preview"
+          className="sticky top-40 hidden flex-col items-center gap-2 xl:flex"
+        >
+          <div className="h-[min(640px,calc(100dvh-17rem))] w-full max-w-[19rem] overflow-hidden rounded-[40px] border-[9px] border-ink bg-white shadow-xl">
+            <LessonDeck
+              variant="embedded"
+              lesson={{ title: draft.title, summary: draft.summary, topicName: topic?.name }}
+              cards={learnerCards}
+              assets={assets}
+              check={check}
+              index={selectedIndex}
+              onIndexChange={(index) => setSelectedId(cards[index]?.id ?? null)}
+            />
+          </div>
+          <p className="text-xs text-muted">Live preview · try the question here</p>
+        </aside>
+      </div>
+
+      {previewOpen && (
+        <LessonPreview
+          lesson={{
+            title: draft.title,
+            summary: draft.summary,
+            topicName: topic?.name ?? null,
+            readingSeconds: lesson?.stats.reading_seconds,
+          }}
+          doc={draft.doc}
+          assets={assets}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
+
+      {action && (
+        <ConfirmDialog
+          open
+          title={dialogs[action].title}
+          confirmLabel={dialogs[action].confirm}
+          busy={busy}
+          error={actionError}
+          onConfirm={() => void runAction()}
+          onClose={() => setAction(null)}
+        >
+          {dialogs[action].body}
+        </ConfirmDialog>
+      )}
+
+      <IssuesDialog
+        open={issuesShown !== null}
+        issues={issuesShown ?? []}
+        cardNumber={(cardId) => {
+          const index = cards.findIndex((card) => card.id === cardId);
+          return index === -1 ? null : index + 1;
+        }}
+        onGoTo={goToIssue}
+        onClose={() => setIssuesShown(null)}
+      />
+
+      <ConfirmDialog
+        open={leaveFailed}
+        title="Leave without saving?"
+        confirmLabel="Leave without saving"
+        busy={false}
+        error={null}
+        onConfirm={() => {
+          setLeaveFailed(false);
+          blocker.proceed?.();
+        }}
+        onClose={() => {
+          setLeaveFailed(false);
+          blocker.reset?.();
+        }}
+      >
+        <p>Your latest changes couldn&rsquo;t be saved. If you leave now, they&rsquo;ll be lost.</p>
+      </ConfirmDialog>
+
+      {toast && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-full bg-ink py-2.5 pr-2.5 pl-5 text-sm text-white shadow-xl"
+        >
+          {toast.message}
+          {toast.undo ? (
+            <button
+              type="button"
+              onClick={toast.undo}
+              className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 font-semibold hover:bg-white/25"
+            >
+              <Undo2 className="size-4" aria-hidden />
+              Undo
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              aria-label="Dismiss"
+              className="rounded-full px-2 py-1 text-white/70 hover:text-white"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

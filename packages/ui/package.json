@@ -6,6 +6,7 @@
   "description": "Shared design tokens, components and auth helpers for the SGJio main app and admin portal.",
   "exports": {
     ".": "./src/index.ts",
+    "./lesson": "./src/lesson/index.ts",
     "./theme.css": "./src/theme.css"
   },
   "peerDependencies": {
@@ -13,5 +14,13 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.0.0"
+  },
+  "dependencies": {
+    "canvas-confetti": "^1.9.4",
+    "motion": "^14.0.0",
+    "react-markdown": "^10.1.0"
+  },
+  "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0"
   }
 }

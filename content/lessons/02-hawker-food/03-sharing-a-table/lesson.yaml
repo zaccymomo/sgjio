@@ -1,0 +1,41 @@
+title: Sharing a Table
+summary: Sharing is normal at lunch rush, and chatting is optional.
+topic: Hawker & Food
+cards:
+  - image: { file: cover.png, alt: "A round hawker table with a packet of tissues on one stool" }
+    text: |-
+      At peak lunch hours, you'll often share a table with strangers. It's completely normal.
+
+  - audio: { file: anyone-sitting.mp3, transcript: "Excuse me, anyone sitting here?" }
+    text: |-
+      The usual opener is *"Excuse me, anyone sitting here?"*, or simply a gesture at the empty chair.
+
+  - text: |-
+      Saying yes is expected. It isn't an invitation to chat: most people eat, keep to their half of the table and leave. Neither side is being unfriendly.
+
+  - text: |-
+      A packet of tissues sits on an empty seat. The seat is {{blank}}.
+    question:
+      options:
+        - text: "choped"
+          correct: true
+        - text: "free"
+          why_not: "The tissues mean someone has reserved it."
+        - text: "dirty"
+          why_not: "A tissue packet is a reservation, not litter."
+      explanation: |-
+        A tissue packet or an umbrella means the seat is **choped**: someone is queueing for food. Look elsewhere.
+
+  - text: |-
+      A stranger gestures at the empty seat at your table during lunch rush. What is expected?
+    question:
+      options:
+        - text: "Agree to share; no need to chat"
+          correct: true
+        - text: "Refuse, since you were there first"
+          why_not: "Sharing at peak hours is expected."
+        - text: "Agree, and introduce yourself properly"
+          why_not: "Friendly, but not expected. Eating quietly is normal."
+        - text: "Move to a different table yourself"
+      explanation: |-
+        Sharing tables at peak hours is normal. You nod or say yes; neither of you is expected to make conversation.

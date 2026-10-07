@@ -5,13 +5,10 @@ import type { MenuItem } from "./RowMenu";
 import type { Reorder } from "./SortableList";
 
 /**
- * What a lesson's ⋯ menu offers, in groups. Drafts can be opened in the editor and, if they
- * have never been published, deleted. Publishing and withdrawing arrive with SCRUM-52 and
- * SCRUM-56:
- *
- * - Draft: Edit, Publish (needs a topic, SCRUM-56), Delete (only drafts can be deleted)
- * - Published: Edit, Withdraw
- * - Withdrawn: Edit, Publish again
+ * What a lesson's ⋯ menu offers, in groups. Every lesson opens in the editor, whatever its
+ * status: editing a published lesson changes its draft, which learners see once published
+ * again (SCRUM-52). Publishing, withdrawing and restoring happen in the editor, where the
+ * lesson's checks are shown. A lesson never published can also be deleted.
  *
  * Move stays its own group in every status, and Delete goes last, in a group of its own.
  */
@@ -25,10 +22,9 @@ export function lessonMenuGroups(
   reorder?: Reorder,
   actions?: LessonActions,
 ): MenuItem[][] {
-  const edit =
-    actions && lesson.status === "draft"
-      ? { label: "Edit", icon: Pencil, onSelect: () => actions.edit(lesson) }
-      : null;
+  const edit = actions
+    ? { label: "Edit", icon: Pencil, onSelect: () => actions.edit(lesson) }
+    : null;
   const remove =
     actions && lesson.deletable
       ? {

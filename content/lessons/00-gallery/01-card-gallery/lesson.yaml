@@ -1,0 +1,68 @@
+# Every kind of card, for checking how lessons look. Never published: open it in the admin
+# portal and use Preview.
+title: Card gallery
+summary: One of every kind of card, for checking how lessons look.
+publish: false
+cards:
+  - image: { file: kopi.png, alt: "Two cups of kopi on a marble kopitiam table" }
+    text: |-
+      An **image card**: the illustration sits on a panel tinted with its own colour, with the text below.
+
+  - audio: { file: kopi-o-kosong.mp3, transcript: "Uncle, one kopi-o kosong." }
+    text: |-
+      An **audio card** with no image: the waveform takes the image's place, and plays when the card opens.
+
+  - text: |-
+      A **text-only card** becomes a *statement*: bigger type, centred, on a soft tint.
+
+  - image: { file: angbao.png, alt: "Red packets and a pair of mandarin oranges" }
+    audio: { file: selamat.mp3, transcript: "Selamat Hari Raya. Maaf zahir dan batin." }
+    text: |-
+      An image **and** audio: the player sits on top of the image.
+
+  - text: |-
+      A **fill-the-blank** question: black coffee with sugar is kopi {{blank}}.
+    question:
+      options:
+        - text: "O"
+          correct: true
+        - text: "C"
+          why_not: "C means evaporated milk, so it still has milk."
+        - text: "kosong"
+          why_not: "Kosong means no sugar."
+      explanation: |-
+        **O** takes the milk out and keeps the sugar.
+
+  - text: |-
+      A question **without a blank** shows its options as answer cards. These keep their order.
+    question:
+      shuffle: false
+      options:
+        - text: "Once"
+        - text: "Twice"
+          correct: true
+        - text: "Three times"
+          why_not: "One fewer."
+        - text: "Four times"
+          why_not: "Four is avoided in any case."
+      explanation: |-
+        Options with a natural order can be kept in that order.
+
+  - text: |-
+      A **one-option tap**, which keeps learners doing something and isn't scored: *"Let's go {{blank}}!"*
+    question:
+      options:
+        - text: "makan"
+      explanation: |-
+        *"Let's go makan"* is an everyday invitation to eat together.
+
+  - text: |-
+      A longer card with a list:
+
+      - **Kopi**: coffee with condensed milk
+      - **Kopi O**: black coffee with sugar
+      - **Kopi C**: coffee with evaporated milk and sugar
+      - **Kosong**: no sugar
+      - **Siew dai**: less sugar
+
+      Long cards scroll inside the card, so the Continue button stays put.

@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import (
     AwareDatetime,
@@ -17,6 +17,7 @@ from pydantic import (
 )
 
 from app.auth import normalise_email
+from app.lesson_doc import LessonDoc
 from app.models import LessonStatus, UserRole, UserType
 from app.profile_options import INTERESTS, LANGUAGES, NEIGHBOURHOODS
 
@@ -216,17 +217,23 @@ MAX_ORDER_IDS = 1000
 
 
 class LessonSummaryOut(BaseModel):
-    """A lesson as the admin portal lists it. The body is left out to keep the list light."""
+    """A lesson as the admin portal lists it. The cards are left out to keep the list light."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     title: str
+    summary: str
     topic_id: uuid.UUID | None
     status: LessonStatus
     updated_at: datetime
     position: int
     deletable: bool
+    has_unpublished_changes: bool
+    version: int | None
+    cards: int
+    questions: int
+    cover_asset_id: uuid.UUID | None
 
 
 class OrderRequest(BaseModel):
@@ -253,32 +260,34 @@ class LessonOrderRequest(OrderRequest):
     topic_id: uuid.UUID | None
 
 
-# --- Lessons (SCRUM-64) -------------------------------------------------------------------
-# What a lesson "is" lives here and, in the admin portal, in admin/src/lib/lessons.ts and
-# admin/src/components/LessonForm.tsx. A change to the lesson's fields should touch these,
-# not every route and page.
+# --- Lessons (SCRUM-19, SCRUM-64, SCRUM-52) ------------------------------------------------
+# What a lesson "is" lives in app/lesson_doc.py and, for both front ends, in
+# packages/ui/src/lesson/types.ts. A change to the lesson's fields should touch those, not
+# every route and page.
 
-# Matches lessons.title (String(200)).
+# Matches lessons.title (String(200)) and lessons.summary (String(160)).
 MAX_LESSON_TITLE = 200
-# A lesson should take under 2 minutes to read: about 400 words, or 2,500 characters.
-# Drafts get ten times that, for pasted notes, while still bounding one request.
-MAX_LESSON_CONTENT = 20_000
+MAX_LESSON_SUMMARY = 160
 
 LessonTitle = Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_LESSON_TITLE)]
-LessonContent = Annotated[str, Field(max_length=MAX_LESSON_CONTENT)]
+LessonSummaryText = Annotated[
+    str, StringConstraints(strip_whitespace=True, max_length=MAX_LESSON_SUMMARY)
+]
 
 
 class LessonFields(BaseModel):
-    """A draft's fields as the editor saves them. Any may be empty: required fields are
-    checked when publishing (SCRUM-56, SCRUM-70). `topic_id: null` means no topic yet."""
+    """A draft's fields as the editor saves them. Any may be empty: what publishing needs
+    is reported as issues instead (SCRUM-56, SCRUM-70). `topic_id: null` means no topic."""
 
     title: LessonTitle = ""
-    content: LessonContent = ""
+    summary: LessonSummaryText = ""
     topic_id: uuid.UUID | None = None
+    doc: LessonDoc = Field(default_factory=LessonDoc)
 
 
 class LessonCreateRequest(LessonFields):
-    """A new draft. Every field is optional."""
+    """A new draft. Every field is optional, so a script can create a whole lesson in one
+    request and then publish it."""
 
 
 class LessonUpdateRequest(LessonFields):
@@ -291,19 +300,77 @@ class LessonUpdateRequest(LessonFields):
     updated_at: AwareDatetime
 
     def changes(self) -> dict:
-        """Only the lesson fields the request actually sent."""
-        return self.model_dump(include=self.model_fields_set & set(LessonFields.model_fields))
+        """Only the lesson fields the request actually sent, `doc` still as a model."""
+        sent = self.model_fields_set & set(LessonFields.model_fields)
+        return {name: getattr(self, name) for name in sent}
 
 
-class LessonOut(BaseModel):
-    """One lesson, body included, for the editor. `deletable` is true only for a draft
-    that has never been published."""
+class LessonChangeRequest(BaseModel):
+    """Publish, discard changes, withdraw or restore, naming the version the page loaded."""
+
+    updated_at: AwareDatetime
+
+
+class IssueOut(BaseModel):
+    """Something that stops the lesson being published (blocker) or is worth a look."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    severity: Literal["blocker", "warning"]
+    code: str
+    message: str
+    card_id: str | None
+    field: str | None
+
+
+class StatsOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    cards: int
+    questions: int
+    scored_questions: int
+    words: int
+    audio_seconds: int
+    reading_seconds: int
+
+
+class VersionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    number: int
+    published_at: datetime
+
+
+class AssetOut(BaseModel):
+    """An image or audio file, with what a page needs to show it before it has loaded."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    kind: Literal["image", "audio"]
+    mime: str
+    url: str
+    size: int
+    width: int | None
+    height: int | None
+    duration_ms: int | None
+    # A tiny blurred copy as a data: URL, and the image's main colour as #rrggbb.
+    placeholder: str | None
+    color: str | None
+    filename: str
+
+
+class LessonOut(BaseModel):
+    """One lesson as the editor needs it: the draft, what still blocks publishing, counts,
+    and the images and audio its cards use. `deletable` is true only for a lesson that has
+    never been published; `version` is the latest published one."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    key: str | None
     title: str
-    content: str
+    summary: str
     topic_id: uuid.UUID | None
     status: LessonStatus
     published_at: datetime | None
@@ -312,3 +379,9 @@ class LessonOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     deletable: bool
+    has_unpublished_changes: bool
+    version: VersionOut | None
+    doc: LessonDoc
+    issues: list[IssueOut]
+    stats: StatsOut
+    assets: dict[str, AssetOut]

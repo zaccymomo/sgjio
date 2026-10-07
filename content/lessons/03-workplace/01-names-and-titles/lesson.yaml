@@ -1,0 +1,44 @@
+title: Names and Titles at Work
+summary: How to address colleagues when you're not sure.
+topic: Workplace
+cards:
+  - image: { file: cover.png, alt: "An email signature card reading Regards, Wei Ling" }
+    text: |-
+      Singapore offices are less formal than much of the region, but seniority still shows in how people address each other.
+
+  - text: |-
+      **First names** are common among peers, and with managers at most companies.
+
+  - text: |-
+      Many Chinese Singaporeans have an English name as well as their given name. Use whichever one they introduce themselves with.
+
+  - text: |-
+      In older or government organisations, some colleagues are **Mr** or **Ms** plus surname. **Sir** and **Ma'am** appear in uniformed and some client-facing roles.
+
+  - text: |-
+      You're unsure how to address a senior colleague. What is the safest approach?
+    question:
+      options:
+        - text: "Copy how they sign emails and how others address them"
+          correct: true
+        - text: "Always use Mr or Ms plus surname"
+          why_not: "Too formal in many offices."
+        - text: "Always use their first name"
+          why_not: "Fine in many offices, but not all."
+        - text: "Use Sir or Ma'am until told otherwise"
+          why_not: "These suit uniformed roles, not most offices."
+      explanation: |-
+        Following how they sign their own emails, and how the rest of the team addresses them, matches the norm of that particular workplace.
+
+  - text: |-
+      Your new manager signs her emails *"Regards, Wei Ling"*. You start your reply: *"Hi {{blank}},"*
+    question:
+      options:
+        - text: "Wei Ling"
+          correct: true
+        - text: "Ms Tan"
+          why_not: "Fine somewhere formal, but she signs with her first name, so follow her lead."
+        - text: "Ma'am"
+          why_not: "Ma'am suits uniformed roles, not most offices."
+      explanation: |-
+        She signs with her first name, so that's how she expects to be addressed.

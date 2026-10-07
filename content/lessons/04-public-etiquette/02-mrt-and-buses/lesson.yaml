@@ -1,0 +1,40 @@
+title: On the MRT and Buses
+summary: The rules you can be fined for, and one you'll be glared at for.
+topic: Public Etiquette
+cards:
+  - image: { file: cover.png, alt: "An MRT train beside a no durians sign" }
+    text: |-
+      Public transport has its own rules, and some of them are enforced with fines.
+
+  - text: |-
+      **No eating or drinking**, not even water, anywhere inside stations or trains.
+
+  - text: |-
+      **No durians.** It's a real rule, and the signs are famous.
+
+  - text: |-
+      Reserved seats are for elderly and pregnant passengers, people with injuries and those with young children. You can sit in one, but give it up as soon as someone needs it.
+
+  - text: |-
+      You're sitting in a reserved seat and someone who needs it gets on. What is expected?
+    question:
+      options:
+        - text: "Give up the seat"
+          correct: true
+        - text: "Stay seated, since you boarded first"
+        - text: "Wait to be asked"
+          why_not: "You're expected to offer before being asked."
+        - text: "Move to a different reserved seat"
+      explanation: |-
+        Reserved seats may be used when free, but the expectation is that you give the seat up as soon as someone who needs it boards.
+
+  - text: |-
+      Thirsty on the train? Wait until you're {{blank}} the station.
+    question:
+      options:
+        - text: "out of"
+          correct: true
+        - text: "on the platform of"
+          why_not: "The ban covers the whole station, platforms included."
+      explanation: |-
+        Eating and drinking, water included, isn't allowed anywhere inside stations or trains.

@@ -1,5 +1,13 @@
-import { AdminLayout, AuthProvider, Button, RequireAuth, useAuth } from "@sgjio/ui";
-import { useState } from "react";
+import {
+  AdminLayout,
+  AuthProvider,
+  Button,
+  FullPageSpinner,
+  RequireAuth,
+  Spinner,
+  useAuth,
+} from "@sgjio/ui";
+import { lazy, Suspense, useState } from "react";
 import {
   Navigate,
   Outlet,
@@ -7,17 +15,27 @@ import {
   RouterProvider,
   createBrowserRouter,
   createRoutesFromElements,
+  useMatch,
   useNavigate,
 } from "react-router-dom";
 
 import { ContentPage } from "./pages/ContentPage";
-import { LessonEditorPage } from "./pages/LessonEditorPage";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { SignInPage } from "./pages/SignInPage";
+
+// Pages with the lesson deck load it only when opened, so the rest of the portal stays light.
+const LessonEditorPage = lazy(() =>
+  import("./pages/LessonEditorPage").then((module) => ({ default: module.LessonEditorPage })),
+);
+const LessonPreviewPage = lazy(() =>
+  import("./pages/LessonPreviewPage").then((module) => ({ default: module.LessonPreviewPage })),
+);
 
 function SignedInLayout() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  // The lesson editor works in three panes, side by side.
+  const wide = useMatch("/lessons/:id") !== null;
   const [signingOut, setSigningOut] = useState(false);
 
   async function handleSignOut() {
@@ -32,6 +50,7 @@ function SignedInLayout() {
 
   return (
     <AdminLayout
+      wide={wide}
       actions={
         <>
           <span className="hidden text-xs text-muted sm:inline">{user?.email}</span>
@@ -41,7 +60,15 @@ function SignedInLayout() {
         </>
       }
     >
-      <Outlet />
+      <Suspense
+        fallback={
+          <div className="flex justify-center py-16 text-brand">
+            <Spinner className="size-6" label="Loading" />
+          </div>
+        }
+      >
+        <Outlet />
+      </Suspense>
     </AdminLayout>
   );
 }
@@ -67,6 +94,15 @@ const router = createBrowserRouter(
 
       {/* Administrators only: anyone else is sent to /sign-in?next=... */}
       <Route element={<RequireAuth />}>
+        {/* Full screen, without the portal's header (SCRUM-65). */}
+        <Route
+          path="/lessons/:id/preview"
+          element={
+            <Suspense fallback={<FullPageSpinner />}>
+              <LessonPreviewPage />
+            </Suspense>
+          }
+        />
         <Route element={<SignedInLayout />}>
           <Route index element={<ContentPage />} />
           {/* /lessons/new for a lesson not saved yet (SCRUM-64). */}

@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     smtp_starttls: bool = False
     email_from: str = "SGJio <no-reply@sgjio.example.com>"
 
+    # Images and audio for lesson cards (SCRUM-19). Uploads larger than these are refused.
+    media_max_image_mb: int = 15
+    media_max_audio_mb: int = 10
+    media_max_audio_seconds: int = 120
+
+    # Lesson files loaded by the seed and `python -m app.cli import-lessons` (content/README.md)
+    content_dir: Path = API_DIR.parent / "content" / "lessons"
+
     # Seed accounts for local development
     seed_admin_email: str = "admin@sgjio.example.com"
     seed_admin_password: str = "AdminPass123"

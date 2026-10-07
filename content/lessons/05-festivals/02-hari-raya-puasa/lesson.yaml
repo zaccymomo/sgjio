@@ -1,0 +1,41 @@
+title: Hari Raya Puasa
+summary: Ramadan, open houses and what to say.
+topic: Festivals
+cards:
+  - image: { file: cover.png, alt: "Woven ketupat parcels and an oil lamp" }
+    text: |-
+      Hari Raya Puasa marks the end of **Ramadan**, the month when Muslims fast from dawn to sunset.
+
+  - text: |-
+      During Ramadan, be considerate about eating in front of fasting colleagues, and expect meetings to shift around **iftar**, the evening meal that breaks the fast.
+
+  - text: |-
+      On Hari Raya itself, families hold open houses and guests are genuinely welcome. Dress modestly and accept food with your right hand.
+
+  - audio: { file: selamat.mp3, transcript: "Selamat Hari Raya. Maaf zahir dan batin." }
+    text: |-
+      The greeting is *"Selamat Hari Raya"*, often followed by *"Maaf zahir dan batin"*, asking forgiveness for any wrong done.
+
+  - text: |-
+      You're visiting a colleague's open house on Hari Raya. What should you do at the door?
+    question:
+      options:
+        - text: "Remove your shoes before entering"
+          correct: true
+        - text: "Wait to be served before sitting"
+        - text: "Bring alcohol as a gift"
+          why_not: "Alcohol is not consumed by Muslims and is never a suitable gift."
+        - text: "Greet the eldest person with a firm handshake"
+      explanation: |-
+        Shoes come off at the door in Malay and Muslim homes, and modest dress is expected when visiting.
+
+  - text: |-
+      Arriving at the open house, you greet your hosts: *"Selamat Hari {{blank}}!"*
+    question:
+      options:
+        - text: "Raya"
+          correct: true
+        - text: "Deepavali"
+          why_not: "Deepavali is the Hindu festival of lights."
+      explanation: |-
+        *"Selamat Hari Raya"* is the greeting for Hari Raya Puasa.
