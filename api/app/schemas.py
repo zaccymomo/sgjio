@@ -350,7 +350,7 @@ class AssetOut(BaseModel):
     kind: Literal["image", "audio"]
     mime: str
     url: str
-    bytes: int
+    size: int
     width: int | None
     height: int | None
     duration_ms: int | None

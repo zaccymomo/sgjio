@@ -3,6 +3,7 @@
 python -m app.cli seed
 python -m app.cli create-admin --email someone@example.com --name "Their Name"
 python -m app.cli send-reset --email admin@sgjio.example.com --scope admin
+python -m app.cli prune-media
 """
 
 import argparse
@@ -11,6 +12,7 @@ import sys
 
 from sqlalchemy import select
 
+from app import media
 from app.auth import normalise_email
 from app.auth.reset import request_password_reset
 from app.config import get_settings
@@ -70,6 +72,14 @@ def cmd_send_reset(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_prune_media(_: argparse.Namespace) -> int:
+    """Delete uploaded images and audio that no lesson uses (SCRUM-19)."""
+    with SessionLocal() as db:
+        removed = media.prune(db)
+    print(f"Deleted {removed} unused file(s)." if removed else "No unused files to delete.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description="SGJio dev commands")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -86,6 +96,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--email", required=True)
     p.add_argument("--scope", choices=[s.value for s in AuthScope], default="app")
     p.set_defaults(func=cmd_send_reset)
+
+    sub.add_parser(
+        "prune-media", help="delete uploaded images and audio that no lesson uses"
+    ).set_defaults(func=cmd_prune_media)
 
     args = parser.parse_args(argv)
     return args.func(args)

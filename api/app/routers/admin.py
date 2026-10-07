@@ -6,16 +6,17 @@ its author forgets to add the guard.
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from pydantic import AwareDatetime
 from sqlalchemy.orm import Session
 
-from app import lessons, topics
+from app import lessons, media, topics
 from app.auth.deps import require_admin
 from app.db import get_db
 from app.models import User
 from app.problems import ContentProblem
 from app.schemas import (
+    AssetOut,
     LessonChangeRequest,
     LessonCreateRequest,
     LessonOrderRequest,
@@ -313,5 +314,41 @@ def restore_lesson(
     """Show a withdrawn lesson to users again, as its latest published version."""
     try:
         return lessons.restore_lesson(db, lesson_id, body.updated_at)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+# --- Images and audio (SCRUM-19) -----------------------------------------------------------
+
+
+@router.post(
+    "/media",
+    response_model=AssetOut,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        413: {"description": "Over the size or length limit (media_too_large)"},
+        415: {"description": "Not a supported image or audio file (media_unsupported)"},
+        422: {"description": "A damaged image (media_unreadable)"},
+    },
+)
+async def upload_media(
+    file: UploadFile,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> media.Asset:
+    """Upload an image (JPEG, PNG, WebP) or audio (MP3, M4A, WAV, Ogg) for a card. Uploading
+    a file that is already stored returns the stored one. Refer to it from a card by `id`."""
+    limit = media.largest_upload_bytes()
+    data = await file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(
+            status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "code": "media_too_large",
+                "message": f"That file is too large. The limit is {limit // (1024 * 1024)} MB.",
+            },
+        )
+    try:
+        return media.store(db, data, file.filename or "", admin.id)
     except ContentProblem as problem:
         raise _refuse(problem) from None

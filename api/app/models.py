@@ -16,6 +16,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     UniqueConstraint,
     func,
@@ -49,6 +50,11 @@ class LessonStatus(str, enum.Enum):
     DRAFT = "draft"
     PUBLISHED = "published"
     WITHDRAWN = "withdrawn"
+
+
+class MediaKind(str, enum.Enum):
+    IMAGE = "image"
+    AUDIO = "audio"
 
 
 class AuthScope(str, enum.Enum):
@@ -264,6 +270,40 @@ class LessonVersion(Base):
     )
 
     lesson: Mapped[Lesson] = relationship(back_populates="versions")
+
+
+class MediaAsset(Base):
+    """An image or audio file a lesson card uses (SCRUM-19).
+
+    The file itself is kept in the database, so media is backed up, reset and moved with
+    everything else and needs no setup. Files never change once stored: a new upload is a
+    new asset, so browsers can cache them for good. Uploading the same file twice gives back
+    the first asset (`sha256` is of the file as uploaded).
+
+    Images are stored as WebP at most 1600px wide, with their EXIF data (which can include
+    where a photo was taken) removed. `placeholder` is a tiny blurred copy to show while the
+    image loads, and `color` its main colour, which the lesson player tints cards with.
+    """
+
+    __tablename__ = "media_assets"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    kind: Mapped[MediaKind] = mapped_column(_enum(MediaKind, "media_kind"), nullable=False)
+    mime: Mapped[str] = mapped_column(String(60), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    # Only loaded when the file is served, never when lessons are listed or edited.
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False, deferred=True)
+    size: Mapped[int] = mapped_column(Integer, nullable=False)
+    width: Mapped[int | None] = mapped_column(Integer)
+    height: Mapped[int | None] = mapped_column(Integer)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    placeholder: Mapped[str | None] = mapped_column(String(2000))
+    color: Mapped[str | None] = mapped_column(String(7))
+    filename: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = _created_at()
 
 
 # --- Progress -----------------------------------------------------------------------------
