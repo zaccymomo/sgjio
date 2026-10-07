@@ -1,0 +1,33 @@
+title: Paying for Public Transport
+summary: Tap in, tap out, and what happens if you forget.
+topic: Getting Around
+cards:
+  - image: { file: cover.png, alt: "A contactless card being tapped on a fare reader" }
+    text: |-
+      You don't need a special transport card. Most people tap a **contactless bank card** or a **phone wallet** on the reader.
+
+  - text: |-
+      Prefer not to use a bank card? Stored-value cards such as **EZ-Link** are sold at station counters and convenience stores.
+
+  - text: |-
+      Tap in when you board and **tap out when you leave**, on buses as well as trains. Fares depend on how far you travel.
+
+  - text: |-
+      What happens if you forget to tap out when leaving a bus or train?
+    question:
+      options:
+        - text: "You're charged the maximum fare for that line"
+          correct: true
+        - text: "You're charged nothing for the trip"
+        - text: "Your card is blocked until you visit a counter"
+        - text: "You're charged a flat minimum fare"
+      explanation: |-
+        Fares are calculated between your tap in and tap out, so missing the tap out charges the maximum fare for that line.
+
+  - text: |-
+      Getting off the bus? Remember to {{blank}}.
+    question:
+      options:
+        - text: "tap out"
+      explanation: |-
+        Tapping out on the way off is what tells the system how far you travelled.

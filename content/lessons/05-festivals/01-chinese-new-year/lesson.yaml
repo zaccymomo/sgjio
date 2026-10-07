@@ -1,0 +1,44 @@
+title: Chinese New Year
+summary: Red packets, mandarin oranges and tossing yusheng.
+topic: Festivals
+cards:
+  - image: { file: cover.png, alt: "Red packets and a pair of mandarin oranges" }
+    text: |-
+      Chinese New Year brings two public holidays in January or February, and the busiest family period of the year.
+
+  - text: |-
+      **Ang bao** are red packets of money, given by married people to children and unmarried younger adults. Use new notes and an even amount.
+
+  - text: |-
+      Ang bao amounts should be even, and never include a {{blank}}.
+    question:
+      options:
+        - text: "four"
+          correct: true
+        - text: "eight"
+          why_not: "Eight sounds like prosperity, so it's a favourite."
+        - text: "two"
+          why_not: "Even amounts such as two are fine. Pairs are lucky."
+      explanation: |-
+        **Four** sounds like the word for death, so it's avoided.
+
+  - text: |-
+      Visiting relatives runs over several days. If you're invited, bring mandarin oranges, traditionally **in pairs**.
+
+  - text: |-
+      **Lo hei**, a tossed raw fish salad, is shared at work and family meals. Everyone tosses together: the higher, the better.
+
+  - text: |-
+      You're invited to a colleague's home for Chinese New Year. What is a suitable gift?
+    question:
+      options:
+        - text: "A pair of mandarin oranges"
+          correct: true
+        - text: "A set of four pastries"
+          why_not: "Four sounds like death and is avoided."
+        - text: "A gift wrapped in white paper"
+          why_not: "White and black are linked with mourning."
+        - text: "A clock or watch"
+          why_not: "Giving a clock sounds like attending a funeral in Chinese."
+      explanation: |-
+        A pair of mandarin oranges is the traditional gift when visiting during Chinese New Year.

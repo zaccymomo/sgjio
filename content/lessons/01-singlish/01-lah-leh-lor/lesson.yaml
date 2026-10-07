@@ -1,0 +1,47 @@
+title: Lah, Leh and Lor
+summary: The little words at the end of a sentence that change what it means.
+topic: Singlish
+cards:
+  - image: { file: cover.png, alt: "Three speech bubbles reading lah, leh and lor" }
+    text: |-
+      Singlish particles sit at the **end of a sentence** and carry its tone. They aren't filler: swap one for another and the meaning changes.
+
+  - audio: { file: lah.mp3, transcript: "Don't worry lah, can one." }
+    text: |-
+      **Lah** softens or insists. *"Don't worry lah"* is reassuring, not dismissive.
+
+  - text: |-
+      **Leh** softens a disagreement or a request: *"But I already paid leh."*
+
+      **Lor** signals resignation: *"Then cancel lor."*
+
+  - audio: { file: meh.mp3, transcript: "Really free meh?" }
+    text: |-
+      **Meh** questions something the speaker doubts: *"Really free meh?"*
+
+  - text: |-
+      Your friend isn't sure the concert is really free. They ask: *"Really free {{blank}}?"*
+    question:
+      options:
+        - text: "meh"
+          correct: true
+        - text: "lah"
+          why_not: "Lah reassures or insists. It doesn't question anything."
+        - text: "lor"
+          why_not: "Lor sounds resigned, not doubtful."
+      explanation: |-
+        **Meh** marks doubt, so it turns a statement into a sceptical question.
+
+  - text: |-
+      A colleague replies to your plan with *"Can meh?"*. What are they signalling?
+    question:
+      options:
+        - text: "They doubt it will work"
+          correct: true
+        - text: "They fully agree"
+          why_not: 'That would be "Can lah". The particle changes everything.'
+        - text: "They are annoyed with you"
+          why_not: "Meh is doubtful, not irritated."
+        - text: "They did not hear you"
+      explanation: |-
+        "Meh" marks doubt, so "Can meh?" is a polite way of questioning whether the plan will actually work, not agreeing to it.

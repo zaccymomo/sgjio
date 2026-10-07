@@ -1,0 +1,57 @@
+title: Words You Will Hear Every Day
+summary: Shiok, sian, makan and the other words that do a lot of work.
+topic: Singlish
+cards:
+  - image: { file: cover.png, alt: "A steaming bowl of laksa with a speech bubble saying shiok" }
+    text: |-
+      A handful of borrowed words do a lot of work in everyday Singapore English. You'll hear them in offices as well as among friends.
+
+  - audio: { file: shiok.mp3, transcript: "Wah, this laksa damn shiok!" }
+    text: |-
+      **Shiok**: intensely satisfying, usually food.
+
+      **Sian**: bored, weary, fed up.
+
+  - text: |-
+      **Makan**: to eat, or a meal. *"Go makan?"*
+
+      **Chope**: to reserve a seat.
+
+      **Alamak**: an exclamation, like "oh no".
+
+  - text: |-
+      **Kiasu** means afraid of missing out. It describes someone who queues an hour early, just in case.
+
+  - text: |-
+      Stuck in a long meeting on a Friday afternoon, your colleague sighs: *"So {{blank}}."*
+    question:
+      options:
+        - text: "sian"
+          correct: true
+        - text: "shiok"
+          why_not: "Shiok is for something satisfying, like a good meal."
+        - text: "kiasu"
+          why_not: "Kiasu is about the fear of missing out, not boredom."
+      explanation: |-
+        **Sian** means bored or fed up: the right word for a long Friday meeting.
+
+  - text: |-
+      Your colleague finishes lunch and says the laksa was *"shiok"*. What do they mean?
+    question:
+      options:
+        - text: "It was delicious"
+          correct: true
+        - text: "It was too spicy"
+        - text: "It was overpriced"
+        - text: "It was disappointing"
+          why_not: "Shiok is always good news."
+      explanation: |-
+        "Shiok" means intensely satisfying or delicious. They enjoyed it.
+
+  - text: |-
+      Using one or two of these naturally is welcomed. Try one now: *"Hungry already. Let's go {{blank}}!"*
+    question:
+      options:
+        - text: "makan"
+      explanation: |-
+        *"Let's go makan"* is an everyday invitation to eat together.

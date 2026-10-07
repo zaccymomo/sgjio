@@ -1,0 +1,48 @@
+title: Saying No Without Saying No
+summary: Hearing the no behind a softened reply.
+topic: Workplace
+cards:
+  - image: { file: cover.png, alt: "A chat bubble saying quite challenging leh next to a calendar" }
+    text: |-
+      Direct refusal is often avoided at work, so a "no" usually arrives softened. It's about saving face on both sides, not about being evasive.
+
+  - text: |-
+      Phrases that usually mean no, or not yet:
+
+      - *"I will try my best"*
+      - *"Let me check and get back to you"*
+      - Silence after a proposal
+
+  - audio: { file: challenging.mp3, transcript: "Hmm, quite challenging leh." }
+    text: |-
+      And this one, when you ask whether a deadline is possible.
+
+  - text: |-
+      You ask for a deadline and hear *"Quite challenging leh"*. What does it most likely mean?
+    question:
+      options:
+        - text: "The deadline is unlikely to be met"
+          correct: true
+        - text: "They need one more day"
+          why_not: "It's a softened no, not a small delay."
+        - text: "They want you to do it instead"
+        - text: "They have agreed to the deadline"
+          why_not: 'Agreement would sound like "Can".'
+      explanation: |-
+        Softened phrasing usually signals a no. It means the deadline isn't realistic, put in a way that avoids a blunt refusal.
+
+  - text: |-
+      Need a firm answer? Ask for something concrete: a **date**, an **owner**, or a yes to one specific next step.
+
+  - text: |-
+      To get past *"I'll try my best"*, you ask: *"Can we agree on a {{blank}}?"*
+    question:
+      options:
+        - text: "date"
+          correct: true
+        - text: "favour"
+          why_not: "A favour adds pressure without making the plan any clearer."
+        - text: "meeting"
+          why_not: "Another meeting may bring the same softened answer."
+      explanation: |-
+        A concrete date gives both sides something definite, without forcing a blunt yes or no.
