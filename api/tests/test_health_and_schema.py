@@ -1,10 +1,12 @@
 """SCRUM-72: the schema and seed data."""
 
+from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 
-from app.models import Lesson, QuizOption, QuizQuestion, Topic, User
+from app.models import Lesson, LessonVersion, Topic, User
 from app.seed import TOPICS, seed
 
 
@@ -20,8 +22,10 @@ def test_seed_creates_admin_user_topics_and_sample_lesson(db):
     assert db.scalar(select(func.count()).select_from(User)) == 2
     assert sorted(t.name for t in db.scalars(select(Topic))) == sorted(TOPICS)
     lesson = db.scalar(select(Lesson))
-    assert lesson.question is not None
-    assert sum(o.is_correct for o in lesson.question.options) == 1
+    questions = [card["question"] for card in lesson.draft["cards"] if card["question"]]
+    assert questions
+    assert all(sum(o["correct"] for o in q["options"]) == 1 for q in questions)
+    assert [version.number for version in lesson.versions] == [1]
 
 
 def test_seed_is_safe_to_run_twice(db):
@@ -38,12 +42,13 @@ def test_topic_names_are_unique_ignoring_case(db):
         db.commit()
 
 
-def test_a_question_can_only_have_one_correct_option(db):
+def test_a_lesson_has_each_version_number_once(db):
     lesson = Lesson(title="Test")
-    lesson.question = QuizQuestion(
-        prompt="?",
-        options=[QuizOption(text="A", is_correct=True), QuizOption(text="B", is_correct=True)],
-    )
+    now = datetime.now(UTC)
+    lesson.versions = [
+        LessonVersion(number=1, title="Test", doc={"cards": []}, published_at=now),
+        LessonVersion(number=1, title="Test", doc={"cards": []}, published_at=now),
+    ]
     db.add(lesson)
     with pytest.raises(IntegrityError):
         db.commit()

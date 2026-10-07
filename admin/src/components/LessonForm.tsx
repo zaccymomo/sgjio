@@ -3,7 +3,6 @@ import { useId } from "react";
 
 import type { Topic } from "../lib/content";
 import { MAX_TITLE, type LessonFieldErrors, type LessonFields } from "../lib/lessons";
-import { MarkdownField } from "./MarkdownField";
 
 const NO_TOPIC = "";
 
@@ -52,13 +51,6 @@ export function LessonForm({
         topics={topics}
         savedTopicId={savedTopicId}
         error={errors.topic_id}
-        readOnly={readOnly}
-      />
-      <MarkdownField
-        label="Lesson text"
-        value={value.content}
-        onChange={(content) => set("content", content)}
-        error={errors.content}
         readOnly={readOnly}
       />
     </div>

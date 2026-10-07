@@ -280,9 +280,9 @@ function LessonEditor({
     }
     switch (error.code) {
       case "validation_error": {
-        const { title, content, topic_id } = error.fieldErrors;
+        const { title, topic_id } = error.fieldErrors;
         const fieldErrors = Object.fromEntries(
-          Object.entries({ title, content, topic_id }).filter(([, message]) => message),
+          Object.entries({ title, topic_id }).filter(([, message]) => message),
         );
         setErrors(fieldErrors);
         if (Object.keys(fieldErrors).length === 0) setProblem({ message: error.message });
@@ -466,8 +466,8 @@ function LessonEditor({
             />
           </section>
 
-          <Placeholder story="SCRUM-19" title="Quiz question">
-            Each lesson ends with a quiz question. Writing it here arrives with the quiz editor.
+          <Placeholder story="SCRUM-19" title="Cards">
+            Lessons are now decks of cards. Writing them here arrives with the card editor.
           </Placeholder>
         </div>
       </form>

@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import lesson_doc
 from app.auth import normalise_email
 from app.config import get_settings
 from app.lessons import next_lesson_position
@@ -27,9 +28,8 @@ from app.models import (
     Lesson,
     LessonCompletion,
     LessonStatus,
+    LessonVersion,
     Profile,
-    QuizOption,
-    QuizQuestion,
     Topic,
     User,
     UserRole,
@@ -576,21 +576,35 @@ def _get_or_create_user(
 
 
 def _create_lesson(spec: dict, topic: Topic, position: int) -> Lesson:
+    """A published lesson: the text as one card, then the question as a card of its own."""
+    doc = lesson_doc.assign_ids(
+        lesson_doc.LessonDoc(
+            cards=[
+                lesson_doc.StoryCard(text=spec["content"]),
+                lesson_doc.StoryCard(
+                    text=spec["prompt"],
+                    question=lesson_doc.ChoiceQuestion(
+                        options=[
+                            lesson_doc.Option(text=text, correct=correct)
+                            for text, correct in spec["options"]
+                        ],
+                        explanation=spec["explanation"],
+                    ),
+                ),
+            ]
+        )
+    )
+    now = datetime.now(UTC)
     lesson = Lesson(
         title=spec["title"],
-        content=spec["content"],
+        draft=lesson_doc.dump(doc),
         topic=topic,
         position=position,
         status=LessonStatus.PUBLISHED,
-        published_at=datetime.now(UTC),
+        published_at=now,
     )
-    lesson.question = QuizQuestion(
-        prompt=spec["prompt"],
-        explanation=spec["explanation"],
-        options=[
-            QuizOption(text=text, is_correct=correct, position=position)
-            for position, (text, correct) in enumerate(spec["options"])
-        ],
+    lesson.versions.append(
+        LessonVersion(number=1, title=spec["title"], doc=lesson_doc.dump(doc), published_at=now)
     )
     return lesson
 

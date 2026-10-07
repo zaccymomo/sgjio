@@ -16,6 +16,7 @@ from app.db import get_db
 from app.models import User
 from app.problems import ContentProblem
 from app.schemas import (
+    LessonChangeRequest,
     LessonCreateRequest,
     LessonOrderRequest,
     LessonOut,
@@ -43,10 +44,19 @@ OUT_OF_DATE = {409: {"description": "The page's list is out of date (order_out_o
 
 
 def _refuse(problem: ContentProblem) -> HTTPException:
-    detail = {"code": problem.code, "message": problem.message}
+    detail = {"code": problem.code, "message": problem.message, **problem.extra}
     if problem.field:
         detail["field"] = problem.field
     return HTTPException(problem.status_code, detail=detail)
+
+
+def _invalid(error: ValueError) -> HTTPException:
+    """A document that is well formed but cannot be stored, e.g. a repeated id or an image
+    that does not exist. Answered like any other validation error, against `doc`."""
+    return HTTPException(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        detail=[{"loc": ["body", "doc"], "msg": str(error), "type": "value_error"}],
+    )
 
 
 @router.get("/topics", response_model=list[TopicOut])
@@ -152,13 +162,14 @@ def reorder_lessons(
         raise _refuse(problem) from None
 
 
-# --- Lesson drafts (SCRUM-64) -------------------------------------------------------------
+# --- Writing lessons (SCRUM-19, SCRUM-64) -------------------------------------------------
 
 LESSON_NOT_FOUND = {404: {"description": "No lesson with that id (lesson_not_found)"}}
 TOPIC_REFUSED = {
     404: {"description": "No topic with that id (topic_not_found, field topic_id)"},
     409: {"description": "That topic is archived (topic_archived, field topic_id)"},
 }
+CHANGED = {409: {"description": "Changed since it was loaded (lesson_out_of_date)"}}
 
 
 @router.post(
@@ -168,16 +179,19 @@ TOPIC_REFUSED = {
     responses=TOPIC_REFUSED,
 )
 def create_lesson(body: LessonCreateRequest, db: Session = Depends(get_db)) -> lessons.LessonDetail:
-    """Create a draft at the end of its topic. Every field may be empty."""
+    """Create a draft at the end of its topic. Every field may be empty; `doc` may hold the
+    whole deck, so a script can write a lesson in one request."""
     try:
-        return lessons.create_lesson(db, body.title, body.content, body.topic_id)
+        return lessons.create_lesson(db, body.title, body.summary, body.topic_id, body.doc)
     except ContentProblem as problem:
         raise _refuse(problem) from None
+    except ValueError as error:
+        raise _invalid(error) from None
 
 
 @router.get("/lessons/{lesson_id}", response_model=LessonOut, responses=LESSON_NOT_FOUND)
 def get_lesson(lesson_id: uuid.UUID, db: Session = Depends(get_db)) -> lessons.LessonDetail:
-    """One lesson of any status, body included."""
+    """One lesson of any status: its draft, issues, counts and the files its cards use."""
     try:
         return lessons.get_lesson(db, lesson_id)
     except ContentProblem as problem:
@@ -191,20 +205,25 @@ def get_lesson(lesson_id: uuid.UUID, db: Session = Depends(get_db)) -> lessons.L
         **LESSON_NOT_FOUND,
         **TOPIC_REFUSED,
         409: {
-            "description": "Not a draft (lesson_not_draft), changed since it was loaded "
-            "(lesson_out_of_date), or the topic is archived (topic_archived)"
+            "description": "Changed since it was loaded (lesson_out_of_date), the topic is "
+            "archived (topic_archived), or a published lesson would lose its topic "
+            "(topic_required)"
         },
     },
 )
 def update_lesson(
     lesson_id: uuid.UUID, body: LessonUpdateRequest, db: Session = Depends(get_db)
 ) -> lessons.LessonDetail:
-    """Change a draft's title, content or topic; fields left out are kept. A new topic puts
-    the lesson at the end of it. Send the `updated_at` the editor loaded."""
+    """Change the draft's title, summary or cards, or the lesson's topic; fields left out
+    are kept. Works whatever the status: users keep seeing the published version until the
+    draft is published. A new topic moves the lesson to the end of it straight away. Send
+    the `updated_at` the editor loaded."""
     try:
         return lessons.update_lesson(db, lesson_id, body.updated_at, body.changes())
     except ContentProblem as problem:
         raise _refuse(problem) from None
+    except ValueError as error:
+        raise _invalid(error) from None
 
 
 @router.delete(
@@ -226,5 +245,73 @@ def delete_lesson(
     """Delete a lesson that has never been published."""
     try:
         lessons.delete_lesson(db, lesson_id, updated_at)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+# --- Publishing (SCRUM-52, SCRUM-56, SCRUM-70) ---------------------------------------------
+
+STATUS_REFUSED = {
+    **LESSON_NOT_FOUND,
+    409: {
+        "description": "Changed since it was loaded (lesson_out_of_date), or not allowed in "
+        "the lesson's status (lesson_status_conflict)"
+    },
+}
+
+
+@router.post(
+    "/lessons/{lesson_id}/publish",
+    response_model=LessonOut,
+    responses={
+        **LESSON_NOT_FOUND,
+        409: {
+            "description": "Something still blocks it (lesson_has_blockers, with `issues`), "
+            "or it changed since it was loaded (lesson_out_of_date)"
+        },
+    },
+)
+def publish_lesson(
+    lesson_id: uuid.UUID,
+    body: LessonChangeRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> lessons.LessonDetail:
+    """Make the draft what users see, as a new version. Safe to repeat."""
+    try:
+        return lessons.publish_lesson(db, lesson_id, body.updated_at, admin.id)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+@router.post("/lessons/{lesson_id}/discard", response_model=LessonOut, responses=STATUS_REFUSED)
+def discard_changes(
+    lesson_id: uuid.UUID, body: LessonChangeRequest, db: Session = Depends(get_db)
+) -> lessons.LessonDetail:
+    """Put the draft back to the latest published version."""
+    try:
+        return lessons.discard_changes(db, lesson_id, body.updated_at)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+@router.post("/lessons/{lesson_id}/withdraw", response_model=LessonOut, responses=STATUS_REFUSED)
+def withdraw_lesson(
+    lesson_id: uuid.UUID, body: LessonChangeRequest, db: Session = Depends(get_db)
+) -> lessons.LessonDetail:
+    """Hide a published lesson from users. Their completions and history keep it."""
+    try:
+        return lessons.withdraw_lesson(db, lesson_id, body.updated_at)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+@router.post("/lessons/{lesson_id}/restore", response_model=LessonOut, responses=STATUS_REFUSED)
+def restore_lesson(
+    lesson_id: uuid.UUID, body: LessonChangeRequest, db: Session = Depends(get_db)
+) -> lessons.LessonDetail:
+    """Show a withdrawn lesson to users again, as its latest published version."""
+    try:
+        return lessons.restore_lesson(db, lesson_id, body.updated_at)
     except ContentProblem as problem:
         raise _refuse(problem) from None
