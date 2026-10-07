@@ -9,7 +9,6 @@ import type { LessonStatus } from "./content";
  */
 export type LessonFields = {
   title: string;
-  content: string;
   topic_id: string | null;
 };
 
@@ -26,23 +25,22 @@ export type Lesson = LessonFields & {
   deletable: boolean;
 };
 
-/** Same limits as the API (MAX_LESSON_TITLE and MAX_LESSON_CONTENT in schemas.py). */
+/** Same limit as the API (MAX_LESSON_TITLE in schemas.py). */
 export const MAX_TITLE = 200;
-export const MAX_CONTENT = 20_000;
 
 export type LessonFieldErrors = Partial<Record<keyof LessonFields, string>>;
 
 export function emptyLesson(topicId: string | null = null): LessonFields {
-  return { title: "", content: "", topic_id: topicId };
+  return { title: "", topic_id: topicId };
 }
 
 export function fieldsOf(lesson: Lesson): LessonFields {
-  return { title: lesson.title, content: lesson.content, topic_id: lesson.topic_id };
+  return { title: lesson.title, topic_id: lesson.topic_id };
 }
 
 /** Whether saving `a` would change `b`. Titles are trimmed on save, so compare them so. */
 export function sameFields(a: LessonFields, b: LessonFields): boolean {
-  return a.title.trim() === b.title.trim() && a.content === b.content && a.topic_id === b.topic_id;
+  return a.title.trim() === b.title.trim() && a.topic_id === b.topic_id;
 }
 
 /**
@@ -54,11 +52,6 @@ export function lessonFieldErrors(fields: LessonFields): LessonFieldErrors {
   const title = fields.title.trim();
   if (title.length > MAX_TITLE) {
     errors.title = `Use ${MAX_TITLE} characters or fewer. This title has ${title.length}.`;
-  }
-  if (fields.content.length > MAX_CONTENT) {
-    errors.content =
-      `Use ${MAX_CONTENT.toLocaleString("en-SG")} characters or fewer. This text has ` +
-      `${fields.content.length.toLocaleString("en-SG")}.`;
   }
   return errors;
 }

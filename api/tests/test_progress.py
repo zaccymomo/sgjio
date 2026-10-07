@@ -23,7 +23,6 @@ def _topic(db, name: str, position: int = 0) -> Topic:
 def _lesson(db, topic: Topic, title: str, status: LessonStatus = LessonStatus.PUBLISHED) -> Lesson:
     lesson = Lesson(
         title=title,
-        content="...",
         topic=topic,
         status=status,
         published_at=datetime.now(UTC) if status == LessonStatus.PUBLISHED else None,
@@ -247,7 +246,7 @@ def test_the_completion_row_survives_withdrawal(client, db, make_user):
 def test_a_lesson_with_no_topic_is_not_counted(client, db, make_user):
     """A draft can exist without a topic; publishing requires one (SCRUM-56)."""
     _sign_in(client, make_user)
-    orphan = Lesson(title="No topic", content="...", status=LessonStatus.PUBLISHED)
+    orphan = Lesson(title="No topic", status=LessonStatus.PUBLISHED)
     db.add(orphan)
     db.commit()
 
