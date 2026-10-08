@@ -1,0 +1,25 @@
+title: Visiting During a Festival
+summary: Be a considerate guest when friends invite you to celebrate.
+topic: Festivals
+cards:
+  - text: |-
+      Festival visits are often relaxed, but an invitation is still an occasion to be thoughtful. Confirm the time, arrive close to it, and let your host guide you on shoes, food and photographs.
+
+  - text: |-
+      A small gift is welcome when visiting a home, though it is not required. If you are unsure about food, choose something sealed and ask about dietary needs first.
+
+  - text: |-
+      During religious celebrations, follow your host's lead. Some homes avoid particular foods or drinks, and some guests may be fasting.
+
+  - text: |-
+      You are invited to a colleague's festival open house and are unsure what food to bring. What is the best first step?
+    question:
+      options:
+        - text: "Ask the host about dietary preferences before choosing"
+          correct: true
+        - text: "Bring any dish without asking"
+          why_not: "A well-meant dish may not suit the household's dietary practices."
+        - text: "Skip the invitation because you do not know the customs"
+          why_not: "Asking respectfully is usually welcomed and lets your host guide you."
+      explanation: |-
+        A quick question lets you choose something considerate and shows respect for the household.

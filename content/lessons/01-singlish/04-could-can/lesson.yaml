@@ -1,0 +1,25 @@
+title: Could, Can and One
+summary: Small Singlish words that make everyday requests sound natural.
+topic: Singlish
+cards:
+  - text: |-
+      In everyday Singapore English, **can** often means both “yes” and “it is possible”. A quick “Can!” is an enthusiastic agreement.
+
+  - text: |-
+      **Could** is a polite way to ask for something: “Could you help me with this?” It is useful at work and in shops.
+
+  - text: |-
+      You may also hear **one** at the end of a sentence. It adds emphasis: “This one is cheaper one.” It is informal speech, not formal writing.
+
+  - text: |-
+      Your colleague asks, “Can we move the meeting to Friday?” Which reply means “Yes, that is possible”?
+    question:
+      options:
+        - text: "Can."
+          correct: true
+        - text: "Cannot, thank you."
+          why_not: "Cannot means it is not possible."
+        - text: "One."
+          why_not: "One adds emphasis to a statement; it does not answer a request by itself."
+      explanation: |-
+        A short “Can” commonly means “Yes, that works” in Singapore English.

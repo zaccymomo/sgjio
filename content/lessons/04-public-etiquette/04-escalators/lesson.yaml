@@ -1,0 +1,25 @@
+title: Escalators and Shared Space
+summary: Make room for people walking and travelling at different speeds.
+topic: Public Etiquette
+cards:
+  - text: |-
+      On most escalators in Singapore, people stand on the **left** and leave the right side clear for anyone who wants to walk up or down.
+
+  - text: |-
+      Keep bags close to you and avoid stopping immediately at the top or bottom. Other people may be stepping off behind you.
+
+  - text: |-
+      This is a courtesy rather than an invitation to rush. Hold the handrail, watch your step and use a lift if you have a pram, bulky luggage or need more space.
+
+  - text: |-
+      You are standing still on an escalator and someone wants to walk past. Where should you stand?
+    question:
+      options:
+        - text: "On the left, leaving the right side clear"
+          correct: true
+        - text: "In the middle so no one can pass"
+          why_not: "That blocks the shared walking side."
+        - text: "On the right with your bag beside you"
+          why_not: "The right side is usually kept open for people walking."
+      explanation: |-
+        Standing on the left keeps an expected passing space open on the right.

@@ -1,0 +1,25 @@
+title: Giving Up Your Seat
+summary: Notice when someone may benefit more from the seat you are using.
+topic: Getting Around
+cards:
+  - text: |-
+      On public transport, priority seats are for people who may need them more: older passengers, pregnant passengers, people with disabilities and adults carrying young children.
+
+  - text: |-
+      You do not need to make a scene. A small gesture or a quiet “Would you like to sit?” is enough. If the person declines, simply take your seat again.
+
+  - text: |-
+      Even away from a marked priority seat, look around when the train or bus is crowded. Someone balancing a child or using a walking aid may appreciate the space.
+
+  - text: |-
+      A crowded bus stops and an older passenger boards near you. What is the considerate response?
+    question:
+      options:
+        - text: "Offer your seat quietly"
+          correct: true
+        - text: "Wait for the passenger to demand a seat"
+          why_not: "Offering early is easier and more considerate than making someone ask."
+        - text: "Move your bag onto the empty seat beside you"
+          why_not: "That takes up space another passenger may need."
+      explanation: |-
+        Offering a seat is a common, low-key courtesy on crowded public transport.
