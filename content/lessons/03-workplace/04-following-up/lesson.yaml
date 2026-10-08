@@ -1,0 +1,25 @@
+title: Following Up After a Meeting
+summary: Turn a polite discussion into clear next steps.
+topic: Workplace
+cards:
+  - text: |-
+      Meetings can end with broad agreement but no one clearly owning the next step. A short follow-up message helps everyone leave with the same understanding.
+
+  - text: |-
+      Keep it practical: list the decision, the owner and a date. This is clearer than asking “Any updates?” several days later.
+
+  - text: |-
+      If a deadline is uncertain, ask what is realistic instead of pressing for an immediate promise. That lets someone raise a concern without losing face.
+
+  - text: |-
+      What is the clearest follow-up after your team agrees to revise a proposal?
+    question:
+      options:
+        - text: "Send a note naming the owner and the agreed date"
+          correct: true
+        - text: "Wait until the deadline and ask whether it is done"
+          why_not: "Waiting makes it harder to surface a problem early."
+        - text: "Assume the most senior person will handle it"
+          why_not: "Agreement does not identify an owner unless someone records one."
+      explanation: |-
+        A brief written follow-up gives the team a shared record of who is doing what and by when.

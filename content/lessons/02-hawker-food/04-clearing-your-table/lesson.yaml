@@ -1,0 +1,25 @@
+title: Clearing Your Table After Eating
+summary: A simple way to leave a shared food court ready for the next person.
+topic: Hawker & Food
+cards:
+  - text: |-
+      At hawker centres and food courts, return your tray, bowls and cups to the tray-return point after eating. Signs usually show where to take halal dishes and other trays.
+
+  - text: |-
+      Wipe up an obvious spill with the tissues you have, then let the cleaners handle anything larger. Do not leave food scraps for the next person.
+
+  - text: |-
+      If you shared a table, everyone can help. Clearing your own things promptly makes it easier for the next group to sit down.
+
+  - text: |-
+      You have finished lunch at a busy food court. What should you do before leaving?
+    question:
+      options:
+        - text: "Return your tray and dishes to the tray-return point"
+          correct: true
+        - text: "Leave them because cleaners will collect everything"
+          why_not: "Cleaners help keep the space tidy, but diners are expected to return their own trays."
+        - text: "Put the tray on the next empty table"
+          why_not: "That leaves work for the next diners and blocks a usable table."
+      explanation: |-
+        Returning your tray is the normal way to help keep a busy shared dining space usable.
