@@ -163,6 +163,17 @@ def test_an_archived_topic_is_only_a_warning():
             "question.options",
         ),
         (
+            {
+                "text": "Q",
+                "question": {
+                    **QUESTION,
+                    "options": [{"text": "Kopi O", "correct": True}, {"text": "kopi o"}],
+                },
+            },
+            "option_duplicate",
+            "question.options",
+        ),
+        (
             {"text": "Q", "question": {**QUESTION, "explanation": " "}},
             "question_explanation_missing",
             "question.explanation",
