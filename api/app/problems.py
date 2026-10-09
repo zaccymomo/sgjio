@@ -107,3 +107,58 @@ def check_reorder(
     """
     if previous_ids != current or len(ids) != len(set(ids)) or set(ids) != set(current):
         raise order_out_of_date()
+
+
+# --- Learners (SCRUM-15, SCRUM-16) ---------------------------------------------------------
+
+
+def lesson_unavailable() -> ContentProblem:
+    """The lesson is not published (a draft, withdrawn, or in an archived topic). Answered
+    as if it did not exist, so learners cannot tell drafts from missing lessons."""
+    return ContentProblem(
+        "lesson_unavailable", "This lesson isn't available any more. It may have been removed.", 404
+    )
+
+
+def lesson_updated() -> ContentProblem:
+    return ContentProblem(
+        "lesson_updated",
+        "This lesson has just been updated. Reload it to see the new version.",
+        409,
+    )
+
+
+def attempt_not_found() -> ContentProblem:
+    return ContentProblem("attempt_not_found", "We couldn't find that attempt.", 404)
+
+
+def attempt_finished() -> ContentProblem:
+    return ContentProblem(
+        "attempt_finished",
+        "This attempt is already finished. Start the lesson again to retake it.",
+        409,
+    )
+
+
+def question_not_found() -> ContentProblem:
+    return ContentProblem(
+        "question_not_found", "That question isn't in this lesson.", 422, field="question_id"
+    )
+
+
+def option_not_found() -> ContentProblem:
+    return ContentProblem(
+        "option_not_found",
+        "That answer isn't one of this question's options.",
+        422,
+        field="option_id",
+    )
+
+
+def questions_unanswered(question_ids: list[str]) -> ContentProblem:
+    return ContentProblem(
+        "questions_unanswered",
+        "Answer every question before finishing the lesson.",
+        409,
+        extra={"question_ids": question_ids},
+    )

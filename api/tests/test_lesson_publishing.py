@@ -218,7 +218,7 @@ def test_discard_needs_a_published_version(admin, topic):
 def test_withdraw_hides_the_lesson_and_keeps_completions(admin, db, topic, make_user):
     user = make_user(**USER)
     lesson = _ok(admin, _create(admin, topic), "publish")
-    db.add(LessonCompletion(user_id=user.id, lesson_id=lesson["id"], answered_correctly=True))
+    db.add(LessonCompletion(user_id=user.id, lesson_id=lesson["id"], best_correct=1, best_scored=1))
     db.commit()
     assert _progress(admin)["completed"] == 1
 

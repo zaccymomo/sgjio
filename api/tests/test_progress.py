@@ -33,7 +33,11 @@ def _lesson(db, topic: Topic, title: str, status: LessonStatus = LessonStatus.PU
 
 
 def _complete(db, user, lesson: Lesson, correct: bool = True) -> None:
-    db.add(LessonCompletion(user_id=user.id, lesson_id=lesson.id, answered_correctly=correct))
+    db.add(
+        LessonCompletion(
+            user_id=user.id, lesson_id=lesson.id, best_correct=int(correct), best_scored=1
+        )
+    )
     db.commit()
 
 

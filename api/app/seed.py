@@ -17,9 +17,10 @@ order an administrator has set (SCRUM-66).
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app import content_import
+from app import content_import, lesson_doc
 from app.auth import normalise_email
 from app.config import get_settings
+from app.lessons import latest_version
 from app.models import (
     Lesson,
     LessonCompletion,
@@ -80,6 +81,14 @@ def _get_or_create_user(
     return user, True
 
 
+def _scored_questions(db: Session, lesson: Lesson) -> int:
+    version = latest_version(db, lesson.id)
+    if version is None:
+        return 0
+    doc = lesson_doc.LessonDoc.model_validate(version.doc)
+    return lesson_doc.stats(doc).scored_questions
+
+
 def _seed_completions(db: Session, user: User) -> list[str]:
     """Give the demo account some progress, but never overwrite real progress."""
     if db.scalar(
@@ -101,11 +110,15 @@ def _seed_completions(db: Session, user: User) -> list[str]:
             .limit(count)
         ).all()
         for index, lesson in enumerate(lessons):
-            # Alternate right and wrong, so the stored correctness is not uniformly true
-            # once tiers (SCRUM-27) start reading it.
+            # Alternate full marks and half marks, so the stored scores are not uniformly
+            # perfect once tiers (SCRUM-27) start reading them.
+            scored = _scored_questions(db, lesson)
             db.add(
                 LessonCompletion(
-                    user_id=user.id, lesson_id=lesson.id, answered_correctly=index % 2 == 0
+                    user_id=user.id,
+                    lesson_id=lesson.id,
+                    best_correct=scored if index % 2 == 0 else scored // 2,
+                    best_scored=scored,
                 )
             )
         if lessons:

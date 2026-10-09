@@ -385,3 +385,108 @@ class LessonOut(BaseModel):
     issues: list[IssueOut]
     stats: StatsOut
     assets: dict[str, AssetOut]
+
+
+# --- Learners (SCRUM-15, SCRUM-16) ---------------------------------------------------------
+
+
+class LearnerOptionOut(BaseModel):
+    """An option as a learner receives it: whether it is right stays on the server."""
+
+    id: str
+    text: str
+
+
+class LearnerQuestionOut(BaseModel):
+    type: Literal["choice"]
+    id: str
+    options: list[LearnerOptionOut]
+    # False for a one-option tap, which always succeeds and isn't counted.
+    scored: bool
+
+
+class LearnerImageOut(BaseModel):
+    asset_id: uuid.UUID
+    alt: str
+
+
+class LearnerAudioOut(BaseModel):
+    asset_id: uuid.UUID
+    transcript: str
+
+
+class LearnerCardOut(BaseModel):
+    type: Literal["story"]
+    id: str
+    text: str
+    image: LearnerImageOut | None
+    audio: LearnerAudioOut | None
+    question: LearnerQuestionOut | None
+
+
+class TopicRefOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+
+
+class LearnerLessonOut(BaseModel):
+    """A published lesson's latest version as learners see it (packages/ui LearnerCard)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    version: int
+    title: str
+    summary: str
+    topic: TopicRefOut
+    reading_seconds: int
+    cards: list[LearnerCardOut]
+    assets: dict[str, AssetOut]
+
+
+class AttemptStartRequest(BaseModel):
+    """The version the learner was shown; refused if a newer one has been published."""
+
+    version: int = Field(ge=1)
+
+
+class AttemptOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    lesson_id: uuid.UUID
+
+
+class AnswerRequest(BaseModel):
+    question_id: str = Field(min_length=1, max_length=40)
+    option_id: str = Field(min_length=1, max_length=40)
+
+
+class CheckResultOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    correct: bool
+    correct_option_id: str
+    why_not: str
+    explanation: str
+
+
+class ScoreOut(BaseModel):
+    """First-try correct answers out of the scored questions."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    correct: int
+    scored: int
+
+
+class AttemptResultOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    attempt_id: uuid.UUID
+    lesson_id: uuid.UUID
+    score: ScoreOut
+    best: ScoreOut
+    first_completion: bool

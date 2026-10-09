@@ -78,9 +78,29 @@ erDiagram
         uuid id PK
         uuid user_id FK "unique with lesson_id"
         uuid lesson_id FK
-        bool answered_correctly "best result so far"
+        int best_correct "best score: first-try correct"
+        int best_scored "out of the scored questions"
+        uuid best_attempt_id FK "the attempt that set it"
         timestamptz completed_at "first completion"
         timestamptz updated_at
+    }
+    lesson_attempts {
+        uuid id PK
+        uuid user_id FK
+        uuid lesson_id FK
+        uuid version_id FK "the version shown"
+        timestamptz started_at "at the first answer"
+        timestamptz finished_at "empty until the end card"
+        int correct "set when finished"
+        int scored
+    }
+    attempt_answers {
+        uuid attempt_id PK "with question_id"
+        string question_id PK "from the lesson document"
+        string option_id
+        bool correct
+        bool scored "false for a one-option tap"
+        timestamptz answered_at
     }
     auth_sessions {
         uuid id PK
@@ -116,10 +136,10 @@ erDiagram
 - **Topics are archived, or deleted only when empty** (SCRUM-57). `archived_at` is a nullable timestamp: empty means active. Archiving hides the topic from users, including its progress circle and the overall figure, but keeps its lessons and everyone's completions, so restoring brings it all back. A topic with no lessons of any status can be deleted outright; otherwise the administrator must archive it. Archived topics keep reserving their name, so the unique index stays as is, and they can still be renamed. A timestamp was chosen over a flag or status column because there are only two states and the date is useful to show.
 - **Topics and lessons have a `position`** (SCRUM-66). Administrators drag topics into order, and that is also the order of users' progress circles. Lessons are ordered within their topic, and lessons with no topic are ordered as one group of their own. A position is only a sort key: there is no unique constraint, and every read breaks ties by `created_at`, so a gap or a duplicate can never break a page. New topics and lessons go to the end, and so does a restored topic. Reordering always rewrites a whole topic list or a whole lesson group at once (see `docs/decisions.md`).
 - **Enumerations are stored as text with a CHECK constraint**, not native Postgres enums, so adding a value later is a simple migration.
-- **Completion is one row per user per lesson** (`lesson_completions`, SCRUM-16). It is written the first time a lesson is completed, however its answers went (AC3), and the unique constraint on `(user_id, lesson_id)` is what makes completion count once however many times it is retaken (AC5, AC6). The learner side of the card decks (not built yet) will add a table of attempts, one per finished deck, holding each answer and the score, against the version taken.
-- **Correctness is a column on that row, not a second table.** `answered_correctly` holds the _best_ result so far, so a later wrong answer never clears an earlier correct one (SCRUM-16 AC5). Completion feeds the progress circles; correctness feeds tiers (SCRUM-27).
+- **Completion is one row per user per lesson** (`lesson_completions`, SCRUM-16). It is written the first time a lesson is completed, however its answers went (AC3), and the unique constraint on `(user_id, lesson_id)` is what makes completion count once however many times it is retaken (AC5, AC6). Each run through a deck is a row in `lesson_attempts`, tied to the version shown, with the first answer to each question in `attempt_answers`; only a finished attempt completes the lesson.
+- **The best score is kept on that row.** `best_correct` of `best_scored` is the best attempt so far by percentage, a tie going to the most recent, so a worse retake never lowers it (SCRUM-16 AC5). 0 of 0 (a lesson with only one-option taps) counts as full marks. Completion feeds the progress circles; the score feeds tiers (SCRUM-27).
 - **A completion row outlives withdrawal.** Withdrawing a lesson leaves the row in place, so the user's history keeps it (SCRUM-52 AC4), while the progress query filters on `status = published` so the circle's two figures both shrink and `completed` can never exceed `available` (SCRUM-16 AC8).
-- **Individual attempts are not stored.** Only the completion and the best result are. A full attempt history would be a separate table; SCRUM-42 and SCRUM-44 will say whether one is needed.
+- **Every attempt is stored** (`lesson_attempts`, `attempt_answers`), finished or not, so attempt history (SCRUM-42) can read them. Only the first answer to each question counts: the key `(attempt_id, question_id)` makes a repeated submission record nothing (SCRUM-16 AC6).
 
 ## Seed data
 
