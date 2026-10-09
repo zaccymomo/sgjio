@@ -583,7 +583,7 @@ def test_a_new_draft_changes_nobodys_progress(admin, db, make_user):
     topic = _topic(db, "Singlish")
     published = _lesson(db, topic, "Published", status=LessonStatus.PUBLISHED)
     user = make_user(**USER)
-    db.add(LessonCompletion(user_id=user.id, lesson_id=published.id, answered_correctly=True))
+    db.add(LessonCompletion(user_id=user.id, lesson_id=published.id, best_correct=1, best_scored=1))
     db.commit()
     assert admin.post("/api/auth/sign-in", json=USER).status_code == 200
     before = admin.get("/api/progress").json()

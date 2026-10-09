@@ -312,12 +312,14 @@ class MediaAsset(Base):
 class LessonCompletion(Base):
     """One row per lesson a user has finished (SCRUM-16).
 
-    A row is written the first time the user answers the lesson's quiz question, right or
-    wrong (AC3), so this table is the "completed" half of every progress circle. Whether
-    they were right is kept separately in `answered_correctly`, which holds the *best*
-    result so far: a later wrong answer never clears an earlier correct one (AC5).
+    A row is written the first time the user finishes the lesson's deck, however many of its
+    questions they got right (AC3), so this table is the "completed" half of every progress
+    circle. How well they did is kept separately as their *best* score so far: first-try
+    correct answers out of the scored questions, compared as a percentage, with a tie
+    keeping the most recent attempt (docs/decisions.md). A worse retake never lowers it
+    (AC5).
 
-    The unique constraint is what makes completion count once however many times the quiz
+    The unique constraint is what makes completion count once however many times the lesson
     is retaken, and makes a repeated submission harmless (AC5, AC6).
     """
 
@@ -333,13 +335,81 @@ class LessonCompletion(Base):
     lesson_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    answered_correctly: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # The best score so far. A lesson whose questions are all one-option taps has nothing
+    # to score: 0 of 0, which counts as all correct.
+    best_correct: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    best_scored: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # The attempt that set the best score, for history (SCRUM-42). Empty for rows written
+    # before attempts were recorded.
+    best_attempt_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lesson_attempts.id", ondelete="SET NULL")
+    )
     # When the lesson was first completed. Retakes update `updated_at`, not this.
     completed_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
 
     user: Mapped[User] = relationship()
     lesson: Mapped[Lesson] = relationship()
+
+    @property
+    def mastered(self) -> bool:
+        """Every scored question right first time, in the best attempt."""
+        return self.best_correct == self.best_scored
+
+
+class LessonAttempt(Base):
+    """One run through a lesson's deck (SCRUM-16), started at its first answer.
+
+    An attempt is tied to the version the learner was shown, so its answers are always
+    checked against the questions they saw, even if a new version is published meanwhile.
+    It is finished once every question has been answered and the learner reaches the end;
+    only then does it count towards completion and the best score. Unfinished attempts are
+    kept but count for nothing (SCRUM-15 AC4).
+    """
+
+    __tablename__ = "lesson_attempts"
+    __table_args__ = (Index("ix_lesson_attempts_user_id_lesson_id", "user_id", "lesson_id"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    lesson_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False
+    )
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("lesson_versions.id", ondelete="CASCADE"), nullable=False
+    )
+    started_at: Mapped[datetime] = _created_at()
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set when finished: first-try correct answers out of the scored questions.
+    correct: Mapped[int | None] = mapped_column(Integer)
+    scored: Mapped[int | None] = mapped_column(Integer)
+
+    version: Mapped[LessonVersion] = relationship()
+    answers: Mapped[list["AttemptAnswer"]] = relationship(
+        back_populates="attempt", cascade="all, delete-orphan", order_by="AttemptAnswer.answered_at"
+    )
+
+
+class AttemptAnswer(Base):
+    """The answer given to one question in one attempt. Only the first counts: the key
+    means a second submission for the same question records nothing (SCRUM-16 AC6)."""
+
+    __tablename__ = "attempt_answers"
+
+    attempt_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("lesson_attempts.id", ondelete="CASCADE"), primary_key=True
+    )
+    # The ids from the lesson document (app/lesson_doc.py), which stay the same across edits.
+    question_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    option_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    # False for a one-option tap, which is left out of the score.
+    scored: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    answered_at: Mapped[datetime] = _created_at()
+
+    attempt: Mapped[LessonAttempt] = relationship(back_populates="answers")
 
 
 # --- Authentication support ---------------------------------------------------------------
