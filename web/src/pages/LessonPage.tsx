@@ -22,6 +22,9 @@ type LearnerLesson = {
   assets: Assets;
 };
 
+/** How long a lesson may take to load before the page says so and offers a retry. */
+const LOAD_TIMEOUT_MS = 15_000;
+
 type Score = { correct: number; scored: number };
 type AttemptResult = {
   attempt_id: string;
@@ -64,11 +67,18 @@ export function LessonPage() {
 
   const fetchLesson = useCallback(
     async (signal?: AbortSignal) => {
+      // A load that hangs is reported like a failed one, so nobody waits on a spinner
+      // forever (AC3).
+      const timeout = new AbortController();
+      const timer = window.setTimeout(() => timeout.abort(), LOAD_TIMEOUT_MS);
+      signal?.addEventListener("abort", () => timeout.abort());
       try {
-        const lesson = await apiFetch<LearnerLesson>(`/api/lessons/${lessonId}`, { signal });
+        const lesson = await apiFetch<LearnerLesson>(`/api/lessons/${lessonId}`, {
+          signal: timeout.signal,
+        });
         return { status: "ready", lesson } as const;
       } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return null;
+        if (signal?.aborted) return null;
         const missing = error instanceof ApiError && error.status === 404;
         return {
           status: "error",
@@ -77,6 +87,8 @@ export function LessonPage() {
             : message(error, "We couldn't load this lesson. Check your connection and try again."),
           retry: !missing,
         } as const;
+      } finally {
+        window.clearTimeout(timer);
       }
     },
     [lessonId],

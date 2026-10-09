@@ -396,6 +396,15 @@ def _card_issues(card: Card, media, blocker, warning) -> None:
         blocker(
             "question_many_correct", "Mark only one option as correct.", card, "question.options"
         )
+    texts = [option.text.casefold() for option in question.options if option.text]
+    if len(texts) != len(set(texts)):
+        # Each option must be a distinct answer (SCRUM-15 AC6).
+        blocker(
+            "option_duplicate",
+            "Two options say the same thing. Make each one a different answer.",
+            card,
+            "question.options",
+        )
     if not question.explanation.strip():
         blocker(
             "question_explanation_missing",
