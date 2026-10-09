@@ -60,6 +60,11 @@ type Props = {
   badge?: ReactNode;
   /** The end card's buttons. Defaults to "Start again" and, with onExit, "Close". */
   renderEnd?: (summary: DeckSummary, restart: () => void) => ReactNode;
+  /**
+   * Called each time the end card is reached, which needs every question answered. The
+   * learner's page records the attempt here; a preview leaves it out, so nothing is saved.
+   */
+  onFinish?: (summary: DeckSummary) => void;
 };
 
 const COVER = -1;
@@ -95,6 +100,7 @@ export function LessonDeck({
   onExit,
   badge,
   renderEnd,
+  onFinish,
 }: Props) {
   const embedded = variant === "embedded";
   const reduced = useReducedMotion();
@@ -223,6 +229,16 @@ export function LessonDeck({
     setDirection(-1);
     setStep(0);
   }
+
+  // Reaching the end card finishes the deck. Read through a ref, so a new callback or
+  // summary on a later render doesn't count as finishing again.
+  const finishRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    finishRef.current = () => onFinish?.(summary);
+  });
+  useEffect(() => {
+    if (!embedded && current === end) finishRef.current();
+  }, [current, end, embedded]);
 
   // Confetti and a fanfare when every scored question was right first time.
   const mastered = summary.scored > 0 && summary.correct === summary.scored;
