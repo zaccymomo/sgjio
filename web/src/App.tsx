@@ -5,6 +5,7 @@ import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { HomePage } from "./pages/HomePage";
+import { LessonPage } from "./pages/LessonPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { EditProfilePage, ProfileSetupPage } from "./pages/ProfileSetupPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -42,6 +43,8 @@ export function App() {
 
           {/* Signed in only: anyone else is sent to /sign-in?next=... */}
           <Route element={<RequireAuth />}>
+            {/* A lesson fills the screen, without the app's bars (SCRUM-15) */}
+            <Route path="lessons/:lessonId" element={<LessonPage />} />
             <Route element={<SignedInLayout />}>
               <Route index element={<HomePage />} />
               {/* Where registration lands a new account (SCRUM-61 AC8) */}
