@@ -188,6 +188,33 @@ class ProgressOut(BaseModel):
     available: int
 
 
+class TopicLessonOut(BaseModel):
+    """One lesson in a topic's list (SCRUM-53). Never says which options are right."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    summary: str
+    reading_seconds: int
+    questions: int
+    completed: bool
+    best_correct: int | None
+    best_scored: int | None
+
+
+class TopicLessonsOut(BaseModel):
+    """A topic opened from its circle: its figure and its published lessons (SCRUM-53)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    completed: int
+    available: int
+    lessons: list[TopicLessonOut]
+
+
 TopicName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 
 

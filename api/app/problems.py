@@ -120,6 +120,14 @@ def lesson_unavailable() -> ContentProblem:
     )
 
 
+def topic_unavailable() -> ContentProblem:
+    """The topic is archived or does not exist. Learners get one answer for both, as with
+    lessons (SCRUM-53)."""
+    return ContentProblem(
+        "topic_unavailable", "This topic isn't available any more. It may have been removed.", 404
+    )
+
+
 def lesson_updated() -> ContentProblem:
     return ContentProblem(
         "lesson_updated",

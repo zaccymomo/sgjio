@@ -1,0 +1,231 @@
+"""SCRUM-53: opening a topic lists its published lessons, each marked completed or not.
+
+The list follows the same counting rules as the landing page circles (SCRUM-16 AC8), so
+the figure on the topic page always matches the circle that led there.
+"""
+
+import uuid
+from datetime import UTC, datetime
+
+from app.models import Lesson, LessonCompletion, LessonStatus, LessonVersion, Topic
+
+USER = {"email": "user@example.com", "password": "Password123"}
+OTHER = {"email": "other@example.com", "password": "Password123"}
+
+
+def _doc(scored: int = 1, words: int = 0) -> dict:
+    cards = [{"id": "intro", "text": " ".join(["word"] * words) or "Hello."}]
+    for n in range(scored):
+        cards.append(
+            {
+                "id": f"c{n}",
+                "text": "Pick {{blank}}.",
+                "question": {
+                    "id": f"q{n}",
+                    "options": [
+                        {"id": "right", "text": "Right", "correct": True},
+                        {"id": "wrong", "text": "Wrong"},
+                    ],
+                    "explanation": "Because.",
+                },
+            }
+        )
+    return {"cards": cards}
+
+
+def _topic(db, name: str = "Singlish", archived: bool = False) -> Topic:
+    topic = Topic(name=name, archived_at=datetime.now(UTC) if archived else None)
+    db.add(topic)
+    db.commit()
+    return topic
+
+
+def _lesson(
+    db,
+    topic: Topic,
+    title: str,
+    position: int = 0,
+    status: LessonStatus = LessonStatus.PUBLISHED,
+    doc: dict | None = None,
+) -> Lesson:
+    lesson = Lesson(title=title, topic=topic, position=position, status=status)
+    db.add(lesson)
+    db.flush()
+    if status != LessonStatus.DRAFT:
+        now = datetime.now(UTC)
+        lesson.published_at = now
+        db.add(
+            LessonVersion(
+                lesson_id=lesson.id,
+                number=1,
+                title=title,
+                summary=f"About {title}",
+                doc=doc or _doc(),
+                published_at=now,
+            )
+        )
+    db.commit()
+    return lesson
+
+
+def _complete(db, user, lesson: Lesson, correct: int = 1, scored: int = 1) -> None:
+    db.add(
+        LessonCompletion(
+            user_id=user.id, lesson_id=lesson.id, best_correct=correct, best_scored=scored
+        )
+    )
+    db.commit()
+
+
+def _sign_in(client, make_user):
+    user = make_user(**USER)
+    client.post("/api/auth/sign-in", json=USER)
+    return user
+
+
+def test_needs_a_signed_in_user(client, db):
+    topic = _topic(db)
+    response = client.get(f"/api/topics/{topic.id}")
+    assert response.status_code == 401
+
+
+def test_an_unknown_topic_is_unavailable(client, make_user):
+    _sign_in(client, make_user)
+    response = client.get(f"/api/topics/{uuid.uuid4()}")
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "topic_unavailable"
+
+
+def test_an_archived_topic_is_unavailable(client, db, make_user):
+    _sign_in(client, make_user)
+    topic = _topic(db, archived=True)
+    _lesson(db, topic, "Lah")
+    response = client.get(f"/api/topics/{topic.id}")
+    assert response.status_code == 404
+    assert response.json()["detail"]["code"] == "topic_unavailable"
+
+
+def test_lists_published_lessons_in_the_order_administrators_set(client, db, make_user):
+    _sign_in(client, make_user)
+    topic = _topic(db)
+    _lesson(db, topic, "Third", position=2)
+    _lesson(db, topic, "First", position=0)
+    _lesson(db, topic, "Second", position=1)
+    _lesson(db, topic, "A draft", position=3, status=LessonStatus.DRAFT)
+    _lesson(db, topic, "Withdrawn", position=4, status=LessonStatus.WITHDRAWN)
+
+    body = client.get(f"/api/topics/{topic.id}").json()
+
+    assert body["name"] == "Singlish"
+    assert [lesson["title"] for lesson in body["lessons"]] == ["First", "Second", "Third"]
+    assert body["lessons"][0]["summary"] == "About First"
+
+
+def test_a_topic_with_no_published_lessons_is_empty_not_missing(client, db, make_user):
+    _sign_in(client, make_user)
+    topic = _topic(db)
+    _lesson(db, topic, "A draft", status=LessonStatus.DRAFT)
+
+    response = client.get(f"/api/topics/{topic.id}")
+
+    assert response.status_code == 200
+    assert response.json() | {"id": None} == {
+        "id": None,
+        "name": "Singlish",
+        "completed": 0,
+        "available": 0,
+        "lessons": [],
+    }
+
+
+def test_marks_completed_lessons_and_counts_them(client, db, make_user):
+    user = _sign_in(client, make_user)
+    other = make_user(**OTHER)
+    topic = _topic(db)
+    done = _lesson(db, topic, "Done", position=0)
+    open_lesson = _lesson(db, topic, "Open", position=1)
+    withdrawn = _lesson(db, topic, "Withdrawn", position=2, status=LessonStatus.WITHDRAWN)
+    _complete(db, user, done, correct=0, scored=1)
+    _complete(db, user, withdrawn)
+    # Someone else's completion never shows on this user's list.
+    _complete(db, other, open_lesson)
+
+    body = client.get(f"/api/topics/{topic.id}").json()
+
+    assert (body["completed"], body["available"]) == (1, 2)
+    first, second = body["lessons"]
+    assert (first["completed"], first["best_correct"], first["best_scored"]) == (True, 0, 1)
+    assert (second["completed"], second["best_correct"], second["best_scored"]) == (
+        False,
+        None,
+        None,
+    )
+
+
+def test_figures_match_the_topics_circle(client, db, make_user):
+    user = _sign_in(client, make_user)
+    topic = _topic(db)
+    lessons = [_lesson(db, topic, f"Lesson {n}", position=n) for n in range(3)]
+    _complete(db, user, lessons[1])
+
+    body = client.get(f"/api/topics/{topic.id}").json()
+    (circle,) = client.get("/api/progress").json()["topics"]
+
+    assert (body["completed"], body["available"]) == (circle["completed"], circle["available"])
+
+
+def test_reading_time_and_questions_come_from_the_latest_version(client, db, make_user):
+    _sign_in(client, make_user)
+    topic = _topic(db)
+    lesson = _lesson(db, topic, "Kopi", doc=_doc(scored=1))
+    db.add(
+        LessonVersion(
+            lesson_id=lesson.id,
+            number=2,
+            title="Kopi, revised",
+            summary="",
+            doc=_doc(scored=3, words=250),
+            published_at=datetime.now(UTC),
+        )
+    )
+    db.commit()
+
+    (item,) = client.get(f"/api/topics/{topic.id}").json()["lessons"]
+
+    assert item["title"] == "Kopi, revised"
+    assert item["questions"] == 3
+    # 250 words at 200 a minute, plus the options and explanations.
+    assert item["reading_seconds"] > 75
+
+
+def test_one_option_taps_are_not_counted_as_questions(client, db, make_user):
+    _sign_in(client, make_user)
+    topic = _topic(db)
+    doc = _doc(scored=1)
+    doc["cards"].append(
+        {
+            "id": "tap",
+            "text": "Say {{blank}}.",
+            "question": {
+                "id": "tap",
+                "options": [{"id": "ok", "text": "thanks"}],
+                "explanation": "Polite.",
+            },
+        }
+    )
+    _lesson(db, topic, "Kopi", doc=doc)
+
+    (item,) = client.get(f"/api/topics/{topic.id}").json()["lessons"]
+
+    assert item["questions"] == 1
+
+
+def test_never_reveals_which_option_is_right(client, db, make_user):
+    _sign_in(client, make_user)
+    topic = _topic(db)
+    _lesson(db, topic, "Kopi")
+
+    text = client.get(f"/api/topics/{topic.id}").text
+
+    assert 'correct"' not in text.replace("best_correct", "")
+    assert "Right" not in text

@@ -8,7 +8,7 @@ import {
 } from "@sgjio/ui/lesson";
 import { ChevronLeft, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 /** A lesson as GET /api/lessons/{id} returns it: never says which option is right. */
 type LearnerLesson = {
@@ -60,6 +60,7 @@ function message(error: unknown, fallback: string): string {
 export function LessonPage() {
   const { lessonId = "" } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [save, setSave] = useState<Save>({ status: "idle" });
   const attempt = useRef<Promise<string> | null>(null);
@@ -167,8 +168,12 @@ export function LessonPage() {
 
   const backToTopic = useCallback(() => {
     if (!lesson) return navigate("/");
-    navigate(`/topics/${lesson.topic.id}`, { state: { topicName: lesson.topic.name } });
-  }, [lesson, navigate]);
+    // Opened from the topic page: step back to it, so the history stays home -> topic and
+    // the browser's back button then leads home (SCRUM-53 AC3, AC4). Opened any other way,
+    // for example from a link, the topic replaces the lesson instead.
+    if ((location.state as { fromTopic?: boolean } | null)?.fromTopic) return navigate(-1);
+    navigate(`/topics/${lesson.topic.id}`, { replace: true });
+  }, [lesson, location.state, navigate]);
 
   if (load.status === "loading") return <FullPageSpinner />;
   if (load.status === "error") {

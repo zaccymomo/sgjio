@@ -100,9 +100,6 @@ function TopicCircle({ topic }: { topic: TopicProgress }) {
   return (
     <Link
       to={`/topics/${id}`}
-      // The topic list has no endpoint of its own yet, so the name travels with the
-      // link. SCRUM-53 will load it from the server and this can go.
-      state={{ topicName: name }}
       // One label for the whole tile: the ring, the name and the status read as a
       // sentence instead of three fragments.
       aria-label={`${name}: ${completed} of ${available} lessons completed. ${status}.`}

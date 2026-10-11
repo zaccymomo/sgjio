@@ -12,6 +12,9 @@ Two rules from SCRUM-16 AC8 are enforced here rather than left to the caller:
 
 Topics an administrator has archived (SCRUM-57) are left out entirely, so their circle
 disappears and the overall figure shrinks with it; restoring brings both back.
+
+Opening a circle lists that topic's lessons (SCRUM-53) by the same rules, so the figure on
+the topic page always matches its circle.
 """
 
 import uuid
@@ -20,7 +23,11 @@ from dataclasses import dataclass
 from sqlalchemy import Select, and_, func, select
 from sqlalchemy.orm import Session
 
+from app import lesson_doc, media
+from app.lesson_doc import LessonDoc
+from app.lessons import latest_version
 from app.models import Lesson, LessonCompletion, LessonStatus, Topic
+from app.problems import topic_unavailable
 from app.topics import visible_to_users
 
 
@@ -76,4 +83,76 @@ def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
         topics=topics,
         completed=sum(topic.completed for topic in topics),
         available=sum(topic.available for topic in topics),
+    )
+
+
+@dataclass(frozen=True)
+class TopicLesson:
+    id: uuid.UUID
+    title: str
+    summary: str
+    reading_seconds: int
+    # Scored questions only: a one-option tap is not a quiz question.
+    questions: int
+    completed: bool
+    # The best result so far (SCRUM-16), empty until the lesson is completed.
+    best_correct: int | None
+    best_scored: int | None
+
+
+@dataclass(frozen=True)
+class TopicLessons:
+    id: uuid.UUID
+    name: str
+    completed: int
+    available: int
+    lessons: list[TopicLesson]
+
+
+def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> TopicLessons:
+    """One topic's published lessons, in the order administrators set, with this user's
+    completions (SCRUM-53). An archived or unknown topic is unavailable."""
+    topic = db.scalar(visible_to_users(select(Topic).where(Topic.id == topic_id)))
+    if topic is None:
+        raise topic_unavailable()
+
+    rows = db.execute(
+        select(Lesson, LessonCompletion)
+        .outerjoin(
+            LessonCompletion,
+            and_(LessonCompletion.lesson_id == Lesson.id, LessonCompletion.user_id == user_id),
+        )
+        .where(Lesson.topic_id == topic.id, Lesson.status == LessonStatus.PUBLISHED)
+        .order_by(Lesson.position, Lesson.created_at)
+    ).all()
+
+    lessons = []
+    for lesson, completion in rows:
+        version = latest_version(db, lesson.id)
+        # A published lesson always has a version; skip one that somehow does not, as
+        # opening it would be refused (app/learning.py).
+        if version is None:
+            continue
+        doc = LessonDoc.model_validate(version.doc)
+        stats = lesson_doc.stats(doc, media.facts_for(db, doc))
+        lessons.append(
+            TopicLesson(
+                id=lesson.id,
+                title=version.title,
+                summary=version.summary,
+                # Worked out as the lesson's cover does, so the two always agree.
+                reading_seconds=stats.reading_seconds,
+                questions=stats.scored_questions,
+                completed=completion is not None,
+                best_correct=completion.best_correct if completion else None,
+                best_scored=completion.best_scored if completion else None,
+            )
+        )
+
+    return TopicLessons(
+        id=topic.id,
+        name=topic.name,
+        completed=sum(1 for lesson in lessons if lesson.completed),
+        available=len(lessons),
+        lessons=lessons,
     )
