@@ -339,7 +339,7 @@ class LessonCompletion(Base):
     # to score: 0 of 0, which counts as all correct.
     best_correct: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     best_scored: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    # The attempt that set the best score, for history (SCRUM-42). Empty for rows written
+    # The attempt that set the best score (SCRUM-54). Empty for rows written
     # before attempts were recorded.
     best_attempt_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("lesson_attempts.id", ondelete="SET NULL")

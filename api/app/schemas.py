@@ -201,6 +201,7 @@ class TopicLessonOut(BaseModel):
     completed: bool
     best_correct: int | None
     best_scored: int | None
+    last_attempted_at: datetime | None
 
 
 class TopicLessonsOut(BaseModel):

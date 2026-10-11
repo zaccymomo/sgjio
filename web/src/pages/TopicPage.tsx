@@ -7,13 +7,14 @@ import { type Topic, type TopicLesson, useTopic } from "../lib/topic";
 
 /**
  * A topic opened from its progress circle (SCRUM-43 AC9): its lessons in the order
- * administrators set, each marked completed or not (SCRUM-53).
+ * administrators set, each marked completed or not (SCRUM-53), with when it was last
+ * attempted and the best score so far (SCRUM-54 AC1, AC2). The page reloads on return
+ * from a lesson, so a retake's date and score show straight away (AC3 to AC5).
  *
  * Selecting a lesson opens it (AC2). The lesson says it came from here, so finishing or
  * closing it steps back to this page rather than stacking a second copy on top (AC3); that
  * keeps the browser's back button, like the "All topics" link, leading home (AC4).
  *
- * Whether each completed lesson's result was right is SCRUM-54; the API already sends it.
  */
 export function TopicPage() {
   const { topicId = "" } = useParams();
@@ -102,7 +103,7 @@ function TopicDetail({ topic }: { topic: Topic }) {
 
 function LessonRow({ lesson }: { lesson: TopicLesson }) {
   const { id, title, completed } = lesson;
-  const meta = completed ? "Completed" : openMeta(lesson);
+  const meta = rowMeta(lesson);
 
   return (
     <Link
@@ -132,9 +133,26 @@ function LessonRow({ lesson }: { lesson: TopicLesson }) {
   );
 }
 
-/** "About 2 min · 1 quiz question", timed as the lesson's cover times it. */
-function openMeta({ reading_seconds, questions }: TopicLesson): string {
-  return `${readingLabel(reading_seconds)} · ${questions} quiz ${plural(questions, "question")}`;
+const DATE = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", year: "numeric" });
+
+/**
+ * "Last attempted on 11 Oct 2026 · Best score 2 / 3", or for a lesson not attempted yet,
+ * "Not attempted yet · About 1 min · 1 quiz question" (timed as the lesson's cover times
+ * it). The score is out of the questions answered then, so a lesson revised since keeps
+ * the total its best was scored on.
+ */
+function rowMeta(lesson: TopicLesson): string {
+  const { last_attempted_at, best_correct, best_scored, reading_seconds, questions } = lesson;
+  if (!last_attempted_at) {
+    return [
+      "Not attempted yet",
+      readingLabel(reading_seconds),
+      `${questions} quiz ${plural(questions, "question")}`,
+    ].join(" · ");
+  }
+  const attempted = `Last attempted on ${DATE.format(new Date(last_attempted_at))}`;
+  // A lesson of one-option taps only has nothing to score.
+  return best_scored ? `${attempted} · Best score ${best_correct} / ${best_scored}` : attempted;
 }
 
 function plural(count: number, word: string): string {

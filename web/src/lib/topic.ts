@@ -13,6 +13,8 @@ export type TopicLesson = {
   /** The best result so far (SCRUM-16), null until the lesson is completed. */
   best_correct: number | null;
   best_scored: number | null;
+  /** When the user last finished it (SCRUM-54), null until the lesson is completed. */
+  last_attempted_at: string | null;
 };
 
 /** A topic opened from its circle. The figures match that circle (SCRUM-16 AC8). */

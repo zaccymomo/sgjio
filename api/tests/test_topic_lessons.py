@@ -1,4 +1,5 @@
-"""SCRUM-53: opening a topic lists its published lessons, each marked completed or not.
+"""SCRUM-53 and SCRUM-54: opening a topic lists its published lessons, each marked completed
+or not, with when it was last attempted and the best score.
 
 The list follows the same counting rules as the landing page circles (SCRUM-16 AC8), so
 the figure on the topic page always matches the circle that led there.
@@ -7,7 +8,16 @@ the figure on the topic page always matches the circle that led there.
 import uuid
 from datetime import UTC, datetime
 
-from app.models import Lesson, LessonCompletion, LessonStatus, LessonVersion, Topic
+from sqlalchemy import select
+
+from app.models import (
+    Lesson,
+    LessonAttempt,
+    LessonCompletion,
+    LessonStatus,
+    LessonVersion,
+    Topic,
+)
 
 USER = {"email": "user@example.com", "password": "Password123"}
 OTHER = {"email": "other@example.com", "password": "Password123"}
@@ -229,3 +239,121 @@ def test_never_reveals_which_option_is_right(client, db, make_user):
 
     assert 'correct"' not in text.replace("best_correct", "")
     assert "Right" not in text
+
+
+# --- Last attempted and best score (SCRUM-54) -----------------------------------------------
+
+
+def _run(client, lesson: Lesson, answers: dict[str, str], finish: bool = True) -> str:
+    response = client.post(f"/api/lessons/{lesson.id}/attempts", json={"version": 1})
+    assert response.status_code == 201, response.json()
+    attempt = response.json()["id"]
+    for question_id, option_id in answers.items():
+        answered = client.post(
+            f"/api/attempts/{attempt}/answers",
+            json={"question_id": question_id, "option_id": option_id},
+        )
+        assert answered.status_code == 200, answered.json()
+    if finish:
+        assert client.post(f"/api/attempts/{attempt}/finish").status_code == 200
+    return attempt
+
+
+def _finished_at(db, attempt_id: str) -> datetime:
+    db.expire_all()
+    return db.get(LessonAttempt, uuid.UUID(attempt_id)).finished_at
+
+
+def _item(client, topic: Topic) -> dict:
+    (item,) = client.get(f"/api/topics/{topic.id}").json()["lessons"]
+    return item
+
+
+TWO_RIGHT = {"q0": "right", "q1": "right"}
+ONE_RIGHT = {"q0": "right", "q1": "wrong"}
+
+
+def test_not_attempted_yet_has_no_date_or_score(client, db, make_user):
+    _sign_in(client, make_user)
+    topic = _topic(db)
+    _lesson(db, topic, "Kopi", doc=_doc(scored=2))
+
+    item = _item(client, topic)
+
+    assert (item["last_attempted_at"], item["best_correct"], item["best_scored"]) == (
+        None,
+        None,
+        None,
+    )
+
+
+def test_an_unfinished_attempt_is_not_an_attempt(client, db, make_user):
+    _sign_in(client, make_user)
+    topic = _topic(db)
+    lesson = _lesson(db, topic, "Kopi", doc=_doc(scored=2))
+    _run(client, lesson, {"q0": "right"}, finish=False)
+
+    assert _item(client, topic)["last_attempted_at"] is None
+
+
+def test_finishing_records_the_date_and_score(client, db, make_user):
+    _sign_in(client, make_user)
+    topic = _topic(db)
+    lesson = _lesson(db, topic, "Kopi", doc=_doc(scored=2))
+    attempt = _run(client, lesson, ONE_RIGHT)
+
+    item = _item(client, topic)
+
+    assert datetime.fromisoformat(item["last_attempted_at"]) == _finished_at(db, attempt)
+    assert (item["best_correct"], item["best_scored"]) == (1, 2)
+
+
+def test_a_worse_retake_moves_the_date_but_keeps_the_best_and_the_count(client, db, make_user):
+    _sign_in(client, make_user)
+    topic = _topic(db)
+    lesson = _lesson(db, topic, "Kopi", doc=_doc(scored=2))
+    _run(client, lesson, TWO_RIGHT)
+    retake = _run(client, lesson, ONE_RIGHT)
+
+    body = client.get(f"/api/topics/{topic.id}").json()
+    (item,) = body["lessons"]
+
+    assert datetime.fromisoformat(item["last_attempted_at"]) == _finished_at(db, retake)
+    assert (item["best_correct"], item["best_scored"]) == (2, 2)
+    assert (body["completed"], body["available"]) == (1, 1)
+
+
+def test_a_better_retake_raises_the_best(client, db, make_user):
+    _sign_in(client, make_user)
+    topic = _topic(db)
+    lesson = _lesson(db, topic, "Kopi", doc=_doc(scored=2))
+    _run(client, lesson, ONE_RIGHT)
+    _run(client, lesson, TWO_RIGHT)
+
+    item = _item(client, topic)
+
+    assert (item["best_correct"], item["best_scored"]) == (2, 2)
+
+
+def test_a_completion_without_attempts_uses_its_completion_time(client, db, make_user):
+    user = _sign_in(client, make_user)
+    topic = _topic(db)
+    lesson = _lesson(db, topic, "Kopi")
+    _complete(db, user, lesson)
+    completion = db.scalar(select(LessonCompletion).where(LessonCompletion.lesson_id == lesson.id))
+
+    item = _item(client, topic)
+
+    assert datetime.fromisoformat(item["last_attempted_at"]) == completion.completed_at
+
+
+def test_another_users_attempts_are_not_counted(client, db, make_user):
+    make_user(**OTHER)
+    client.post("/api/auth/sign-in", json=OTHER)
+    topic = _topic(db)
+    lesson = _lesson(db, topic, "Kopi", doc=_doc(scored=2))
+    _run(client, lesson, TWO_RIGHT)
+    client.post("/api/auth/sign-out")
+    _sign_in(client, make_user)
+
+    assert _item(client, topic)["last_attempted_at"] is None
