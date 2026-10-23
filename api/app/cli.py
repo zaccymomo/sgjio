@@ -5,6 +5,7 @@ python -m app.cli create-admin --email someone@example.com --name "Their Name"
 python -m app.cli send-reset --email admin@sgjio.example.com --scope admin
 python -m app.cli prune-media
 python -m app.cli import-lessons [folder] [--publish]
+python -m app.cli demo-activity
 """
 
 import argparse
@@ -14,7 +15,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from app import content_import, media
+from app import content_import, demo, media
 from app.auth import normalise_email
 from app.auth.reset import request_password_reset
 from app.config import get_settings
@@ -102,6 +103,15 @@ def cmd_prune_media(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_demo_activity(_: argparse.Namespace) -> int:
+    """Add demo learners and their lesson runs, for lesson insights (SCRUM-84). Replaces
+    any demo learners already there, so dates are always relative to today."""
+    with SessionLocal() as db:
+        log = demo.demo_activity(db)
+    print("Added:\n  - " + "\n  - ".join(log))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description="SGJio dev commands")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -123,6 +133,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("folder", nargs="?", help="defaults to content/lessons")
     p.add_argument("--publish", action="store_true", help="publish new and changed lessons")
     p.set_defaults(func=cmd_import_lessons)
+
+    sub.add_parser(
+        "demo-activity", help="add demo learners and lesson runs (replaces earlier ones)"
+    ).set_defaults(func=cmd_demo_activity)
 
     sub.add_parser(
         "prune-media", help="delete uploaded images and audio that no lesson uses"
