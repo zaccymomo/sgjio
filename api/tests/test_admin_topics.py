@@ -1,4 +1,5 @@
-"""SCRUM-57: administrators create, rename, archive, restore and delete topics."""
+"""SCRUM-57: administrators create, rename, archive, restore and delete topics.
+SCRUM-86: and give them a description."""
 
 import uuid
 from datetime import UTC, datetime
@@ -34,8 +35,8 @@ def _lesson(db, topic: Topic, status: LessonStatus) -> Lesson:
     return lesson
 
 
-def _create(client, name: str):
-    return client.post(URL, json={"name": name})
+def _create(client, name: str, **fields):
+    return client.post(URL, json={"name": name, **fields})
 
 
 # --- Create -------------------------------------------------------------------------------
@@ -46,8 +47,25 @@ def test_create_a_topic(admin):
     assert response.status_code == 201
     body = response.json()
     assert body["name"] == "Singlish"
+    assert body["description"] == ""
     assert body["archived_at"] is None
     assert (body["lesson_count"], body["published_count"]) == (0, 0)
+
+
+def test_create_with_a_description(admin):
+    response = _create(admin, "Singlish", description="  Words you will hear every day.\n")
+    assert response.status_code == 201
+    assert response.json()["description"] == "Words you will hear every day."
+
+
+def test_a_description_of_200_characters_is_accepted(admin):
+    assert _create(admin, "Singlish", description="x" * 200).status_code == 201
+
+
+def test_a_description_over_200_characters_is_refused(admin):
+    response = _create(admin, "Singlish", description="x" * 201)
+    assert response.status_code == 422
+    assert [error["loc"][-1] for error in response.json()["detail"]] == ["description"]
 
 
 def test_create_trims_whitespace(admin):
@@ -104,6 +122,42 @@ def test_an_archived_topic_can_be_renamed(admin, db):
     response = admin.patch(f"{URL}/{topic.id}", json={"name": "Local slang"})
     assert response.status_code == 200
     assert response.json()["archived_at"] is not None
+
+
+def test_editing_without_a_description_keeps_it(admin, db):
+    topic = _topic(db, "Singlish")
+    topic.description = "Words you will hear every day."
+    db.commit()
+    response = admin.patch(f"{URL}/{topic.id}", json={"name": "Local slang"})
+    assert response.json()["description"] == "Words you will hear every day."
+
+
+def test_edit_a_description(admin, db):
+    topic = _topic(db, "Singlish")
+    response = admin.patch(
+        f"{URL}/{topic.id}", json={"name": "Singlish", "description": " Everyday words. "}
+    )
+    assert response.status_code == 200
+    assert response.json()["description"] == "Everyday words."
+    db.refresh(topic)
+    assert topic.description == "Everyday words."
+
+
+def test_an_empty_description_clears_it(admin, db):
+    topic = _topic(db, "Singlish")
+    topic.description = "Words you will hear every day."
+    db.commit()
+    response = admin.patch(f"{URL}/{topic.id}", json={"name": "Singlish", "description": "  "})
+    assert response.json()["description"] == ""
+
+
+def test_an_archived_topics_description_can_be_edited(admin, db):
+    topic = _topic(db, "Singlish", archived=True)
+    response = admin.patch(
+        f"{URL}/{topic.id}", json={"name": "Singlish", "description": "Everyday words."}
+    )
+    assert response.status_code == 200
+    assert response.json()["description"] == "Everyday words."
 
 
 def test_rename_of_a_missing_topic_is_not_found(admin):
