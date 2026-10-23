@@ -203,6 +203,27 @@ class ProgressOut(BaseModel):
     suggestion: SuggestionOut | None
 
 
+class MistakeOut(BaseModel):
+    """A question answered wrongly, as its lesson reads now (SCRUM-44)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    lesson_id: uuid.UUID
+    lesson_title: str
+    topic_name: str
+    question_id: str
+    text: str
+    chosen: str
+    correct: str
+    explanation: str
+    why_not: str
+    answered_at: datetime
+
+
+class ReviewOut(BaseModel):
+    mistakes: list[MistakeOut]
+
+
 class TopicLessonOut(BaseModel):
     """One lesson in a topic's list (SCRUM-53). Never says which options are right."""
 

@@ -1,6 +1,6 @@
 import { Button, Dialog, ErrorState, ProgressRing, Spinner, cn, useAuth } from "@sgjio/ui";
 import { readingLabel } from "@sgjio/ui/lesson";
-import { ChevronRight, Info, PartyPopper, Sparkles } from "lucide-react";
+import { ChevronRight, Info, PartyPopper, RotateCcw, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -10,7 +10,8 @@ import { type Progress, type Suggestion, type TopicProgress, useProgress } from 
  * The landing page is the portfolio (SCRUM-43): one progress circle per topic that has a
  * published lesson, plus one overall figure. Selecting a circle opens that topic
  * (SCRUM-53). Below the circles is one suggested lesson, from the topic where progress is
- * weakest (SCRUM-6); the circles stay the way to pick any topic instead.
+ * weakest (SCRUM-6); the circles stay the way to pick any topic instead. Then a way to review
+ * the questions answered wrongly (SCRUM-44).
  */
 export function HomePage() {
   const { user } = useAuth();
@@ -37,7 +38,27 @@ export function HomePage() {
         <>
           <ProgressSection progress={state.progress} />
           {state.progress.available > 0 && (
-            <SuggestionSection suggestion={state.progress.suggestion} />
+            <>
+              <SuggestionSection suggestion={state.progress.suggestion} />
+              {/* SCRUM-44 AC1 */}
+              <Link
+                to="/review"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg border border-line bg-white px-3.5 py-3",
+                  "transition-colors hover:border-brand/40 hover:bg-brand-soft/40",
+                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+                )}
+              >
+                <RotateCcw className="size-5 shrink-0 text-brand" aria-hidden />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-sm font-semibold text-ink">Review mistakes</span>
+                  <span className="text-caption text-subtle">
+                    See the right answers to questions you missed
+                  </span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-subtle" aria-hidden />
+              </Link>
+            </>
           )}
         </>
       )}
