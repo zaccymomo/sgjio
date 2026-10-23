@@ -55,6 +55,8 @@ type Props = {
   variant?: "full" | "embedded";
   index?: number;
   onIndexChange?: (index: number) => void;
+  /** "full" only: the card to open at instead of the cover, e.g. to preview one question. */
+  start?: number;
   onExit?: () => void;
   /** Shown in the top bar, e.g. a "Preview" label. */
   badge?: ReactNode;
@@ -97,6 +99,7 @@ export function LessonDeck({
   variant = "full",
   index,
   onIndexChange,
+  start,
   onExit,
   badge,
   renderEnd,
@@ -105,7 +108,7 @@ export function LessonDeck({
   const embedded = variant === "embedded";
   const reduced = useReducedMotion();
   const [muted, setMuted] = useMuted();
-  const [step, setStep] = useState(embedded ? (index ?? 0) : COVER);
+  const [step, setStep] = useState(embedded ? (index ?? 0) : (start ?? COVER));
   const [direction, setDirection] = useState(1);
   const [started, setStarted] = useState(false);
   const regionRef = useRef<HTMLDivElement>(null);

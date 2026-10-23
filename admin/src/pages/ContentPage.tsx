@@ -243,6 +243,7 @@ export function ContentPage() {
   };
   const lessonActions: LessonActions = {
     edit: (lesson) => navigate(`/lessons/${lesson.id}`),
+    insights: (lesson) => navigate(`/lessons/${lesson.id}/insights`),
     remove: (lesson) => {
       setLessonDeleteError(null);
       setLessonToDelete(lesson);

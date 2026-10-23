@@ -1,7 +1,7 @@
 """Request and response shapes shared across routers."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -421,6 +421,111 @@ class LessonOut(BaseModel):
     issues: list[IssueOut]
     stats: StatsOut
     assets: dict[str, AssetOut]
+
+
+# --- Lesson insights (SCRUM-84) ------------------------------------------------------------
+# Shares are fractions from 0 to 1. Figures are None where fewer than 5 learners are behind
+# them, and nothing here names a learner.
+
+
+class InsightsPreviousOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    number: int
+    average_best: float
+    right_first_time: float | None
+
+
+class InsightsSummaryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    learners: int
+    share_of_learners: float
+    average_best: float
+    right_first_time: float | None
+    finish_rate: float
+    previous: InsightsPreviousOut | None
+
+
+class InsightsOptionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    text: str
+    correct: bool
+    chosen: float
+
+
+class InsightsQuestionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    number: int
+    card_number: int
+    text: str
+    right_first_time: float
+    previous_right_first_time: float | None
+    fixed_on_retake: float | None
+    newcomers: float | None
+    singaporeans: float | None
+    options: list[InsightsOptionOut]
+
+
+class InsightsFunnelStepOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    question: int | None
+    runs: int
+
+
+class InsightsScoreOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    correct: int
+    learners: int
+
+
+class InsightsTrendSeriesOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    version: int
+    finished: list[int | None]
+    average_best: list[float | None]
+    right_first_time: list[float | None]
+    finish_rate: list[float | None]
+
+
+class InsightsTrendOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    weeks: list[date]
+    series: list[InsightsTrendSeriesOut]
+
+
+class LessonInsightsOut(BaseModel):
+    """How learners do on one version of a lesson. `enough` is false until 5 learners have
+    finished that version, and then every figure is null. `doc` and `assets` are the
+    version's deck, for previewing exactly what learners saw."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    status: LessonStatus
+    topic_name: str | None
+    versions: list[VersionOut]
+    version: int | None
+    learners: Literal["all", "newcomer", "singaporean"]
+    min_learners: int
+    enough: bool
+    summary: InsightsSummaryOut | None
+    questions: list[InsightsQuestionOut] | None
+    funnel: list[InsightsFunnelStepOut] | None
+    scores: list[InsightsScoreOut] | None
+    trend: InsightsTrendOut
+    doc: dict | None
+    assets: dict[str, AssetOut]
+    reading_seconds: int
 
 
 # --- Learners (SCRUM-15, SCRUM-16) ---------------------------------------------------------

@@ -46,6 +46,10 @@ def lesson_not_found() -> ContentProblem:
     return ContentProblem("lesson_not_found", "That lesson no longer exists.", 404)
 
 
+def version_not_found() -> ContentProblem:
+    return ContentProblem("version_not_found", "That version of the lesson doesn't exist.", 404)
+
+
 def lesson_not_deletable() -> ContentProblem:
     return ContentProblem(
         "lesson_not_deletable",

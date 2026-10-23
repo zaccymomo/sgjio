@@ -142,6 +142,7 @@ erDiagram
 - **The best score is kept on that row.** `best_correct` of `best_scored` is the best attempt so far by percentage, a tie going to the most recent, so a worse retake never lowers it (SCRUM-16 AC5). 0 of 0 (a lesson with only one-option taps) counts as full marks. Completion feeds the progress circles; the score feeds tiers (SCRUM-27).
 - **A completion row outlives withdrawal.** Withdrawing a lesson leaves the row in place, so the user's history keeps it (SCRUM-52 AC4), while the progress query filters on `status = published` so the circle's two figures both shrink and `completed` can never exceed `available` (SCRUM-16 AC8).
 - **Every attempt is stored** (`lesson_attempts`, `attempt_answers`), finished or not, so attempt history (SCRUM-42) can read them. Only the first answer to each question counts: the key `(attempt_id, question_id)` makes a repeated submission record nothing (SCRUM-16 AC6).
+- **Lesson insights read these tables and add none** (SCRUM-84, `api/app/insights.py`). Each attempt names its version, so figures are per version, and each answer its option, so the page can say how often each wrong option was chosen. Nothing is stored about who saw what; the figures are worked out on each request.
 
 ## Seed data
 
@@ -154,3 +155,7 @@ erDiagram
   state a progress circle can be in: not started, in progress and complete. These are only
   added when that account has no progress at all, so re-seeding never overwrites real
   progress made by clicking through the app.
+
+## Demo learners
+
+`python -m app.cli demo-activity` is separate from the seed, for the demo and for trying lesson insights (SCRUM-84). It adds 60 demo learners (40 newcomers, 20 Singaporeans) at `demo.sgjio.example.com`, with a random password nobody knows, and about 1,100 runs through the published lessons over the last 12 weeks, each lesson's versions taking turns. A few questions are made confusing on purpose (`STORIES` in `api/app/demo.py`). Running it again deletes the demo learners, which deletes their runs and completions, and adds them back with dates relative to today, so run it on the morning of a demo. Nobody else's data is touched.

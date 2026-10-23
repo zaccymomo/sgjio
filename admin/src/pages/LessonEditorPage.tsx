@@ -11,6 +11,7 @@ import {
 } from "@sgjio/ui/lesson";
 import {
   ArchiveRestore,
+  ChartColumn,
   ChevronLeft,
   CircleAlert,
   CloudOff,
@@ -546,6 +547,13 @@ function LessonEditor({
   };
 
   const menuItems: MenuAction[] = [];
+  if (lesson?.version) {
+    menuItems.push({
+      label: "Insights",
+      icon: ChartColumn,
+      onSelect: () => navigate(`/lessons/${lesson.id}/insights`),
+    });
+  }
   if (everPublished && changed) {
     menuItems.push({
       label: "Discard changes",

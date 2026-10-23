@@ -30,7 +30,7 @@ python -m pytest                                       # 384 tests, uses the sgj
 python -m ruff check . && python -m ruff format .
 python -m alembic revision --autogenerate -m "..."     # then READ the generated file
 python -m alembic upgrade head
-python -m app.cli seed | create-admin | send-reset | prune-media
+python -m app.cli seed | create-admin | send-reset | prune-media | demo-activity
 python -m app.cli import-lessons [folder] [--publish]   # load lesson files (content/README.md)
 npm run dev:web | dev:admin                            # from repo root
 npm run lint && npm run format && npm run typecheck && npm run build
