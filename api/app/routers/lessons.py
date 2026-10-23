@@ -1,4 +1,5 @@
-"""Learners' lessons: reading one and answering its questions (SCRUM-15, SCRUM-16).
+"""Learners' lessons: reading one and answering its questions (SCRUM-15, SCRUM-16), and
+reporting a problem on a card (SCRUM-82).
 
 Everything here is the signed-in user's own: attempts are found by id and owner together,
 so one user can never answer or read another's. The rules live in app/learning.py.
@@ -9,7 +10,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app import learning
+from app import learning, reports
 from app.auth.deps import require_user
 from app.db import get_db
 from app.models import User
@@ -21,6 +22,8 @@ from app.schemas import (
     AttemptStartRequest,
     CheckResultOut,
     LearnerLessonOut,
+    ReportRequest,
+    ReportSentOut,
 )
 
 router = APIRouter(dependencies=[Depends(require_user)])
@@ -105,5 +108,26 @@ def finish(
     kept (SCRUM-16 AC3 to AC6). Finishing again changes nothing."""
     try:
         return learning.finish(db, user.id, attempt_id)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+@router.post(
+    "/lessons/{lesson_id}/reports",
+    response_model=ReportSentOut,
+    status_code=201,
+    responses={**UNAVAILABLE, 422: {"description": "Not a version or card of this lesson"}},
+)
+def report_problem(
+    lesson_id: uuid.UUID,
+    body: ReportRequest,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    """Report a problem on one card, naming the version shown (SCRUM-82)."""
+    try:
+        return reports.report_problem(
+            db, user.id, lesson_id, body.version, body.card_id, body.reason, body.note
+        )
     except ContentProblem as problem:
         raise _refuse(problem) from None

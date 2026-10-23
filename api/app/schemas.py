@@ -18,7 +18,7 @@ from pydantic import (
 
 from app.auth import normalise_email
 from app.lesson_doc import LessonDoc
-from app.models import LessonStatus, UserRole, UserType
+from app.models import LessonStatus, ReportReason, UserRole, UserType
 from app.profile_options import INTERESTS, LANGUAGES, NEIGHBOURHOODS
 
 # Email syntax check for registration. Built once: TypeAdapter compiles a validator.
@@ -667,3 +667,24 @@ class AttemptResultOut(BaseModel):
     score: ScoreOut
     best: ScoreOut
     first_completion: bool
+
+
+# --- Reported problems (SCRUM-82, SCRUM-83) ------------------------------------------------
+
+MAX_REPORT_NOTE = 500
+
+
+class ReportRequest(BaseModel):
+    """A problem on one card of the version the learner was shown (SCRUM-82)."""
+
+    version: int = Field(ge=1)
+    card_id: str = Field(min_length=1, max_length=40)
+    reason: ReportReason
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_REPORT_NOTE)] = ""
+
+
+class ReportSentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    created_at: datetime
