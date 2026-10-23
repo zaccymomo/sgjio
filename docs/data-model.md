@@ -32,6 +32,7 @@ erDiagram
     topics {
         uuid id PK
         string name UK "unique ignoring case, archived topics included"
+        string description "up to 200 characters, empty = none"
         timestamptz archived_at "null = active"
         int position "admin-set order, also the circles' order"
     }
@@ -134,6 +135,7 @@ erDiagram
 - **A lesson belongs to one topic.** This keeps the progress-circle arithmetic simple, as assumed in SCRUM-56. A draft may have no topic yet; publishing requires one.
 - **Withdrawn lessons are kept, not deleted** (`status = withdrawn`), so users' history still shows lessons they completed (SCRUM-52 AC4).
 - **Topics are archived, or deleted only when empty** (SCRUM-57). `archived_at` is a nullable timestamp: empty means active. Archiving hides the topic from users, including its progress circle and the overall figure, but keeps its lessons and everyone's completions, so restoring brings it all back. A topic with no lessons of any status can be deleted outright; otherwise the administrator must archive it. Archived topics keep reserving their name, so the unique index stays as is, and they can still be renamed. A timestamp was chosen over a flag or status column because there are only two states and the date is useful to show.
+- **A topic's description is plain text, and empty means none** (SCRUM-86), like a lesson's `summary`: never null, so there is only one way to have no description. Up to 200 characters, shown under the topic's name on its page.
 - **Topics and lessons have a `position`** (SCRUM-66). Administrators drag topics into order, and that is also the order of users' progress circles. Lessons are ordered within their topic, and lessons with no topic are ordered as one group of their own. A position is only a sort key: there is no unique constraint, and every read breaks ties by `created_at`, so a gap or a duplicate can never break a page. New topics and lessons go to the end, and so does a restored topic. Reordering always rewrites a whole topic list or a whole lesson group at once (see `docs/decisions.md`).
 - **Enumerations are stored as text with a CHECK constraint**, not native Postgres enums, so adding a value later is a simple migration.
 - **Completion is one row per user per lesson** (`lesson_completions`, SCRUM-16). It is written the first time a lesson is completed, however its answers went (AC3), and the unique constraint on `(user_id, lesson_id)` is what makes completion count once however many times it is retaken (AC5, AC6). Each run through a deck is a row in `lesson_attempts`, tied to the version shown, with the first answer to each question in `attempt_answers`; only a finished attempt completes the lesson.
@@ -146,7 +148,7 @@ erDiagram
 `python -m app.cli seed` is safe to run repeatedly. It adds:
 
 - one administrator and one Newcomer user (see README for the sign-in details)
-- the six topics from the Figma home screen: Singlish, Hawker & Food, Workplace, Public Etiquette, Festivals, Getting Around
+- the six topics from the Figma home screen: Singlish, Hawker & Food, Workplace, Public Etiquette, Festivals, Getting Around, each with a description. Running it again fills in a description only where a topic has none, so an administrator's edit is kept.
 - the lessons in `content/lessons` (three per topic, eighteen in all, each a deck of cards with illustrations, some audio and two or three questions), published, plus a draft "Card gallery" showing every kind of card. Running it again only updates lessons whose files changed; see `content/README.md`.
 - some completed lessons for the Newcomer account, chosen so the landing page shows every
   state a progress circle can be in: not started, in progress and complete. These are only

@@ -11,6 +11,8 @@ import { type Topic, type TopicLesson, useTopic } from "../lib/topic";
  * attempted and the best score so far (SCRUM-54 AC1, AC2). The page reloads on return
  * from a lesson, so a retake's date and score show straight away (AC3 to AC5).
  *
+ * Its description, if it has one, sits under the title (SCRUM-86).
+ *
  * Selecting a lesson opens it (AC2). The lesson says it came from here, so finishing or
  * closing it steps back to this page rather than stacking a second copy on top (AC3); that
  * keeps the browser's back button, like the "All topics" link, leading home (AC4).
@@ -55,12 +57,15 @@ function TopicView({ topicId }: { topicId: string }) {
 }
 
 function TopicDetail({ topic }: { topic: Topic }) {
-  const { name, completed, available, lessons } = topic;
+  const { name, description, completed, available, lessons } = topic;
   const questions = lessons.reduce((total, lesson) => total + lesson.questions, 0);
 
   return (
     <>
-      <h1 className="text-[22px] font-bold text-ink">{name}</h1>
+      <div>
+        <h1 className="text-[22px] font-bold text-ink">{name}</h1>
+        {description && <p className="mt-1 text-sm text-muted">{description}</p>}
+      </div>
 
       {available === 0 ? (
         <section className="rounded-lg border border-line bg-surface p-5 text-center">

@@ -205,24 +205,31 @@ class TopicLessonOut(BaseModel):
 
 
 class TopicLessonsOut(BaseModel):
-    """A topic opened from its circle: its figure and its published lessons (SCRUM-53)."""
+    """A topic opened from its circle: its figure and its published lessons (SCRUM-53), and
+    its description, empty if it has none (SCRUM-86)."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     name: str
+    description: str
     completed: int
     available: int
     lessons: list[TopicLessonOut]
 
 
 TopicName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+# Matches topics.description (String(200)). Empty means the topic has none.
+TopicDescription = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
 
 
 class TopicRequest(BaseModel):
-    """Create or rename a topic (SCRUM-57). The name is trimmed before the length check."""
+    """Create or edit a topic (SCRUM-57, SCRUM-86). Both fields are trimmed before the length
+    check. Leaving `description` out keeps the current one (empty for a new topic); an empty
+    string clears it."""
 
     name: TopicName
+    description: TopicDescription | None = None
 
 
 class TopicOut(BaseModel):
@@ -232,6 +239,7 @@ class TopicOut(BaseModel):
 
     id: uuid.UUID
     name: str
+    description: str
     archived_at: datetime | None
     position: int
     lesson_count: int

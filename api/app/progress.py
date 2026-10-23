@@ -107,6 +107,7 @@ class TopicLesson:
 class TopicLessons:
     id: uuid.UUID
     name: str
+    description: str
     completed: int
     available: int
     lessons: list[TopicLesson]
@@ -171,6 +172,7 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
     return TopicLessons(
         id=topic.id,
         name=topic.name,
+        description=topic.description,
         completed=sum(1 for lesson in lessons if lesson.completed),
         available=len(lessons),
         lessons=lessons,

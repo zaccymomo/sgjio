@@ -16,6 +16,7 @@ export { ForgotPasswordCard, ResetPasswordCard } from "./components/PasswordRese
 export { ProgressRing } from "./components/ProgressRing";
 export { SignInForm } from "./components/SignInForm";
 export { FullPageSpinner, Spinner } from "./components/Spinner";
+export { TextAreaField, type TextAreaFieldProps } from "./components/TextAreaField";
 export { TextField, type TextFieldProps } from "./components/TextField";
 
 export { ApiError, apiFetch } from "./lib/api";

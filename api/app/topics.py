@@ -4,6 +4,8 @@ Routes stay thin: they call these functions and turn a ContentProblem into an HT
 
 - names are trimmed by the request schema, 1-80 characters, and unique ignoring case
   (SCRUM-57 AC4). Archived topics still reserve their name and can still be renamed.
+- a description is optional, trimmed, up to 200 characters, and empty when there is none
+  (SCRUM-86). Editing a topic without one in the request keeps the current one.
 - a topic is archived (hidden from users, lessons and progress kept) or, only when it has
   no lessons of any status, deleted. Deleting never falls back to archiving.
 - order (SCRUM-66): a new topic goes to the end, and so does a restored one, so the order
@@ -42,6 +44,7 @@ def _not_empty() -> ContentProblem:
 class TopicSummary:
     id: uuid.UUID
     name: str
+    description: str
     archived_at: datetime | None
     position: int
     lesson_count: int
@@ -77,6 +80,7 @@ def _summary_query() -> Select:
         select(
             Topic.id,
             Topic.name,
+            Topic.description,
             Topic.archived_at,
             Topic.position,
             func.count(Lesson.id).label("lesson_count"),
@@ -108,20 +112,25 @@ def next_topic_position(db: Session) -> int:
     return db.scalar(select(func.coalesce(func.max(Topic.position) + 1, 0)))
 
 
-def create_topic(db: Session, name: str) -> TopicSummary:
+def create_topic(db: Session, name: str, description: str = "") -> TopicSummary:
     if _name_in_use(db, name):
         raise _name_taken()
-    topic = Topic(name=name, position=next_topic_position(db))
+    topic = Topic(name=name, description=description, position=next_topic_position(db))
     db.add(topic)
     _commit_name(db)
     return _summary(db, topic.id)
 
 
-def rename_topic(db: Session, topic_id: uuid.UUID, name: str) -> TopicSummary:
+def update_topic(
+    db: Session, topic_id: uuid.UUID, name: str, description: str | None = None
+) -> TopicSummary:
+    """Rename a topic and, unless `description` is None, replace its description."""
     topic = _get(db, topic_id)
     if _name_in_use(db, name, except_id=topic.id):
         raise _name_taken()
     topic.name = name
+    if description is not None:
+        topic.description = description
     _commit_name(db)
     return _summary(db, topic.id)
 

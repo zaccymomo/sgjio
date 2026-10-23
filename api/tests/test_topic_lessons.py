@@ -1,5 +1,5 @@
 """SCRUM-53 and SCRUM-54: opening a topic lists its published lessons, each marked completed
-or not, with when it was last attempted and the best score.
+or not, with when it was last attempted and the best score. SCRUM-86: and its description.
 
 The list follows the same counting rules as the landing page circles (SCRUM-16 AC8), so
 the figure on the topic page always matches the circle that led there.
@@ -43,8 +43,10 @@ def _doc(scored: int = 1, words: int = 0) -> dict:
     return {"cards": cards}
 
 
-def _topic(db, name: str = "Singlish", archived: bool = False) -> Topic:
-    topic = Topic(name=name, archived_at=datetime.now(UTC) if archived else None)
+def _topic(db, name: str = "Singlish", archived: bool = False, description: str = "") -> Topic:
+    topic = Topic(
+        name=name, description=description, archived_at=datetime.now(UTC) if archived else None
+    )
     db.add(topic)
     db.commit()
     return topic
@@ -142,10 +144,21 @@ def test_a_topic_with_no_published_lessons_is_empty_not_missing(client, db, make
     assert response.json() | {"id": None} == {
         "id": None,
         "name": "Singlish",
+        "description": "",
         "completed": 0,
         "available": 0,
         "lessons": [],
     }
+
+
+def test_includes_the_topics_description(client, db, make_user):
+    _sign_in(client, make_user)
+    topic = _topic(db, description="The little words you will hear every day.")
+    _lesson(db, topic, "Lah")
+
+    body = client.get(f"/api/topics/{topic.id}").json()
+
+    assert body["description"] == "The little words you will hear every day."
 
 
 def test_marks_completed_lessons_and_counts_them(client, db, make_user):

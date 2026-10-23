@@ -156,6 +156,9 @@ class Topic(Base):
     `position` is the order administrators set (SCRUM-66), which is also the order of
     the circles users see. It is a sort key, not unique: reads break ties by `created_at`,
     so a gap or a duplicate can never break a page.
+
+    `description` is a line or two shown under the name on the topic's page (SCRUM-86).
+    Empty means the topic has none; it is never null, like a lesson's `summary`.
     """
 
     __tablename__ = "topics"
@@ -166,6 +169,9 @@ class Topic(Base):
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     name: Mapped[str] = mapped_column(String(80), nullable=False)
+    description: Mapped[str] = mapped_column(
+        String(200), nullable=False, default="", server_default=""
+    )
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Defaults to 0 so rows built directly (tests, scripts) still work; the API appends.
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

@@ -87,18 +87,21 @@ def reorder_topics(
     responses=NAME_TAKEN,
 )
 def create_topic(body: TopicRequest, db: Session = Depends(get_db)) -> topics.TopicSummary:
+    """Add a topic at the end of the list, with an optional description (SCRUM-86)."""
     try:
-        return topics.create_topic(db, body.name)
+        return topics.create_topic(db, body.name, body.description or "")
     except ContentProblem as problem:
         raise _refuse(problem) from None
 
 
 @router.patch("/topics/{topic_id}", response_model=TopicOut, responses={**NOT_FOUND, **NAME_TAKEN})
-def rename_topic(
+def update_topic(
     topic_id: uuid.UUID, body: TopicRequest, db: Session = Depends(get_db)
 ) -> topics.TopicSummary:
+    """Rename a topic and change its description. Leaving `description` out keeps it;
+    an empty one clears it (SCRUM-86)."""
     try:
-        return topics.rename_topic(db, topic_id, body.name)
+        return topics.update_topic(db, topic_id, body.name, body.description)
     except ContentProblem as problem:
         raise _refuse(problem) from None
 
