@@ -21,6 +21,8 @@ export type TopicLesson = {
 export type Topic = {
   id: string;
   name: string;
+  /** What the topic covers, shown under its name (SCRUM-86). Empty when it has none. */
+  description: string;
   completed: number;
   available: number;
   lessons: TopicLesson[];
