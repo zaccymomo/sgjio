@@ -27,6 +27,9 @@ import { SignInPage } from "./pages/SignInPage";
 const LessonEditorPage = lazy(() =>
   import("./pages/LessonEditorPage").then((module) => ({ default: module.LessonEditorPage })),
 );
+const LessonInsightsPage = lazy(() =>
+  import("./pages/LessonInsightsPage").then((module) => ({ default: module.LessonInsightsPage })),
+);
 const LessonPreviewPage = lazy(() =>
   import("./pages/LessonPreviewPage").then((module) => ({ default: module.LessonPreviewPage })),
 );
@@ -107,6 +110,8 @@ const router = createBrowserRouter(
           <Route index element={<ContentPage />} />
           {/* /lessons/new for a lesson not saved yet (SCRUM-64). */}
           <Route path="/lessons/:id" element={<LessonEditorPage />} />
+          {/* How learners do on it (SCRUM-84). */}
+          <Route path="/lessons/:id/insights" element={<LessonInsightsPage />} />
           {/* Topics used to have their own page; they now live on the content page. */}
           <Route path="/topics" element={<Navigate to="/" replace />} />
         </Route>
