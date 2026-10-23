@@ -36,7 +36,7 @@ from sqlalchemy.orm import Session
 
 from app import lesson_doc, media
 from app.lesson_doc import Issue, LessonDoc, Stats
-from app.models import Lesson, LessonStatus, LessonVersion, Topic
+from app.models import Lesson, LessonReport, LessonStatus, LessonVersion, ReportStatus, Topic
 from app.problems import (
     ContentProblem,
     check_reorder,
@@ -68,6 +68,8 @@ class LessonSummary:
     questions: int
     # The first image in the deck, for a thumbnail.
     cover_asset_id: uuid.UUID | None
+    # Problems learners reported that nobody has dealt with yet (SCRUM-83 AC4).
+    open_reports: int
 
 
 @dataclass(frozen=True)
@@ -164,10 +166,17 @@ def list_lessons(db: Session) -> list[LessonSummary]:
         .group_by(LessonVersion.lesson_id)
         .subquery()
     )
+    reports = (
+        select(LessonReport.lesson_id, func.count().label("open"))
+        .where(LessonReport.status == ReportStatus.OPEN)
+        .group_by(LessonReport.lesson_id)
+        .subquery()
+    )
     query = (
-        select(Lesson, latest.c.number)
+        select(Lesson, latest.c.number, func.coalesce(reports.c.open, 0))
         .outerjoin(Topic, Lesson.topic_id == Topic.id)
         .outerjoin(latest, latest.c.lesson_id == Lesson.id)
+        .outerjoin(reports, reports.c.lesson_id == Lesson.id)
         .order_by(
             Topic.position.nulls_last(),
             Topic.created_at,
@@ -178,7 +187,7 @@ def list_lessons(db: Session) -> list[LessonSummary]:
         )
     )
     summaries = []
-    for lesson, version in db.execute(query).all():
+    for lesson, version, open_reports in db.execute(query).all():
         cards = lesson.draft.get("cards", [])
         summaries.append(
             LessonSummary(
@@ -195,6 +204,7 @@ def list_lessons(db: Session) -> list[LessonSummary]:
                 cards=len(cards),
                 questions=sum(1 for card in cards if card.get("question")),
                 cover_asset_id=_cover(lesson.draft),
+                open_reports=open_reports,
             )
         )
     return summaries

@@ -1,14 +1,24 @@
 """SCRUM-82: a learner reports a problem on one card of a lesson, naming the lesson, the
-version and the card it was sent from."""
+version and the card it was sent from. SCRUM-83: administrators see the open reports and
+mark them Fixed or Dismissed."""
 
 from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import select
 
-from app.models import Lesson, LessonReport, LessonStatus, LessonVersion, ReportStatus, Topic
+from app.models import (
+    Lesson,
+    LessonReport,
+    LessonStatus,
+    LessonVersion,
+    ReportStatus,
+    Topic,
+    UserRole,
+)
 
 USER = {"email": "user@example.com", "password": "Password123"}
+ADMIN = {"email": "admin@example.com", "password": "AdminPass123"}
 
 DOC = {
     "cards": [
@@ -134,3 +144,116 @@ def test_a_lesson_learners_cannot_open_cannot_be_reported(db, learner, lesson):
     db.commit()
     response = _report(learner, lesson)
     assert (response.status_code, response.json()["detail"]["code"]) == (404, "lesson_unavailable")
+
+
+# --- Administrators (SCRUM-83) -------------------------------------------------------------
+
+
+@pytest.fixture
+def admin(make_user):
+    """An admin-portal client of its own, so the learner's session stays signed in."""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    make_user(ADMIN["email"], ADMIN["password"], role=UserRole.ADMIN, name="Admin")
+    with TestClient(app) as admin_client:
+        assert admin_client.post("/api/admin/auth/sign-in", json=ADMIN).status_code == 200
+        yield admin_client
+
+
+def _open(admin) -> list[dict]:
+    response = admin.get("/api/admin/reports")
+    assert response.status_code == 200
+    return response.json()
+
+
+def test_reports_are_for_administrators_only(learner, lesson):
+    assert learner.get("/api/admin/reports").status_code == 401
+
+
+def test_open_reports_newest_first_with_what_the_page_needs(admin, learner, lesson):
+    """AC1: lesson, card, reason, note and date, and nothing about who sent it."""
+    _report(learner, lesson, card_id="intro", reason="typo", note="Kopi is misspelt.")
+    _report(learner, lesson, card_id="c1", reason="wrong")
+
+    first, second = _open(admin)
+    assert (first["card_id"], second["card_id"]) == ("c1", "intro")
+    assert second == {
+        "id": second["id"],
+        "lesson_id": str(lesson.id),
+        "lesson_title": "Ordering kopi",
+        "topic_name": "Hawker & Food",
+        "version": 1,
+        "card_id": "intro",
+        "card_number": 1,
+        "card_excerpt": "Kopi is coffee with condensed milk.",
+        "card_in_draft": True,
+        "reason": "typo",
+        "note": "Kopi is misspelt.",
+        "status": "open",
+        "created_at": second["created_at"],
+        "resolved_at": None,
+    }
+    assert first["card_excerpt"] == "Black coffee with sugar is kopi ___."
+
+
+def test_a_report_says_when_its_card_has_left_the_draft(db, admin, learner, lesson):
+    """AC2: the editor opens the card by id, so the page needs to know it is still there."""
+    _report(learner, lesson, card_id="intro")
+    lesson.draft = {"cards": DOC["cards"][1:]}
+    db.commit()
+
+    [report] = _open(admin)
+    assert report["card_in_draft"] is False
+    assert report["card_number"] == 1  # still its place in the version reported
+
+
+@pytest.mark.parametrize("status", ["fixed", "dismissed"])
+def test_marking_a_report_takes_it_off_the_open_list_and_keeps_it(
+    db, admin, learner, lesson, status
+):
+    """AC3."""
+    _report(learner, lesson)
+    [report] = _open(admin)
+
+    response = admin.put(f"/api/admin/reports/{report['id']}/status", json={"status": status})
+    assert response.status_code == 200
+    assert response.json()["status"] == status
+    assert response.json()["resolved_at"] is not None
+
+    assert _open(admin) == []
+    [kept] = admin.get("/api/admin/reports?status=closed").json()
+    assert (kept["id"], kept["status"]) == (report["id"], status)
+    [row] = _reports(db)
+    assert row.resolved_by is not None
+
+
+def test_a_report_can_be_reopened(admin, learner, lesson):
+    _report(learner, lesson)
+    [report] = _open(admin)
+    admin.put(f"/api/admin/reports/{report['id']}/status", json={"status": "dismissed"})
+
+    response = admin.put(f"/api/admin/reports/{report['id']}/status", json={"status": "open"})
+    assert response.json()["resolved_at"] is None
+    assert [r["id"] for r in _open(admin)] == [report["id"]]
+
+
+def test_an_unknown_report_or_status_is_refused(admin):
+    missing = "00000000-0000-0000-0000-000000000000"
+    response = admin.put(f"/api/admin/reports/{missing}/status", json={"status": "fixed"})
+    assert (response.status_code, response.json()["detail"]["code"]) == (404, "report_not_found")
+    assert admin.get("/api/admin/reports?status=everything").status_code == 422
+
+
+def test_the_lesson_list_counts_each_lessons_open_reports(admin, learner, lesson):
+    """AC4."""
+    _report(learner, lesson)
+    _report(learner, lesson, card_id="intro")
+    [row] = admin.get("/api/admin/lessons").json()
+    assert row["open_reports"] == 2
+
+    [report, _] = _open(admin)
+    admin.put(f"/api/admin/reports/{report['id']}/status", json={"status": "fixed"})
+    [row] = admin.get("/api/admin/lessons").json()
+    assert row["open_reports"] == 1

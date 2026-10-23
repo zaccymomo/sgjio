@@ -77,6 +77,8 @@ export function TopicGroup({
         .filter(Boolean)
         .join(" · ")
     : `Drafts not yet in a topic · ${plural(allLessons.length, "lesson")}`;
+  // So a collapsed topic still says it has problems to look at (SCRUM-83 AC4).
+  const openReports = allLessons.reduce((total, lesson) => total + lesson.open_reports, 0);
 
   return (
     <div
@@ -113,7 +115,15 @@ export function TopicGroup({
             >
               {name}
             </span>
-            <span className="shrink-0 text-caption text-muted">{meta}</span>
+            <span className="shrink-0 text-caption text-muted">
+              {meta}
+              {openReports > 0 && (
+                <span className="font-semibold text-danger">
+                  {" "}
+                  · {plural(openReports, "open report")}
+                </span>
+              )}
+            </span>
           </span>
         </button>
         {topic && actions && (

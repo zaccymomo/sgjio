@@ -18,7 +18,7 @@ from pydantic import (
 
 from app.auth import normalise_email
 from app.lesson_doc import LessonDoc
-from app.models import LessonStatus, ReportReason, UserRole, UserType
+from app.models import LessonStatus, ReportReason, ReportStatus, UserRole, UserType
 from app.profile_options import INTERESTS, LANGUAGES, NEIGHBOURHOODS
 
 # Email syntax check for registration. Built once: TypeAdapter compiles a validator.
@@ -306,6 +306,7 @@ class LessonSummaryOut(BaseModel):
     cards: int
     questions: int
     cover_asset_id: uuid.UUID | None
+    open_reports: int
 
 
 class OrderRequest(BaseModel):
@@ -688,3 +689,30 @@ class ReportSentOut(BaseModel):
 
     id: uuid.UUID
     created_at: datetime
+
+
+class ReportOut(BaseModel):
+    """A reported problem as administrators see it: never who sent it (SCRUM-83 AC1)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    lesson_id: uuid.UUID
+    lesson_title: str
+    topic_name: str | None
+    version: int
+    card_id: str
+    card_number: int | None
+    card_excerpt: str
+    card_in_draft: bool
+    reason: ReportReason
+    note: str
+    status: ReportStatus
+    created_at: datetime
+    resolved_at: datetime | None
+
+
+class ReportStatusRequest(BaseModel):
+    """Fixed or Dismissed takes a report off the open list (AC3); Open puts it back."""
+
+    status: ReportStatus

@@ -41,6 +41,8 @@ export type LessonSummary = {
   questions: number;
   /** The first image in the deck, served at /api/media/{id}. */
   cover_asset_id: string | null;
+  /** Problems learners reported that nobody has dealt with yet (SCRUM-83 AC4). */
+  open_reports: number;
 };
 
 export type Content = { topics: Topic[]; lessons: LessonSummary[] };

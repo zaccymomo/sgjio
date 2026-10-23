@@ -5,10 +5,12 @@ import {
   FullPageSpinner,
   RequireAuth,
   Spinner,
+  cn,
   useAuth,
 } from "@sgjio/ui";
 import { lazy, Suspense, useState } from "react";
 import {
+  NavLink,
   Navigate,
   Outlet,
   Route,
@@ -21,6 +23,7 @@ import {
 
 import { ContentPage } from "./pages/ContentPage";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
+import { ReportsPage } from "./pages/ReportsPage";
 import { SignInPage } from "./pages/SignInPage";
 
 // Pages with the lesson deck load it only when opened, so the rest of the portal stays light.
@@ -56,7 +59,14 @@ function SignedInLayout() {
       wide={wide}
       actions={
         <>
-          <span className="hidden text-xs text-muted sm:inline">{user?.email}</span>
+          <nav aria-label="Portal" className="flex items-center gap-1">
+            <HeaderLink to="/" end>
+              Content
+            </HeaderLink>
+            {/* SCRUM-83 */}
+            <HeaderLink to="/reports">Reports</HeaderLink>
+          </nav>
+          <span className="hidden text-xs text-muted lg:inline">{user?.email}</span>
           <Button variant="secondary" size="sm" onClick={handleSignOut} loading={signingOut}>
             Sign out
           </Button>
@@ -73,6 +83,24 @@ function SignedInLayout() {
         <Outlet />
       </Suspense>
     </AdminLayout>
+  );
+}
+
+function HeaderLink({ to, end, children }: { to: string; end?: boolean; children: string }) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        cn(
+          "rounded-sm px-2 py-1 text-sm font-medium transition-colors",
+          "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+          isActive ? "bg-surface text-ink" : "text-muted hover:text-ink",
+        )
+      }
+    >
+      {children}
+    </NavLink>
   );
 }
 
@@ -112,6 +140,8 @@ const router = createBrowserRouter(
           <Route path="/lessons/:id" element={<LessonEditorPage />} />
           {/* How learners do on it (SCRUM-84). */}
           <Route path="/lessons/:id/insights" element={<LessonInsightsPage />} />
+          {/* Problems learners reported (SCRUM-83). */}
+          <Route path="/reports" element={<ReportsPage />} />
           {/* Topics used to have their own page; they now live on the content page. */}
           <Route path="/topics" element={<Navigate to="/" replace />} />
         </Route>

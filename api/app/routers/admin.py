@@ -5,12 +5,13 @@ its author forgets to add the guard.
 """
 
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from pydantic import AwareDatetime
 from sqlalchemy.orm import Session
 
-from app import insights, lessons, media, topics
+from app import insights, lessons, media, reports, topics
 from app.auth.deps import require_admin
 from app.db import get_db
 from app.models import User
@@ -24,6 +25,8 @@ from app.schemas import (
     LessonOut,
     LessonSummaryOut,
     LessonUpdateRequest,
+    ReportOut,
+    ReportStatusRequest,
     TopicOrderRequest,
     TopicOut,
     TopicRequest,
@@ -379,5 +382,36 @@ async def upload_media(
         )
     try:
         return media.store(db, data, file.filename or "", admin.id)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+# --- Reported problems (SCRUM-83) ---------------------------------------------------------
+
+
+@router.get("/reports", response_model=list[ReportOut])
+def list_reports(
+    which: Literal["open", "closed"] = Query("open", alias="status"),
+    db: Session = Depends(get_db),
+) -> list[reports.ReportSummary]:
+    """Open reports newest first (`status=open`, AC1), or those marked Fixed or Dismissed,
+    most recently dealt with first (`status=closed`, AC3). Never says who sent them."""
+    return reports.list_reports(db, which)
+
+
+@router.put(
+    "/reports/{report_id}/status",
+    response_model=ReportOut,
+    responses={404: {"description": "No report with that id (report_not_found)"}},
+)
+def set_report_status(
+    report_id: uuid.UUID,
+    body: ReportStatusRequest,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> reports.ReportSummary:
+    """Mark a report Fixed or Dismissed, which keeps it for reference (AC3), or reopen it."""
+    try:
+        return reports.set_status(db, admin.id, report_id, body.status)
     except ContentProblem as problem:
         raise _refuse(problem) from None
