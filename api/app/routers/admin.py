@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from pydantic import AwareDatetime
 from sqlalchemy.orm import Session
 
-from app import lessons, media, topics
+from app import insights, lessons, media, topics
 from app.auth.deps import require_admin
 from app.db import get_db
 from app.models import User
@@ -19,6 +19,7 @@ from app.schemas import (
     AssetOut,
     LessonChangeRequest,
     LessonCreateRequest,
+    LessonInsightsOut,
     LessonOrderRequest,
     LessonOut,
     LessonSummaryOut,
@@ -317,6 +318,31 @@ def restore_lesson(
     """Show a withdrawn lesson to users again, as its latest published version."""
     try:
         return lessons.restore_lesson(db, lesson_id, body.updated_at)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+# --- Insights (SCRUM-84) -------------------------------------------------------------------
+
+
+@router.get(
+    "/lessons/{lesson_id}/insights",
+    response_model=LessonInsightsOut,
+    responses={
+        404: {"description": "No such lesson or version (lesson_not_found, version_not_found)"}
+    },
+)
+def lesson_insights(
+    lesson_id: uuid.UUID,
+    version: int | None = Query(None, ge=1, description="Defaults to the latest version"),
+    learners: insights.Learners = Query("all", description="Everyone, or one kind of learner"),
+    db: Session = Depends(get_db),
+) -> insights.LessonInsights:
+    """How learners do on one version of a lesson: who finished it, scores, where they
+    stop, and each question's answers. No figure is given for fewer than 5 learners, and no
+    learner is named."""
+    try:
+        return insights.lesson_insights(db, lesson_id, version, learners)
     except ContentProblem as problem:
         raise _refuse(problem) from None
 
