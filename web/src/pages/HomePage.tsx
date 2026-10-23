@@ -1,4 +1,15 @@
-import { ErrorState, Placeholder, ProgressRing, Spinner, cn, useAuth } from "@sgjio/ui";
+import {
+  Button,
+  Dialog,
+  ErrorState,
+  Placeholder,
+  ProgressRing,
+  Spinner,
+  cn,
+  useAuth,
+} from "@sgjio/ui";
+import { Info } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { type Progress, type TopicProgress, useProgress } from "../lib/progress";
@@ -40,6 +51,8 @@ export function HomePage() {
 
 function ProgressSection({ progress }: { progress: Progress }) {
   const { topics, completed, available } = progress;
+  // The circle whose explanation is open (SCRUM-46), or null when it is closed.
+  const [explaining, setExplaining] = useState<TopicProgress | null>(null);
 
   if (available === 0) {
     return (
@@ -83,12 +96,76 @@ function ProgressSection({ progress }: { progress: Progress }) {
 
       <ul className="mt-3 grid grid-cols-3 gap-2.5 md:grid-cols-4">
         {topics.map((topic) => (
-          <li key={topic.id}>
+          // The explanation button sits beside the link rather than inside it, since a
+          // button inside a link is invalid and would also open the topic.
+          <li key={topic.id} className="relative">
             <TopicCircle topic={topic} />
+            <button
+              type="button"
+              onClick={() => setExplaining(topic)}
+              aria-label={`How the ${topic.name} circle is filled`}
+              className={cn(
+                "absolute top-1 right-1 flex size-8 items-center justify-center rounded-sm",
+                "text-subtle hover:bg-surface hover:text-ink",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+              )}
+            >
+              <Info className="size-4" aria-hidden />
+            </button>
           </li>
         ))}
       </ul>
+
+      <CircleExplanation topic={explaining} onClose={() => setExplaining(null)} />
     </section>
+  );
+}
+
+/**
+ * SCRUM-46: what fills a circle and how quiz results are used, in plain language.
+ * Closing it only clears the open topic, so the landing page is left as it was (AC5).
+ */
+function CircleExplanation({
+  topic,
+  onClose,
+}: {
+  topic: TopicProgress | null;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog
+      open={topic !== null}
+      title="How your circles are filled"
+      description={
+        topic && `${topic.name}: ${topic.completed} of ${topic.available} lessons completed.`
+      }
+      onClose={onClose}
+      footer={
+        <Button data-autofocus onClick={onClose}>
+          Got it
+        </Button>
+      }
+    >
+      <ul className="flex list-disc flex-col gap-2 pl-5 text-sm text-ink">
+        {/* AC1 */}
+        <li>
+          Each circle counts the lessons you&apos;ve completed out of the lessons available in that
+          topic.
+        </li>
+        {/* AC2 */}
+        <li>Finishing a lesson completes it, even if you answered some questions incorrectly.</li>
+        {/* AC3: finish() in api/app/learning.py keeps the best score. */}
+        <li>
+          Your quiz results are recorded separately and count toward your tier. We keep your best
+          result, so retaking a quiz until you get it right counts in full.
+        </li>
+        {/* AC4 */}
+        <li>
+          A circle reflects the lessons in the topic right now. When new lessons are added, the
+          circle fills a smaller share until you complete them too.
+        </li>
+      </ul>
+    </Dialog>
   );
 }
 
@@ -104,7 +181,8 @@ function TopicCircle({ topic }: { topic: TopicProgress }) {
       // sentence instead of three fragments.
       aria-label={`${name}: ${completed} of ${available} lessons completed. ${status}.`}
       className={cn(
-        "flex h-full flex-col items-center gap-1.5 rounded-lg border border-line bg-white px-2 py-3",
+        // pt-6 leaves room for the explanation button in the top-right corner.
+        "flex h-full flex-col items-center gap-1.5 rounded-lg border border-line bg-white px-2 pt-6 pb-3",
         "transition-colors hover:border-brand/40 hover:bg-brand-soft/40",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
       )}
