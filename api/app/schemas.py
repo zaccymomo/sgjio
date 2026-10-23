@@ -178,14 +178,29 @@ class TopicProgressOut(BaseModel):
     available: int
 
 
+class SuggestionOut(BaseModel):
+    """The suggested next lesson beside the circles (SCRUM-6)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    lesson_id: uuid.UUID
+    title: str
+    summary: str
+    reading_seconds: int
+    topic_id: uuid.UUID
+    topic_name: str
+
+
 class ProgressOut(BaseModel):
-    """Every circle plus the overall figure, as defined in SCRUM-16 AC7."""
+    """Every circle plus the overall figure, as defined in SCRUM-16 AC7, and the suggested
+    next lesson, null once everything available is completed (SCRUM-6)."""
 
     model_config = ConfigDict(from_attributes=True)
 
     topics: list[TopicProgressOut]
     completed: int
     available: int
+    suggestion: SuggestionOut | None
 
 
 class TopicLessonOut(BaseModel):

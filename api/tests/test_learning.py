@@ -401,4 +401,9 @@ def test_a_completion_survives_withdrawal_but_leaves_the_figures(learner, db, le
     db.commit()
 
     assert _completion(db, lesson) is not None
-    assert learner.get("/api/progress").json() == {"topics": [], "completed": 0, "available": 0}
+    assert learner.get("/api/progress").json() == {
+        "topics": [],
+        "completed": 0,
+        "available": 0,
+        "suggestion": None,
+    }

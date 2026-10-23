@@ -9,10 +9,22 @@ export type TopicProgress = {
   available: number;
 };
 
+/** The suggested next lesson (SCRUM-6), from the topic where progress is weakest. */
+export type Suggestion = {
+  lesson_id: string;
+  title: string;
+  summary: string;
+  reading_seconds: number;
+  topic_id: string;
+  topic_name: string;
+};
+
 export type Progress = {
   topics: TopicProgress[];
   completed: number;
   available: number;
+  /** Null once every lesson available has been completed (SCRUM-6 AC6). */
+  suggestion: Suggestion | null;
 };
 
 type State =
