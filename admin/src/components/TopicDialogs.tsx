@@ -1,52 +1,61 @@
-import { Alert, ApiError, Button, Dialog, TextField } from "@sgjio/ui";
+import { Alert, ApiError, Button, Dialog, TextAreaField, TextField } from "@sgjio/ui";
 import { useState, type FormEvent } from "react";
 
-import type { Topic } from "../lib/content";
+import type { Topic, TopicFields } from "../lib/content";
 import { plural } from "../lib/format";
 
-/** Same limit as the API (TopicName in api/app/schemas.py). */
+/** Same limits as the API (TopicName and TopicDescription in api/app/schemas.py). */
 const MAX_NAME = 80;
+const MAX_DESCRIPTION = 200;
 
-export type NameDialogState = { mode: "create" } | { mode: "rename"; topic: Topic };
+export type TopicDialogState =
+  | { mode: "create" }
+  /** `focus` puts the cursor in the description, e.g. after "Add a description". */
+  | { mode: "edit"; topic: Topic; focus?: "description" };
 
 /**
- * Create a topic, or rename one (SCRUM-57). Checks the obvious on the spot, and shows the
- * server's answer on the field, e.g. a name that is already taken, ignoring case.
+ * Create a topic, or edit one's name and description (SCRUM-57, SCRUM-86). Checks the
+ * obvious on the spot, and shows the server's answer on the field, e.g. a name that is
+ * already taken, ignoring case.
  */
-export function TopicNameDialog({
+export function TopicDialog({
   state,
   onClose,
   onSave,
 }: {
-  state: NameDialogState | null;
+  state: TopicDialogState | null;
   onClose: () => void;
   /** Throws an ApiError if the server refuses. */
-  onSave: (name: string) => Promise<void>;
+  onSave: (fields: TopicFields) => Promise<void>;
 }) {
   const [saving, setSaving] = useState(false);
-  const renaming = state?.mode === "rename" ? state.topic : null;
+  const editing = state?.mode === "edit" ? state : null;
 
   return (
     <Dialog
       open={state !== null}
-      title={renaming ? `Rename “${renaming.name}”` : "New topic"}
+      title={editing ? `Edit “${editing.topic.name}”` : "New topic"}
       description={
-        renaming
-          ? "Users see the new name on their progress circle straight away."
+        editing
+          ? "Users see the name on their progress circle, and the description at the top of the topic’s page."
           : "It goes at the end of your topic list. Users see it once it has a published lesson."
       }
       onClose={onClose}
       dismissible={!saving}
     >
-      <NameForm
-        initial={renaming?.name ?? ""}
-        submitLabel={renaming ? "Save name" : "Create topic"}
+      <TopicForm
+        initial={{
+          name: editing?.topic.name ?? "",
+          description: editing?.topic.description ?? "",
+        }}
+        focusDescription={editing?.focus === "description"}
+        submitLabel={editing ? "Save topic" : "Create topic"}
         saving={saving}
         onCancel={onClose}
-        onSubmit={async (name) => {
+        onSubmit={async (fields) => {
           setSaving(true);
           try {
-            await onSave(name);
+            await onSave(fields);
           } finally {
             setSaving(false);
           }
@@ -56,44 +65,65 @@ export function TopicNameDialog({
   );
 }
 
-function NameForm({
+type FieldErrors = { name?: string; description?: string };
+
+function TopicForm({
   initial,
+  focusDescription,
   submitLabel,
   saving,
   onCancel,
   onSubmit,
 }: {
-  initial: string;
+  initial: TopicFields;
+  focusDescription: boolean;
   submitLabel: string;
   saving: boolean;
   onCancel: () => void;
-  onSubmit: (name: string) => Promise<void>;
+  onSubmit: (fields: TopicFields) => Promise<void>;
 }) {
-  const [name, setName] = useState(initial);
-  const [fieldError, setFieldError] = useState<string>();
+  const [name, setName] = useState(initial.name);
+  const [description, setDescription] = useState(initial.description);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string>();
-  const trimmed = name.trim();
+  const fields = { name: name.trim(), description: description.trim() };
+
+  function check(): FieldErrors {
+    const errors: FieldErrors = {};
+    if (fields.name === "") errors.name = "Enter a name for the topic.";
+    else if (fields.name.length > MAX_NAME) {
+      errors.name = `Use ${MAX_NAME} characters or fewer. This name has ${fields.name.length}.`;
+    }
+    if (fields.description.length > MAX_DESCRIPTION) {
+      errors.description = `Use ${MAX_DESCRIPTION} characters or fewer. This description has ${fields.description.length}.`;
+    }
+    return errors;
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setFormError(undefined);
-    if (trimmed === "") return setFieldError("Enter a name for the topic.");
-    if (trimmed.length > MAX_NAME) {
-      return setFieldError(`Use ${MAX_NAME} characters or fewer. This name has ${trimmed.length}.`);
+    const errors = check();
+    setFieldErrors(errors);
+    if (errors.name || errors.description) return;
+    if (fields.name === initial.name && fields.description === initial.description) {
+      return onCancel();
     }
-    if (trimmed === initial) return onCancel();
 
-    setFieldError(undefined);
     try {
-      await onSubmit(trimmed);
+      await onSubmit(fields);
     } catch (error) {
-      if (error instanceof ApiError && (error.field === "name" || error.fieldErrors.name)) {
-        setFieldError(error.fieldErrors.name ?? error.message);
-      } else {
-        setFormError(
-          error instanceof ApiError ? error.message : "Something went wrong. Please try again.",
-        );
+      if (!(error instanceof ApiError)) {
+        return setFormError("Something went wrong. Please try again.");
       }
+      const server: FieldErrors = {
+        name: error.fieldErrors.name ?? (error.field === "name" ? error.message : undefined),
+        description:
+          error.fieldErrors.description ??
+          (error.field === "description" ? error.message : undefined),
+      };
+      if (server.name || server.description) setFieldErrors(server);
+      else setFormError(error.message);
     }
   }
 
@@ -102,15 +132,27 @@ function NameForm({
       {formError && <Alert tone="error">{formError}</Alert>}
       <TextField
         label="Topic name"
-        data-autofocus
+        data-autofocus={focusDescription ? undefined : true}
         autoComplete="off"
         value={name}
         onChange={(event) => {
           setName(event.target.value);
-          setFieldError(undefined);
+          setFieldErrors(({ description }) => ({ description }));
         }}
-        error={fieldError}
-        hint={`${trimmed.length} / ${MAX_NAME} characters`}
+        error={fieldErrors.name}
+        hint={`${fields.name.length} / ${MAX_NAME} characters`}
+      />
+      <TextAreaField
+        label="Description (optional)"
+        data-autofocus={focusDescription ? true : undefined}
+        placeholder="What learners will find in this topic, in a sentence or two."
+        value={description}
+        onChange={(event) => {
+          setDescription(event.target.value);
+          setFieldErrors(({ name }) => ({ name }));
+        }}
+        error={fieldErrors.description}
+        hint={`${fields.description.length} / ${MAX_DESCRIPTION} characters`}
       />
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button variant="secondary" onClick={onCancel} disabled={saving}>

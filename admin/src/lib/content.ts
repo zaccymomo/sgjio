@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export type Topic = {
   id: string;
   name: string;
+  /** Shown under the name on the topic's page in the main app. Empty when it has none. */
+  description: string;
   archived_at: string | null;
   position: number;
   lesson_count: number;
@@ -44,13 +46,16 @@ export type LessonSummary = {
 export type Content = { topics: Topic[]; lessons: LessonSummary[] };
 
 const TOPICS = "/api/admin/topics";
+
+/** What the New topic and Edit topic dialog saves. */
+export type TopicFields = { name: string; description: string };
 const LESSONS = "/api/admin/lessons";
 
 export const topicApi = {
   list: (signal?: AbortSignal) => apiFetch<Topic[]>(TOPICS, { signal }),
-  create: (name: string) => apiFetch<Topic>(TOPICS, { method: "POST", body: { name } }),
-  rename: (id: string, name: string) =>
-    apiFetch<Topic>(`${TOPICS}/${id}`, { method: "PATCH", body: { name } }),
+  create: (fields: TopicFields) => apiFetch<Topic>(TOPICS, { method: "POST", body: fields }),
+  update: (id: string, fields: TopicFields) =>
+    apiFetch<Topic>(`${TOPICS}/${id}`, { method: "PATCH", body: fields }),
   archive: (id: string) => apiFetch<Topic>(`${TOPICS}/${id}/archive`, { method: "POST" }),
   restore: (id: string) => apiFetch<Topic>(`${TOPICS}/${id}/restore`, { method: "POST" }),
   remove: (id: string) => apiFetch<void>(`${TOPICS}/${id}`, { method: "DELETE" }),
