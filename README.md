@@ -152,6 +152,7 @@ After seeding you should find 2 users, 6 topics and 18 published lessons, each a
 | Apply migrations          | `cd api && python -m alembic upgrade head`                                            |
 | Add an administrator      | `cd api && python -m app.cli create-admin --email you@example.com --name "Your Name"` |
 | Load lessons from files   | `cd api && python -m app.cli import-lessons --publish` (see `content/README.md`)      |
+| Add demo learners         | `cd api && python -m app.cli demo-activity` (for lesson insights; replaces earlier)   |
 
 The API tests use a separate `sgjio_test` database, so they never touch your data.
 
