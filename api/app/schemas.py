@@ -18,7 +18,7 @@ from pydantic import (
 
 from app.auth import normalise_email
 from app.lesson_doc import LessonDoc
-from app.models import LessonStatus, ReportReason, ReportStatus, UserRole, UserType
+from app.models import AdminAction, LessonStatus, ReportReason, ReportStatus, UserRole, UserType
 from app.profile_options import INTERESTS, LANGUAGES, NEIGHBOURHOODS
 
 # Email syntax check for registration. Built once: TypeAdapter compiles a validator.
@@ -37,7 +37,7 @@ class UserOut(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    """A new main-app account (SCRUM-61). Administrators are made with `app.cli`, not here."""
+    """A new main-app account (SCRUM-61). Administrators are invited from the portal."""
 
     name: str = Field(min_length=1, max_length=120)
     email: str = Field(min_length=1, max_length=254)
@@ -72,6 +72,82 @@ class RegisterResponse(BaseModel):
     """Registration signs the new user in, so it answers like sign-in (SCRUM-61 AC1)."""
 
     user: UserOut
+
+
+class AdminInviteRequest(BaseModel):
+    """A new administrator, invited from the portal (SCRUM-81 AC2)."""
+
+    name: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=1, max_length=254)
+    # Set once the person adding them has confirmed an email outside ADMIN_EMAIL_DOMAIN.
+    allow_other_domain: bool = False
+
+    @field_validator("name")
+    @classmethod
+    def _require_a_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Enter their name.")
+        return value
+
+    @field_validator("email")
+    @classmethod
+    def _require_a_valid_email(cls, value: str) -> str:
+        value = normalise_email(value)
+        try:
+            _EMAIL.validate_python(value)
+        except ValidationError:
+            raise ValueError("Enter an email address like name@example.com.") from None
+        return value
+
+
+class AdminOut(BaseModel):
+    """An administrator on the Administrators page (SCRUM-81 AC1)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    email: str
+    status: Literal["active", "invited", "removed"]
+    added_at: datetime
+    added_by: str | None = Field(description="Who invited them; empty if seeded or unknown")
+    last_sign_in_at: datetime | None
+    invited_at: datetime | None = Field(description="When the latest invite was sent")
+    invite_expires_at: datetime | None
+    removed_at: datetime | None
+    removed_by: str | None
+    is_you: bool
+
+
+class AdminActivityOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    action: AdminAction
+    at: datetime
+    admin_id: uuid.UUID
+    admin_name: str
+    actor_id: uuid.UUID | None = Field(description="Empty: the person themselves, or the CLI")
+    actor_name: str | None
+
+
+class AdminsOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    admins: list[AdminOut] = Field(description="Active and invited, by name")
+    removed: list[AdminOut] = Field(description="Most recently removed first")
+    activity: list[AdminActivityOut] = Field(description="Latest changes first")
+    email_domain: str | None = Field(description="Emails outside it need confirming")
+    invite_hours: int
+
+
+class InviteOut(BaseModel):
+    """Who an invite link is for, so its page can greet them (SCRUM-81)."""
+
+    name: str
+    email: str
+    invited_by: str | None
 
 
 class SignInRequest(BaseModel):

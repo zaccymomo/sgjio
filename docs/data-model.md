@@ -7,6 +7,7 @@ erDiagram
     users ||--o| profiles : "has"
     users ||--o{ auth_sessions : "signed in on"
     users ||--o{ password_reset_tokens : "requested"
+    users ||--o{ admin_events : "changed (admin) / made (actor)"
     topics ||--o{ lessons : "contains"
     lessons ||--o{ lesson_versions : "published as"
     users ||--o{ lesson_versions : "published"
@@ -23,6 +24,15 @@ erDiagram
         string password_hash "Argon2"
         string role "user | admin"
         string user_type "newcomer | singaporean | null for admins"
+        timestamptz invited_at "admin waiting to choose a password"
+        timestamptz removed_at "admin removed: closed, restorable"
+        timestamptz created_at
+    }
+    admin_events {
+        uuid id PK
+        string action "invited | invite_resent | joined | invite_cancelled | removed | restored | added"
+        uuid admin_id FK "whose account"
+        uuid actor_id FK "who did it; null = themselves or the CLI"
         timestamptz created_at
     }
     profiles {
@@ -144,7 +154,9 @@ erDiagram
 
 ## Why it looks like this
 
-- **One `users` table for users and administrators.** `role` separates them. Administrators are not created by registration; they are seeded or added with `python -m app.cli create-admin` (SCRUM-68 open decision).
+- **One `users` table for users and administrators.** `role` separates them, and one email is one account. Administrators are not created by registration; they are invited from the portal (SCRUM-81), or seeded, or added with `python -m app.cli create-admin` for the first one.
+- **Removed administrators are kept, closed** (`removed_at`, SCRUM-81), like archived topics: they cannot sign in anywhere, and restoring them opens the account again with a new link. An invited administrator who has not yet chosen a password has `invited_at` set, and a password nobody knows.
+- **`admin_events` is the history; the columns are the state.** Sign-in checks read `removed_at` and `invited_at`; the Administrators page reads the log for who added or removed someone, and for its activity list. Rows are only ever added, so every round of removing and restoring is kept.
 - **Users and administrators have separate sessions.** `scope` on a session or reset link says which front end it belongs to. An admin-portal session never opens main-app routes, and the reverse holds too.
 - **Tokens are stored hashed.** The raw session and reset tokens only exist in the browser cookie or the emailed link. A copy of the database cannot be used to sign in.
 - **A lesson belongs to one topic.** This keeps the progress-circle arithmetic simple, as assumed in SCRUM-56. A draft may have no topic yet; publishing requires one.
