@@ -30,7 +30,11 @@ type CardChrome = {
  * The confirmation is the same whether or not the email has an account (AC2), so the
  * page cannot be used to check who is registered.
  */
-export function ForgotPasswordCard({ badge, footer }: CardChrome) {
+export function ForgotPasswordCard({
+  badge,
+  footer,
+  subtitle = "Enter the email you signed up with and we'll send you a link to choose a new one.",
+}: CardChrome & { subtitle?: string }) {
   const { requestPasswordReset } = useAuth();
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string>();
@@ -89,7 +93,7 @@ export function ForgotPasswordCard({ badge, footer }: CardChrome) {
   return (
     <AuthCard
       title="Forgot your password?"
-      subtitle="Enter the email you signed up with and we'll send you a link to choose a new one."
+      subtitle={subtitle}
       icon={KeyRound}
       badge={badge}
       footer={footer}
@@ -183,7 +187,6 @@ function SentConfirmation({
 }
 
 type LinkState = "checking" | "valid" | "invalid";
-type FieldErrors = { password?: string; password_confirmation?: string };
 
 /**
  * The whole "Choose a new password" card, where the emailed link lands (SCRUM-63 AC4-AC6,
@@ -205,14 +208,7 @@ export function ResetPasswordCard({
 }) {
   const { checkResetLink, resetPassword } = useAuth();
   const [linkState, setLinkState] = useState<LinkState>(token ? "checking" : "invalid");
-  const [password, setPassword] = useState("");
-  const [confirmation, setConfirmation] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [triedToSubmit, setTriedToSubmit] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const passwordRef = useRef<HTMLInputElement>(null);
-  const confirmationRef = useRef<HTMLInputElement>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -226,7 +222,7 @@ export function ResetPasswordCard({
         } else {
           // Could not reach the server: let them try the form, which checks again.
           setLinkState("valid");
-          setFormError(
+          setCheckError(
             error instanceof ApiError ? error.message : "Something went wrong. Please try again.",
           );
         }
@@ -236,6 +232,105 @@ export function ResetPasswordCard({
       active = false;
     };
   }, [token, checkResetLink]);
+
+  if (linkState === "invalid") {
+    // AC6: say the link is dead, and make asking for a new one the obvious next step.
+    return (
+      <AuthCard
+        title="This link is no longer valid"
+        subtitle="Reset links work once, expire after a few minutes, and stop working when a newer link is sent."
+        icon={Link2Off}
+        badge={badge}
+        footer={footer}
+      >
+        <LinkButton to={forgotPasswordHref}>Request a new link</LinkButton>
+      </AuthCard>
+    );
+  }
+
+  return (
+    <AuthCard
+      title="Choose a new password"
+      subtitle={
+        linkState === "valid" ? "You'll use it to sign in from now on." : "Checking your link…"
+      }
+      icon={LockKeyhole}
+      badge={badge}
+      footer={footer}
+    >
+      {linkState === "checking" ? (
+        <CheckingLink />
+      ) : (
+        <NewPasswordForm
+          submitLabel="Save new password"
+          initialError={checkError}
+          deadLinkCode="reset_link_invalid"
+          onDeadLink={() => setLinkState("invalid")}
+          onSubmit={async (password, confirmation) => {
+            await resetPassword({
+              token: token ?? "",
+              password,
+              password_confirmation: confirmation,
+            });
+            onSuccess();
+          }}
+        />
+      )}
+    </AuthCard>
+  );
+}
+
+/** The spinner a card shows while its emailed link is checked. */
+export function CheckingLink() {
+  return (
+    <div className="flex justify-center py-6 text-brand">
+      <Spinner className="size-6" label="Checking your link" />
+    </div>
+  );
+}
+
+/** A full-width dark button that is a link, e.g. "Request a new link". */
+export function LinkButton({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className="flex h-11 items-center justify-center rounded-sm bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+    >
+      {children}
+    </Link>
+  );
+}
+
+type FieldErrors = { password?: string; password_confirmation?: string };
+
+/**
+ * A new password typed twice, with the rules ticked off while typing (SCRUM-61). Used by
+ * the reset card, and by the admin portal's invite page (SCRUM-81).
+ *
+ * `onSubmit` throws an ApiError when the server refuses: one naming a field is shown on it,
+ * and `deadLinkCode` (the emailed link is used or expired) calls `onDeadLink` instead.
+ */
+export function NewPasswordForm({
+  submitLabel,
+  initialError = null,
+  deadLinkCode,
+  onDeadLink,
+  onSubmit,
+}: {
+  submitLabel: string;
+  initialError?: string | null;
+  deadLinkCode: string;
+  onDeadLink: () => void;
+  onSubmit: (password: string, confirmation: string) => Promise<void>;
+}) {
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [triedToSubmit, setTriedToSubmit] = useState(false);
+  const [formError, setFormError] = useState<string | null>(initialError);
+  const [submitting, setSubmitting] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const confirmationRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -255,13 +350,12 @@ export function ResetPasswordCard({
 
     setSubmitting(true);
     try {
-      await resetPassword({ token: token ?? "", password, password_confirmation: confirmation });
-      onSuccess();
+      await onSubmit(password, confirmation);
     } catch (error) {
       if (!(error instanceof ApiError)) {
         setFormError("Something went wrong. Please try again.");
-      } else if (error.code === "reset_link_invalid") {
-        setLinkState("invalid");
+      } else if (error.code === deadLinkCode) {
+        onDeadLink();
       } else if (error.field === "password" || error.field === "password_confirmation") {
         const message = error.failures.length > 0 ? error.failures.join(" ") : error.message;
         setFieldErrors({ [error.field]: message });
@@ -273,81 +367,45 @@ export function ResetPasswordCard({
     }
   }
 
-  if (linkState === "invalid") {
-    // AC6: say the link is dead, and make asking for a new one the obvious next step.
-    return (
-      <AuthCard
-        title="This link is no longer valid"
-        subtitle="Reset links work once, expire after a few minutes, and stop working when a newer link is sent."
-        icon={Link2Off}
-        badge={badge}
-        footer={footer}
-      >
-        <Link
-          to={forgotPasswordHref}
-          className="flex h-11 items-center justify-center rounded-sm bg-ink px-4 text-sm font-semibold text-white hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-        >
-          Request a new link
-        </Link>
-      </AuthCard>
-    );
-  }
-
   const matches = confirmation.length > 0 && password === confirmation;
 
   return (
-    <AuthCard
-      title="Choose a new password"
-      subtitle={
-        linkState === "valid" ? "You'll use it to sign in from now on." : "Checking your link…"
-      }
-      icon={LockKeyhole}
-      badge={badge}
-      footer={footer}
-    >
-      {linkState === "checking" ? (
-        <div className="flex justify-center py-6 text-brand">
-          <Spinner className="size-6" label="Checking your link" />
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-          {formError && <Alert tone="error">{formError}</Alert>}
-          <div className="flex flex-col gap-2">
-            <PasswordField
-              ref={passwordRef}
-              label="New password"
-              autoComplete="new-password"
-              autoFocus
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              error={fieldErrors.password}
-            />
-            {/* AC4: the rules from SCRUM-61, ticked off while typing. */}
-            <PasswordRules password={password} showUnmet={triedToSubmit} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <PasswordField
-              ref={confirmationRef}
-              label="Confirm new password"
-              autoComplete="new-password"
-              value={confirmation}
-              onChange={(e) => setConfirmation(e.target.value)}
-              error={fieldErrors.password_confirmation}
-            />
-            <p aria-live="polite" className="flex items-center gap-1.5 text-xs text-success">
-              {matches && !fieldErrors.password_confirmation && (
-                <>
-                  <Check className="size-3.5" aria-hidden />
-                  Passwords match
-                </>
-              )}
-            </p>
-          </div>
-          <Button type="submit" fullWidth loading={submitting}>
-            Save new password
-          </Button>
-        </form>
-      )}
-    </AuthCard>
+    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {formError && <Alert tone="error">{formError}</Alert>}
+      <div className="flex flex-col gap-2">
+        <PasswordField
+          ref={passwordRef}
+          label="New password"
+          autoComplete="new-password"
+          autoFocus
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          error={fieldErrors.password}
+        />
+        {/* The rules from SCRUM-61, ticked off while typing. */}
+        <PasswordRules password={password} showUnmet={triedToSubmit} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <PasswordField
+          ref={confirmationRef}
+          label="Confirm new password"
+          autoComplete="new-password"
+          value={confirmation}
+          onChange={(e) => setConfirmation(e.target.value)}
+          error={fieldErrors.password_confirmation}
+        />
+        <p aria-live="polite" className="flex items-center gap-1.5 text-xs text-success">
+          {matches && !fieldErrors.password_confirmation && (
+            <>
+              <Check className="size-3.5" aria-hidden />
+              Passwords match
+            </>
+          )}
+        </p>
+      </div>
+      <Button type="submit" fullWidth loading={submitting}>
+        {submitLabel}
+      </Button>
+    </form>
   );
 }
