@@ -9,6 +9,7 @@ import { LessonPage } from "./pages/LessonPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { EditProfilePage, ProfileSetupPage } from "./pages/ProfileSetupPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { ReviewPage } from "./pages/ReviewPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
 import { TopicPage } from "./pages/TopicPage";
@@ -51,6 +52,8 @@ export function App() {
               <Route path="profile-setup" element={<ProfileSetupPage />} />
               {/* A progress circle leads here (SCRUM-43 AC9) */}
               <Route path="topics/:topicId" element={<TopicPage />} />
+              {/* "Review mistakes" on the landing page leads here (SCRUM-44 AC1) */}
+              <Route path="review" element={<ReviewPage />} />
               <Route
                 path="practice"
                 element={<ComingSoonPage title="AI scenario practice" module="Module 4" />}

@@ -1,5 +1,5 @@
 import { cn } from "@sgjio/ui";
-import { FileText } from "lucide-react";
+import { FileText, Flag } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
@@ -67,6 +67,16 @@ export function LessonRow({
                 <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-px text-2xs font-bold text-amber-800">
                   Unpublished changes
                 </span>
+              )}
+              {/* SCRUM-83 AC4: how many problems learners reported, leading to them. */}
+              {lesson.open_reports > 0 && (
+                <Link
+                  to={`/reports?lesson=${lesson.id}`}
+                  className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-danger/10 px-1.5 py-px text-2xs font-bold text-danger hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                >
+                  <Flag className="size-3" aria-hidden />
+                  {plural(lesson.open_reports, "open report")}
+                </Link>
               )}
             </p>
           </div>

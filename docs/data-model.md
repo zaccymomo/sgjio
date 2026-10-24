@@ -13,6 +13,8 @@ erDiagram
     users ||--o{ media_assets : "uploaded"
     users ||--o{ lesson_completions : "completed"
     lessons ||--o{ lesson_completions : "completed by"
+    lessons ||--o{ lesson_reports : "reported in"
+    lesson_versions ||--o{ lesson_reports : "as shown"
 
     users {
         uuid id PK
@@ -103,6 +105,19 @@ erDiagram
         bool scored "false for a one-option tap"
         timestamptz answered_at
     }
+    lesson_reports {
+        uuid id PK
+        uuid lesson_id FK
+        uuid version_id FK "the version shown"
+        string card_id "from the lesson document"
+        string reason "wrong | insensitive | typo | media | other"
+        string note "up to 500 characters"
+        uuid reporter_id FK "never shown to administrators"
+        string status "open | fixed | dismissed"
+        timestamptz created_at
+        timestamptz resolved_at
+        uuid resolved_by FK
+    }
     auth_sessions {
         uuid id PK
         uuid user_id FK
@@ -141,6 +156,7 @@ erDiagram
 - **Completion is one row per user per lesson** (`lesson_completions`, SCRUM-16). It is written the first time a lesson is completed, however its answers went (AC3), and the unique constraint on `(user_id, lesson_id)` is what makes completion count once however many times it is retaken (AC5, AC6). Each run through a deck is a row in `lesson_attempts`, tied to the version shown, with the first answer to each question in `attempt_answers`; only a finished attempt completes the lesson.
 - **The best score is kept on that row.** `best_correct` of `best_scored` is the best attempt so far by percentage, a tie going to the most recent, so a worse retake never lowers it (SCRUM-16 AC5). 0 of 0 (a lesson with only one-option taps) counts as full marks. Completion feeds the progress circles; the score feeds tiers (SCRUM-27).
 - **A completion row outlives withdrawal.** Withdrawing a lesson leaves the row in place, so the user's history keeps it (SCRUM-52 AC4), while the progress query filters on `status = published` so the circle's two figures both shrink and `completed` can never exceed `available` (SCRUM-16 AC8).
+- **A reported problem names the version and the card** (`lesson_reports`, SCRUM-82 AC3). Card ids stay the same across edits, so administrators can open the same card in today's draft (SCRUM-83 AC2). Dealing with a report marks it `fixed` or `dismissed` rather than deleting it (AC3). The reporter is kept but never shown (AC1).
 - **Every attempt is stored** (`lesson_attempts`, `attempt_answers`), finished or not, so attempt history (SCRUM-42) can read them. Only the first answer to each question counts: the key `(attempt_id, question_id)` makes a repeated submission record nothing (SCRUM-16 AC6).
 - **Lesson insights read these tables and add none** (SCRUM-84, `api/app/insights.py`). Each attempt names its version, so figures are per version, and each answer its option, so the page can say how often each wrong option was chosen. Nothing is stored about who saw what; the figures are worked out on each request.
 

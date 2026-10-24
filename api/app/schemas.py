@@ -18,7 +18,7 @@ from pydantic import (
 
 from app.auth import normalise_email
 from app.lesson_doc import LessonDoc
-from app.models import LessonStatus, UserRole, UserType
+from app.models import LessonStatus, ReportReason, ReportStatus, UserRole, UserType
 from app.profile_options import INTERESTS, LANGUAGES, NEIGHBOURHOODS
 
 # Email syntax check for registration. Built once: TypeAdapter compiles a validator.
@@ -178,14 +178,50 @@ class TopicProgressOut(BaseModel):
     available: int
 
 
+class SuggestionOut(BaseModel):
+    """The suggested next lesson beside the circles (SCRUM-6)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    lesson_id: uuid.UUID
+    title: str
+    summary: str
+    reading_seconds: int
+    topic_id: uuid.UUID
+    topic_name: str
+
+
 class ProgressOut(BaseModel):
-    """Every circle plus the overall figure, as defined in SCRUM-16 AC7."""
+    """Every circle plus the overall figure, as defined in SCRUM-16 AC7, and the suggested
+    next lesson, null once everything available is completed (SCRUM-6)."""
 
     model_config = ConfigDict(from_attributes=True)
 
     topics: list[TopicProgressOut]
     completed: int
     available: int
+    suggestion: SuggestionOut | None
+
+
+class MistakeOut(BaseModel):
+    """A question answered wrongly, as its lesson reads now (SCRUM-44)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    lesson_id: uuid.UUID
+    lesson_title: str
+    topic_name: str
+    question_id: str
+    text: str
+    chosen: str
+    correct: str
+    explanation: str
+    why_not: str
+    answered_at: datetime
+
+
+class ReviewOut(BaseModel):
+    mistakes: list[MistakeOut]
 
 
 class TopicLessonOut(BaseModel):
@@ -270,6 +306,7 @@ class LessonSummaryOut(BaseModel):
     cards: int
     questions: int
     cover_asset_id: uuid.UUID | None
+    open_reports: int
 
 
 class OrderRequest(BaseModel):
@@ -631,3 +668,51 @@ class AttemptResultOut(BaseModel):
     score: ScoreOut
     best: ScoreOut
     first_completion: bool
+
+
+# --- Reported problems (SCRUM-82, SCRUM-83) ------------------------------------------------
+
+MAX_REPORT_NOTE = 500
+
+
+class ReportRequest(BaseModel):
+    """A problem on one card of the version the learner was shown (SCRUM-82)."""
+
+    version: int = Field(ge=1)
+    card_id: str = Field(min_length=1, max_length=40)
+    reason: ReportReason
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_REPORT_NOTE)] = ""
+
+
+class ReportSentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    created_at: datetime
+
+
+class ReportOut(BaseModel):
+    """A reported problem as administrators see it: never who sent it (SCRUM-83 AC1)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    lesson_id: uuid.UUID
+    lesson_title: str
+    topic_name: str | None
+    version: int
+    card_id: str
+    card_number: int | None
+    card_excerpt: str
+    card_in_draft: bool
+    reason: ReportReason
+    note: str
+    status: ReportStatus
+    created_at: datetime
+    resolved_at: datetime | None
+
+
+class ReportStatusRequest(BaseModel):
+    """Fixed or Dismissed takes a report off the open list (AC3); Open puts it back."""
+
+    status: ReportStatus

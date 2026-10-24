@@ -99,7 +99,7 @@ class AttemptResult:
 # --- Reading -------------------------------------------------------------------------------
 
 
-def _published_lesson(db: Session, lesson_id: uuid.UUID) -> Lesson:
+def published_lesson(db: Session, lesson_id: uuid.UUID) -> Lesson:
     """The lesson if learners may see it: published, in a topic that is not archived."""
     lesson = db.get(Lesson, lesson_id)
     if (
@@ -128,7 +128,7 @@ def learner_lesson(
     db: Session, lesson_id: uuid.UUID, rng: random.Random | None = None
 ) -> LearnerLesson:
     """The latest version of a published lesson as a learner sees it (SCRUM-15 AC1)."""
-    lesson = _published_lesson(db, lesson_id)
+    lesson = published_lesson(db, lesson_id)
     version = latest_version(db, lesson.id)
     if version is None:
         raise lesson_unavailable()
@@ -145,7 +145,7 @@ def learner_lesson(
         }
         for card in doc.cards
     ]
-    topic: Topic = lesson.topic  # type: ignore[assignment]  # checked in _published_lesson
+    topic: Topic = lesson.topic  # type: ignore[assignment]  # checked in published_lesson
     return LearnerLesson(
         id=lesson.id,
         version=version.number,
@@ -165,7 +165,7 @@ def start_attempt(
     db: Session, user_id: uuid.UUID, lesson_id: uuid.UUID, version: int
 ) -> LessonAttempt:
     """Start a run through the version the learner was shown, which must be the latest."""
-    lesson = _published_lesson(db, lesson_id)
+    lesson = published_lesson(db, lesson_id)
     latest = latest_version(db, lesson.id)
     if latest is None:
         raise lesson_unavailable()
@@ -213,7 +213,7 @@ def answer(
 ) -> CheckResult:
     """Check one answer and record it, if it is the first for that question."""
     attempt = _locked_attempt(db, user_id, attempt_id)
-    _published_lesson(db, attempt.lesson_id)
+    published_lesson(db, attempt.lesson_id)
     if attempt.finished_at is not None:
         raise attempt_finished()
     question = next((q for q in _questions(attempt.version) if q.id == question_id), None)
@@ -268,7 +268,7 @@ def finish(db: Session, user_id: uuid.UUID, attempt_id: uuid.UUID) -> AttemptRes
             first_completion=False,
         )
 
-    _published_lesson(db, attempt.lesson_id)
+    published_lesson(db, attempt.lesson_id)
     answers = {a.question_id: a for a in attempt.answers}
     missing = [q.id for q in _questions(attempt.version) if q.id not in answers]
     if missing:

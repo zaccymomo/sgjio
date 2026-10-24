@@ -1,23 +1,17 @@
-import {
-  Button,
-  Dialog,
-  ErrorState,
-  Placeholder,
-  ProgressRing,
-  Spinner,
-  cn,
-  useAuth,
-} from "@sgjio/ui";
-import { Info } from "lucide-react";
+import { Button, Dialog, ErrorState, ProgressRing, Spinner, cn, useAuth } from "@sgjio/ui";
+import { readingLabel } from "@sgjio/ui/lesson";
+import { ChevronRight, Info, PartyPopper, RotateCcw, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { type Progress, type TopicProgress, useProgress } from "../lib/progress";
+import { type Progress, type Suggestion, type TopicProgress, useProgress } from "../lib/progress";
 
 /**
  * The landing page is the portfolio (SCRUM-43): one progress circle per topic that has a
  * published lesson, plus one overall figure. Selecting a circle opens that topic
- * (SCRUM-53). The suggested lesson beside it is SCRUM-6.
+ * (SCRUM-53). Below the circles is one suggested lesson, from the topic where progress is
+ * weakest (SCRUM-6); the circles stay the way to pick any topic instead. Then a way to review
+ * the questions answered wrongly (SCRUM-44).
  */
 export function HomePage() {
   const { user } = useAuth();
@@ -40,11 +34,34 @@ export function HomePage() {
           read as "no progress". */}
       {state.status === "error" && <ErrorState message={state.message} onRetry={reload} />}
 
-      {state.status === "ready" && <ProgressSection progress={state.progress} />}
-
-      <Placeholder story="SCRUM-6" title="Suggested for you">
-        The next lesson, drawn from the topic where progress is weakest.
-      </Placeholder>
+      {state.status === "ready" && (
+        <>
+          <ProgressSection progress={state.progress} />
+          {state.progress.available > 0 && (
+            <>
+              <SuggestionSection suggestion={state.progress.suggestion} />
+              {/* SCRUM-44 AC1 */}
+              <Link
+                to="/review"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg border border-line bg-white px-3.5 py-3",
+                  "transition-colors hover:border-brand/40 hover:bg-brand-soft/40",
+                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+                )}
+              >
+                <RotateCcw className="size-5 shrink-0 text-brand" aria-hidden />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-sm font-semibold text-ink">Review mistakes</span>
+                  <span className="text-caption text-subtle">
+                    See the right answers to questions you missed
+                  </span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-subtle" aria-hidden />
+              </Link>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -117,6 +134,54 @@ function ProgressSection({ progress }: { progress: Progress }) {
       </ul>
 
       <CircleExplanation topic={explaining} onClose={() => setExplaining(null)} />
+    </section>
+  );
+}
+
+/**
+ * SCRUM-6: the suggested next lesson. The figures reload on return from a lesson, so
+ * completing it brings the next suggestion straight away (AC4). With every lesson completed
+ * there is none, and the page says so (AC6).
+ */
+function SuggestionSection({ suggestion }: { suggestion: Suggestion | null }) {
+  return (
+    <section className="flex flex-col gap-2.5">
+      <h2 className="text-caption font-semibold tracking-wide text-muted uppercase">
+        Suggested for you
+      </h2>
+      {suggestion ? (
+        <Link
+          to={`/lessons/${suggestion.lesson_id}`}
+          aria-label={`Suggested lesson: ${suggestion.title}, in ${suggestion.topic_name}. ${readingLabel(suggestion.reading_seconds)}.`}
+          className={cn(
+            "flex items-center gap-3 rounded-lg border border-brand/30 bg-brand-soft/40 px-3.5 py-3",
+            "transition-colors hover:border-brand/60 hover:bg-brand-soft/70",
+            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+          )}
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+            <Sparkles className="size-5" aria-hidden />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col" aria-hidden>
+            <span className="text-sm font-semibold text-ink">{suggestion.title}</span>
+            {suggestion.summary && (
+              <span className="text-caption text-muted">{suggestion.summary}</span>
+            )}
+            <span className="text-caption text-subtle">
+              {suggestion.topic_name} · {readingLabel(suggestion.reading_seconds)}
+            </span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-subtle" aria-hidden />
+        </Link>
+      ) : (
+        <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3.5 py-3">
+          <PartyPopper className="size-5 shrink-0 text-brand" aria-hidden />
+          <p className="text-sm text-ink">
+            You&apos;ve completed every lesson available. There&apos;s nothing further for now; new
+            lessons will appear here when they&apos;re published.
+          </p>
+        </div>
+      )}
     </section>
   );
 }

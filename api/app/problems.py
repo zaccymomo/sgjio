@@ -174,3 +174,18 @@ def questions_unanswered(question_ids: list[str]) -> ContentProblem:
         409,
         extra={"question_ids": question_ids},
     )
+
+
+def reported_version_not_found() -> ContentProblem:
+    """A report names a version this lesson never had (SCRUM-82)."""
+    return ContentProblem(
+        "version_not_found", "That version isn't one of this lesson's.", 422, field="version"
+    )
+
+
+def card_not_found() -> ContentProblem:
+    return ContentProblem("card_not_found", "That card isn't in this lesson.", 422, field="card_id")
+
+
+def report_not_found() -> ContentProblem:
+    return ContentProblem("report_not_found", "We couldn't find that report.", 404)

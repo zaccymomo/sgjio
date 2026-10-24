@@ -15,11 +15,17 @@ disappears and the overall figure shrinks with it; restoring brings both back.
 
 Opening a circle lists that topic's lessons (SCRUM-53) by the same rules, so the figure on
 the topic page always matches its circle.
+
+Beside the circles sits one suggested lesson (SCRUM-6): the next lesson not yet completed in
+the topic where progress is weakest, meaning the smallest share of its lessons completed.
+Topics tie in the order administrators set, so someone with no activity at all is pointed at
+the first lesson of the first topic. With everything completed there is no suggestion.
 """
 
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from fractions import Fraction
 
 from sqlalchemy import Select, and_, func, select
 from sqlalchemy.orm import Session
@@ -41,10 +47,24 @@ class TopicProgress:
 
 
 @dataclass(frozen=True)
+class Suggestion:
+    """The lesson to start with next (SCRUM-6), as its latest version reads."""
+
+    lesson_id: uuid.UUID
+    title: str
+    summary: str
+    reading_seconds: int
+    topic_id: uuid.UUID
+    topic_name: str
+
+
+@dataclass(frozen=True)
 class Progress:
     topics: list[TopicProgress]
     completed: int
     available: int
+    # None once every lesson available has been completed (SCRUM-6 AC6).
+    suggestion: Suggestion | None
 
 
 def _topic_rows(user_id: uuid.UUID) -> Select:
@@ -84,7 +104,46 @@ def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
         topics=topics,
         completed=sum(topic.completed for topic in topics),
         available=sum(topic.available for topic in topics),
+        suggestion=_suggestion(db, user_id, topics),
     )
+
+
+def _suggestion(db: Session, user_id: uuid.UUID, topics: list[TopicProgress]) -> Suggestion | None:
+    """The first lesson not yet completed in the weakest topic (SCRUM-6 AC2).
+
+    `topics` are the circles, in order, so `sorted` (which is stable) breaks a tie by the
+    order administrators set. A topic with nothing left to do is never the weakest.
+    """
+    unfinished = [topic for topic in topics if topic.completed < topic.available]
+    for topic in sorted(unfinished, key=lambda t: Fraction(t.completed, t.available)):
+        completed = select(LessonCompletion.id).where(
+            LessonCompletion.lesson_id == Lesson.id, LessonCompletion.user_id == user_id
+        )
+        lessons = db.scalars(
+            select(Lesson)
+            .where(
+                Lesson.topic_id == topic.id,
+                Lesson.status == LessonStatus.PUBLISHED,
+                ~completed.exists(),
+            )
+            .order_by(Lesson.position, Lesson.created_at)
+        )
+        for lesson in lessons:
+            version = latest_version(db, lesson.id)
+            # A published lesson always has a version; one that somehow does not could not
+            # be opened (app/learning.py), so it is passed over.
+            if version is None:
+                continue
+            doc = LessonDoc.model_validate(version.doc)
+            return Suggestion(
+                lesson_id=lesson.id,
+                title=version.title,
+                summary=version.summary,
+                reading_seconds=lesson_doc.stats(doc, media.facts_for(db, doc)).reading_seconds,
+                topic_id=topic.id,
+                topic_name=topic.name,
+            )
+    return None
 
 
 @dataclass(frozen=True)

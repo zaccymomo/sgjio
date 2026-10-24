@@ -6,9 +6,11 @@ import {
   type DeckSummary,
   type LearnerCard,
 } from "@sgjio/ui/lesson";
-import { ChevronLeft, RotateCcw } from "lucide-react";
+import { Check, ChevronLeft, Flag, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+
+import { ReportProblemDialog } from "../components/ReportProblemDialog";
 
 /** A lesson as GET /api/lessons/{id} returns it: never says which option is right. */
 type LearnerLesson = {
@@ -56,6 +58,9 @@ function message(error: unknown, fallback: string): string {
  * finishes it, which is what completes the lesson. Leaving earlier records nothing, and
  * the lesson opens from its cover next time (AC4). Closing, or "Back to …" at the end,
  * returns to the lesson's topic (AC13).
+ *
+ * Every card has "Report a problem" in its top bar (SCRUM-82). The report form opens over
+ * the deck, so sending it leaves the learner on the same card.
  */
 export function LessonPage() {
   const { lessonId = "" } = useParams();
@@ -63,6 +68,9 @@ export function LessonPage() {
   const location = useLocation();
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [save, setSave] = useState<Save>({ status: "idle" });
+  // The card being reported, and whether the last report was just sent (SCRUM-82).
+  const [reporting, setReporting] = useState<{ id: string; number: number } | null>(null);
+  const [reportSent, setReportSent] = useState(false);
   const attempt = useRef<Promise<string> | null>(null);
   const finished = useRef<string | null>(null);
 
@@ -110,6 +118,12 @@ export function LessonPage() {
   }
 
   const lesson = load.status === "ready" ? load.lesson : null;
+
+  useEffect(() => {
+    if (!reportSent) return;
+    const timer = window.setTimeout(() => setReportSent(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, [reportSent]);
 
   /** The attempt this run of the deck records to, started by its first answer. */
   const ensureAttempt = useCallback(() => {
@@ -236,7 +250,7 @@ export function LessonPage() {
   }
 
   return (
-    <div className="h-dvh">
+    <div className="relative h-dvh">
       <LessonDeck
         lesson={{
           title: ready.title,
@@ -250,7 +264,45 @@ export function LessonPage() {
         onExit={backToTopic}
         onFinish={onFinish}
         renderEnd={renderEnd}
+        cardActions={(card) => (
+          <button
+            type="button"
+            onClick={() => {
+              setReportSent(false);
+              setReporting({ id: card.id, number: ready.cards.indexOf(card) + 1 });
+            }}
+            aria-label="Report a problem with this card"
+            title="Report a problem"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-ink/5 hover:text-ink focus-visible:outline-2 focus-visible:outline-brand"
+          >
+            <Flag className="size-5" aria-hidden />
+          </button>
+        )}
       />
+      <ReportProblemDialog
+        open={reporting !== null}
+        lessonId={ready.id}
+        version={ready.version}
+        cardId={reporting?.id ?? ""}
+        cardNumber={reporting?.number ?? 0}
+        onClose={() => setReporting(null)}
+        onSent={() => {
+          setReporting(null);
+          setReportSent(true);
+        }}
+      />
+      {/* AC2: a confirmation, over the card the learner carries on from. */}
+      <div
+        role="status"
+        className="pointer-events-none absolute inset-x-0 top-16 z-20 flex justify-center px-4"
+      >
+        {reportSent && (
+          <p className="flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-white shadow-lg">
+            <Check className="size-4" aria-hidden />
+            Thanks, your report has been sent.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

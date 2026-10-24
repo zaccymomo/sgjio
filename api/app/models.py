@@ -52,6 +52,25 @@ class LessonStatus(str, enum.Enum):
     WITHDRAWN = "withdrawn"
 
 
+class ReportReason(str, enum.Enum):
+    """Why a learner reported a card (SCRUM-82 AC1)."""
+
+    WRONG = "wrong"  # wrong or outdated
+    INSENSITIVE = "insensitive"
+    TYPO = "typo"
+    MEDIA = "media"  # image or audio not working
+    OTHER = "other"
+
+
+class ReportStatus(str, enum.Enum):
+    """An open report waits for an administrator; the other two are kept for reference
+    (SCRUM-83 AC3)."""
+
+    OPEN = "open"
+    FIXED = "fixed"
+    DISMISSED = "dismissed"
+
+
 class MediaKind(str, enum.Enum):
     IMAGE = "image"
     AUDIO = "audio"
@@ -416,6 +435,56 @@ class AttemptAnswer(Base):
     answered_at: Mapped[datetime] = _created_at()
 
     attempt: Mapped[LessonAttempt] = relationship(back_populates="answers")
+
+
+# --- Reported problems --------------------------------------------------------------------
+
+
+class LessonReport(Base):
+    """A problem a learner reported on one card of a lesson (SCRUM-82), for administrators to
+    fix or dismiss (SCRUM-83).
+
+    It names the version and the card it was sent from (AC3): card ids stay the same across
+    edits, so the editor can open the same card in today's draft. Reports are never deleted
+    when dealt with, only marked Fixed or Dismissed.
+
+    `reporter_id` is kept so a report belongs to someone, but administrators are never shown
+    who sent it (SCRUM-83 AC1).
+    """
+
+    __tablename__ = "lesson_reports"
+    __table_args__ = (Index("ix_lesson_reports_status_created_at", "status", "created_at"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lesson_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("lesson_versions.id", ondelete="CASCADE"), nullable=False
+    )
+    card_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    reason: Mapped[ReportReason] = mapped_column(
+        _enum(ReportReason, "report_reason"), nullable=False
+    )
+    note: Mapped[str] = mapped_column(String(500), nullable=False, default="", server_default="")
+    reporter_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    status: Mapped[ReportStatus] = mapped_column(
+        _enum(ReportStatus, "report_status"),
+        nullable=False,
+        default=ReportStatus.OPEN,
+        server_default=ReportStatus.OPEN.value,
+    )
+    created_at: Mapped[datetime] = _created_at()
+    # When, and by which administrator, it was marked Fixed or Dismissed.
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+    lesson: Mapped[Lesson] = relationship()
+    version: Mapped[LessonVersion] = relationship()
 
 
 # --- Authentication support ---------------------------------------------------------------

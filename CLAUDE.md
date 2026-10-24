@@ -26,7 +26,7 @@ The developer uses Anaconda. **Always run Python tools with `python -m`** from `
 ```bash
 docker compose up -d                                   # Postgres + Mailpit (http://localhost:8025)
 cd api && python -m uvicorn app.main:app --reload      # API
-python -m pytest                                       # 384 tests, uses the sgjio_test database
+python -m pytest                                       # 453 tests, uses the sgjio_test database
 python -m ruff check . && python -m ruff format .
 python -m alembic revision --autogenerate -m "..."     # then READ the generated file
 python -m alembic upgrade head
@@ -64,5 +64,6 @@ Seed logins: main app `newcomer@sgjio.example.com` / `UserPass123`; admin `admin
 - **Lessons are decks of cards (SCRUM-19).** A card has Markdown text (bold, italics, lists, and at most one `{{blank}}`), an optional image and/or audio, and an optional question: 1 to 4 options, exactly one correct, an explanation, optional "why not" notes on wrong options, shuffled unless the author says not. A one-option question is a tap that fills the blank and isn't scored. A lesson needs at least one question to publish, belongs to exactly one topic, and should read in under 2 minutes. The document's rules live in `api/app/lesson_doc.py` (issues: blockers vs warnings); the shared types in `packages/ui/src/lesson/types.ts`.
 - **Drafts and versions (SCRUM-52).** Editors always change a lesson's draft; publishing copies it into a numbered `lesson_versions` row, which is what users see. Statuses Draft / Published / Withdrawn; withdrawn lessons, and every version, are kept for users' history. Topic and position are not versioned.
 - **Learners see the newest version** when they start or retake a lesson. Built in SCRUM-15/16 (`/lessons/:id` in `web/`): a lesson is complete when its deck is finished; the score is first-try correct answers out of the scored questions; the best percentage is kept, and a tie keeps the most recent; "mastered" means all correct. Answers are checked on the server, and the learner's copy of a lesson never contains which option is right.
+- **Reported problems (SCRUM-82, SCRUM-83).** Learners flag a card from the flag in the lesson's top bar (`cardActions` on `LessonDeck`); `lesson_reports` keeps the lesson, version, card id, reason and note. Admins see them at `/reports` in `admin/`, never with the reporter, and mark them Fixed or Dismissed (kept). Rules in `api/app/reports.py`.
 - **Media** (images, audio) is uploaded once, stored in Postgres (`media_assets`) and served publicly at `/api/media/{id}`; lessons refer to it by id. Images become WebP at most 1600px wide.
 - Open decisions and the defaults chosen are in `docs/decisions.md`. Don't change them silently; flag it.
