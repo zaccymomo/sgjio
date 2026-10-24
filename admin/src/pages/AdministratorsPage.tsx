@@ -165,14 +165,13 @@ export function AdministratorsPage() {
           label: "Remove",
           icon: UserMinus,
           danger: true,
-          onSelect: () => ask({ kind: admin.is_you ? "self" : "remove", admin }),
+          onSelect: () => ask({ kind: "remove", admin }),
         },
       ],
     ];
   }
 
   const data = state.status === "ready" ? state.data : null;
-  const active = data?.admins.filter((a) => a.status === "active").length ?? 0;
   const waiting = data?.admins.filter((a) => a.status === "invited").length ?? 0;
 
   return (
@@ -260,7 +259,11 @@ export function AdministratorsPage() {
                       key={admin.id}
                       admin={admin}
                       highlighted={highlight === admin.id}
-                      action={<RowMenu name={admin.name} groups={menuFor(admin)} />}
+                      // You can't remove yourself (AC5), so your own row offers nothing.
+                      // The server refuses it too.
+                      action={
+                        admin.is_you ? null : <RowMenu name={admin.name} groups={menuFor(admin)} />
+                      }
                     />
                   ))}
                 </ul>
@@ -339,7 +342,6 @@ export function AdministratorsPage() {
       )}
       <ConfirmAdminDialog
         state={confirm}
-        onlyAdmin={active <= 1}
         busy={busy}
         error={confirmError}
         onCancel={() => setConfirm(null)}

@@ -1,14 +1,5 @@
 import { Alert, ApiError, Button, Dialog, TextField, looksLikeEmail } from "@sgjio/ui";
-import {
-  BookOpen,
-  KeyRound,
-  LogOut,
-  Mail,
-  MailX,
-  RotateCcw,
-  ShieldCheck,
-  type LucideIcon,
-} from "lucide-react";
+import { BookOpen, KeyRound, LogOut, Mail, MailX, RotateCcw, type LucideIcon } from "lucide-react";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { emailDomain, inviteLifetime, type Admin } from "../../lib/admins";
@@ -245,23 +236,17 @@ function PersonCard({ admin }: { admin: Admin }) {
   );
 }
 
-export type ConfirmState = { kind: "remove" | "restore" | "self"; admin: Admin };
+export type ConfirmState = { kind: "remove" | "restore"; admin: Admin };
 
-/**
- * Confirm removing an administrator or cancelling an invite (AC4), restoring one, or, for
- * your own row, say why you can't remove yourself (AC5).
- */
+/** Confirm removing an administrator or cancelling an invite (AC4), or restoring one. */
 export function ConfirmAdminDialog({
   state,
-  onlyAdmin,
   busy,
   error,
   onCancel,
   onConfirm,
 }: {
   state: ConfirmState | null;
-  /** You are the only active administrator. */
-  onlyAdmin: boolean;
   busy: boolean;
   error: string | null;
   onCancel: () => void;
@@ -270,32 +255,6 @@ export function ConfirmAdminDialog({
   const admin = state?.admin;
   const first = admin?.name.split(/\s+/)[0] ?? "";
   const invited = admin?.status === "invited";
-
-  if (state?.kind === "self") {
-    return (
-      <Dialog
-        open
-        title="You can't remove yourself"
-        onClose={onCancel}
-        footer={
-          <Button onClick={onCancel} data-autofocus>
-            Got it
-          </Button>
-        }
-      >
-        <div className="flex items-start gap-3 text-sm text-muted">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
-            <ShieldCheck className="size-4.5" aria-hidden />
-          </span>
-          <p>
-            {onlyAdmin
-              ? "You're the only administrator, and SGJio always needs one. Add someone else first; they can then remove you."
-              : "So that nobody locks themselves out by mistake, another administrator has to remove you."}
-          </p>
-        </div>
-      </Dialog>
-    );
-  }
 
   const restoring = state?.kind === "restore";
   const title = !admin

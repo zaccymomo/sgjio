@@ -1,6 +1,6 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { cn, Spinner, useAuth } from "@sgjio/ui";
-import { ChevronDown, LogOut, UsersRound, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, LogOut, UsersRound, type LucideIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useMatch, useNavigate } from "react-router-dom";
 
@@ -110,12 +110,15 @@ function MenuLink({
       aria-current={current ? "page" : undefined}
       className={cn(
         "flex cursor-pointer items-center gap-2.5 rounded-sm px-2.5 py-2 text-sm text-ink outline-none select-none",
-        "data-highlighted:bg-surface",
-        current && "font-semibold",
+        // The page you are on is filled in, so it reads as selected, not just hovered.
+        current
+          ? "bg-brand-soft font-semibold data-highlighted:bg-brand-soft"
+          : "data-highlighted:bg-surface",
       )}
     >
       <Icon className={cn("size-4 shrink-0", current ? "text-brand" : "text-muted")} aria-hidden />
       {children}
+      {current && <Check className="ml-auto size-4 shrink-0 text-brand" aria-hidden />}
     </DropdownMenu.Item>
   );
 }
