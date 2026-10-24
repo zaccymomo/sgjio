@@ -3,18 +3,22 @@ import {
   ApiError,
   AuthCard,
   Button,
-  PASSWORD_HINT,
-  PasswordField,
-  TextField,
+  CheckingLink,
+  ForgotPasswordCard,
+  LinkButton,
+  NewPasswordForm,
+  ResetPasswordCard,
   apiFetch,
-  passwordRuleFailures,
+  useAuth,
 } from "@sgjio/ui";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link2Off, Mail, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-const REQUEST_PATH = "/api/admin/auth/forgot-password";
-const VALIDATE_PATH = "/api/admin/auth/reset-password/check";
-const CONFIRM_PATH = "/api/admin/auth/reset-password";
+import type { Notice } from "../lib/content";
+
+const INVITE_CHECK = "/api/admin/auth/invite/check";
+const INVITE_ACCEPT = "/api/admin/auth/invite/accept";
 
 const backToSignIn = (
   <Link to="/sign-in" className="font-semibold text-brand hover:underline">
@@ -22,206 +26,190 @@ const backToSignIn = (
   </Link>
 );
 
+/**
+ * SCRUM-69 AC1-AC3, on the same card as the main app (SCRUM-63). An administrator still
+ * waiting to set up their account is sent a new invite instead (SCRUM-81).
+ */
 export function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
-  const [emailError, setEmailError] = useState<string | undefined>();
-  const [formError, setFormError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const emailRef = useRef<HTMLInputElement>(null);
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (!email.trim()) {
-      setEmailError("Enter your email.");
-      emailRef.current?.focus();
-      return;
-    }
-
-    setEmailError(undefined);
-    setFormError(null);
-    setSubmitting(true);
-    try {
-      await apiFetch<void>(REQUEST_PATH, { method: "POST", body: { email } });
-      setSent(true);
-    } catch {
-      setFormError("We couldn't process your request. Please try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
-    <AuthCard
-      title="Forgot your password?"
-      subtitle="Enter your email and we'll send a reset link if it belongs to an administrator account."
+    <ForgotPasswordCard
       badge="Admin"
+      subtitle="Enter your administrator email and we'll send you a link to choose a new password."
       footer={backToSignIn}
-    >
-      {sent ? (
-        <Alert tone="success">
-          If an administrator account uses that email, we have sent a password reset link. It is
-          valid for 5 minutes.
-        </Alert>
-      ) : (
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-          {formError && <Alert tone="error">{formError}</Alert>}
-          <TextField
-            ref={emailRef}
-            label="Email"
-            type="email"
-            autoComplete="email"
-            inputMode="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            error={emailError}
-          />
-          <Button type="submit" fullWidth loading={submitting}>
-            Send reset link
-          </Button>
-        </form>
-      )}
-    </AuthCard>
+    />
   );
 }
 
-/** Where an emailed admin reset link lands: /reset-password?token=... (SCRUM-69 AC4-7). */
+/** Where an emailed admin reset link lands: /reset-password?token=... (SCRUM-69 AC4-AC7). */
 export function ResetPasswordPage() {
-  const [params] = useSearchParams();
   const navigate = useNavigate();
-  const token = params.get("token");
-  const [checking, setChecking] = useState(true);
-  const [valid, setValid] = useState(false);
-  const [password, setPassword] = useState("");
-  const [passwordConfirmation, setPasswordConfirmation] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [complete, setComplete] = useState(false);
-  const passwordRef = useRef<HTMLInputElement>(null);
-  const confirmationRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    let active = true;
-    if (!token) return;
-    void apiFetch<void>(VALIDATE_PATH, { method: "POST", body: { token } })
-      .then(() => {
-        if (active) setValid(true);
-      })
-      .catch(() => {
-        // A link that cannot be checked is not safe to use; invite a fresh request instead.
-        if (active) setValid(false);
-      })
-      .finally(() => {
-        if (active) setChecking(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [token]);
-
-  useEffect(() => {
-    if (!complete) return;
-    const timeout = window.setTimeout(() => navigate("/sign-in", { replace: true }), 2000);
-    return () => window.clearTimeout(timeout);
-  }, [complete, navigate]);
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    if (!token) return;
-
-    const errors: Record<string, string> = {};
-    const passwordFailures = passwordRuleFailures(password);
-    if (!password) errors.password = "Enter a new password.";
-    else if (passwordFailures.length) errors.password = passwordFailures.join(" ");
-    if (!passwordConfirmation) errors.password_confirmation = "Confirm your new password.";
-    else if (password !== passwordConfirmation)
-      errors.password_confirmation = "The passwords do not match.";
-    setFieldErrors(errors);
-    setFormError(null);
-    if (errors.password) return passwordRef.current?.focus();
-    if (errors.password_confirmation) return confirmationRef.current?.focus();
-
-    setSubmitting(true);
-    try {
-      await apiFetch<void>(CONFIRM_PATH, {
-        method: "POST",
-        body: { token, password, password_confirmation: passwordConfirmation },
-      });
-      setComplete(true);
-    } catch (error) {
-      if (error instanceof ApiError && error.code === "reset_link_invalid") {
-        setValid(false);
-      } else if (error instanceof ApiError && error.field) {
-        setFieldErrors({ [error.field]: error.message });
-      } else {
-        setFormError("We couldn't reset your password. Please try again.");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  if (token && checking) {
-    return (
-      <AuthCard title="Choose a new password" badge="Admin" footer={backToSignIn}>
-        <p className="text-sm text-muted">Checking your reset link…</p>
-      </AuthCard>
-    );
-  }
-
-  if (!valid) {
-    return (
-      <AuthCard title="Reset link unavailable" badge="Admin" footer={backToSignIn}>
-        <Alert tone="error">This password reset link is no longer valid. Request a new one.</Alert>
-        <Link
-          to="/forgot-password"
-          className="mt-4 inline-block text-sm font-semibold text-brand hover:underline"
-        >
-          Request a new reset link
-        </Link>
-      </AuthCard>
-    );
-  }
-
-  if (complete) {
-    return (
-      <AuthCard title="Password reset" badge="Admin" footer={backToSignIn}>
-        <Alert tone="success">Your password has been reset. Taking you to sign in…</Alert>
-      </AuthCard>
-    );
-  }
+  const [params] = useSearchParams();
 
   return (
-    <AuthCard
-      title="Choose a new password"
-      subtitle="Use at least 8 characters, including a letter and a number."
+    <ResetPasswordCard
+      token={params.get("token")}
       badge="Admin"
+      forgotPasswordHref="/forgot-password"
       footer={backToSignIn}
+      // Say it worked, on the sign-in page (AC5).
+      onSuccess={() => navigate("/sign-in", { replace: true, state: { passwordReset: true } })}
+    />
+  );
+}
+
+type Invite = { name: string; email: string; invited_by: string | null };
+
+type InviteState =
+  | { status: "checking" }
+  | { status: "ready"; invite: Invite }
+  | { status: "invalid" }
+  | { status: "unreachable"; message: string };
+
+/** What an invite link is, from the server. `null`: the check was cancelled. */
+async function checkInvite(token: string, signal?: AbortSignal): Promise<InviteState | null> {
+  try {
+    const invite = await apiFetch<Invite>(INVITE_CHECK, {
+      method: "POST",
+      body: { token },
+      signal,
+    });
+    return { status: "ready", invite };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") return null;
+    if (error instanceof ApiError && error.code === "invite_link_invalid") {
+      return { status: "invalid" };
+    }
+    return {
+      status: "unreachable",
+      message:
+        error instanceof ApiError ? error.message : "Something went wrong. Please try again.",
+    };
+  }
+}
+
+/**
+ * Where an invite email lands: /set-password?token=... (SCRUM-81 AC2). Greets the person by
+ * name, says who invited them and which email they will sign in with, and once they choose
+ * a password, signs them straight in.
+ */
+export function SetPasswordPage() {
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const token = params.get("token");
+  const { refresh } = useAuth();
+  const [state, setState] = useState<InviteState>(
+    token ? { status: "checking" } : { status: "invalid" },
+  );
+
+  useEffect(() => {
+    if (!token) return;
+    const controller = new AbortController();
+    void checkInvite(token, controller.signal).then((next) => next && setState(next));
+    return () => controller.abort();
+  }, [token]);
+
+  if (state.status === "invalid") {
+    return (
+      <AuthCard
+        title="This invite link no longer works"
+        subtitle="Invite links work once, last a few days, and stop working when a newer invite is sent."
+        icon={Link2Off}
+        badge="Admin"
+        footer={
+          <>
+            Already set up?{" "}
+            <Link to="/sign-in" className="font-semibold text-brand hover:underline">
+              Sign in
+            </Link>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <LinkButton to="/forgot-password">Email me a new link</LinkButton>
+          <p className="text-center text-xs text-muted">
+            Or ask the administrator who invited you to send it again.
+          </p>
+        </div>
+      </AuthCard>
+    );
+  }
+
+  if (state.status === "unreachable") {
+    return (
+      <AuthCard title="Set up your account" icon={ShieldCheck} badge="Admin" footer={backToSignIn}>
+        <div className="flex flex-col gap-4">
+          <Alert tone="error">{state.message}</Alert>
+          <Button
+            fullWidth
+            onClick={() => {
+              setState({ status: "checking" });
+              void checkInvite(token ?? "").then((next) => next && setState(next));
+            }}
+          >
+            Try again
+          </Button>
+        </div>
+      </AuthCard>
+    );
+  }
+
+  if (state.status === "checking") {
+    return (
+      <AuthCard
+        title="Set up your account"
+        subtitle="Checking your invite…"
+        icon={ShieldCheck}
+        badge="Admin"
+      >
+        <CheckingLink />
+      </AuthCard>
+    );
+  }
+
+  const { invite } = state;
+  const first = invite.name.split(/\s+/)[0];
+  return (
+    <AuthCard
+      title={`Welcome, ${first}`}
+      subtitle={
+        <>
+          {invite.invited_by ? (
+            <strong className="font-semibold text-ink">{invite.invited_by}</strong>
+          ) : (
+            "Your team"
+          )}{" "}
+          invited you to the SGJio admin portal. Choose a password to finish setting up.
+        </>
+      }
+      icon={ShieldCheck}
+      badge="Admin"
     >
-      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-        {formError && <Alert tone="error">{formError}</Alert>}
-        <PasswordField
-          ref={passwordRef}
-          label="New password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          error={fieldErrors.password}
-          hint={PASSWORD_HINT}
+      <div className="flex flex-col gap-5">
+        <div className="flex items-center gap-3 rounded-md bg-surface px-3 py-2.5">
+          <Mail className="size-4 shrink-0 text-muted" aria-hidden />
+          <div className="min-w-0">
+            <p className="text-caption text-muted">You&rsquo;ll sign in with</p>
+            <p className="truncate text-sm font-semibold text-ink">{invite.email}</p>
+          </div>
+        </div>
+        <NewPasswordForm
+          submitLabel="Set password and sign in"
+          deadLinkCode="invite_link_invalid"
+          onDeadLink={() => setState({ status: "invalid" })}
+          onSubmit={async (password, confirmation) => {
+            await apiFetch(INVITE_ACCEPT, {
+              method: "POST",
+              body: { token, password, password_confirmation: confirmation },
+            });
+            await refresh();
+            const notice: Notice = {
+              tone: "success",
+              message: `Welcome to SGJio admin, ${first}. You're signed in.`,
+            };
+            navigate("/", { replace: true, state: { notice } });
+          }}
         />
-        <PasswordField
-          ref={confirmationRef}
-          label="Confirm new password"
-          autoComplete="new-password"
-          value={passwordConfirmation}
-          onChange={(event) => setPasswordConfirmation(event.target.value)}
-          error={fieldErrors.password_confirmation}
-        />
-        <Button type="submit" fullWidth loading={submitting}>
-          Reset password
-        </Button>
-      </form>
+      </div>
     </AuthCard>
   );
 }

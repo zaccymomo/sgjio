@@ -1,14 +1,5 @@
-import {
-  AdminLayout,
-  AuthProvider,
-  Button,
-  FullPageSpinner,
-  RequireAuth,
-  Spinner,
-  cn,
-  useAuth,
-} from "@sgjio/ui";
-import { lazy, Suspense, useState } from "react";
+import { AdminLayout, AuthProvider, FullPageSpinner, RequireAuth, Spinner, cn } from "@sgjio/ui";
+import { lazy, Suspense } from "react";
 import {
   NavLink,
   Navigate,
@@ -18,11 +9,12 @@ import {
   createBrowserRouter,
   createRoutesFromElements,
   useMatch,
-  useNavigate,
 } from "react-router-dom";
 
+import { AccountMenu } from "./components/AccountMenu";
+import { AdministratorsPage } from "./pages/AdministratorsPage";
 import { ContentPage } from "./pages/ContentPage";
-import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
+import { ForgotPasswordPage, ResetPasswordPage, SetPasswordPage } from "./pages/PasswordPages";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SignInPage } from "./pages/SignInPage";
 
@@ -38,21 +30,8 @@ const LessonPreviewPage = lazy(() =>
 );
 
 function SignedInLayout() {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
   // The lesson editor works in three panes, side by side.
   const wide = useMatch("/lessons/:id") !== null;
-  const [signingOut, setSigningOut] = useState(false);
-
-  async function handleSignOut() {
-    setSigningOut(true);
-    try {
-      await signOut();
-      navigate("/sign-in", { replace: true });
-    } finally {
-      setSigningOut(false);
-    }
-  }
 
   return (
     <AdminLayout
@@ -66,10 +45,8 @@ function SignedInLayout() {
             {/* SCRUM-83 */}
             <HeaderLink to="/reports">Reports</HeaderLink>
           </nav>
-          <span className="hidden text-xs text-muted lg:inline">{user?.email}</span>
-          <Button variant="secondary" size="sm" onClick={handleSignOut} loading={signingOut}>
-            Sign out
-          </Button>
+          {/* Who you are, Administrators (SCRUM-81) and Sign out. */}
+          <AccountMenu />
         </>
       }
     >
@@ -122,6 +99,8 @@ const router = createBrowserRouter(
       <Route path="/sign-in" element={<SignInPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      {/* Where an invite email lands (SCRUM-81). */}
+      <Route path="/set-password" element={<SetPasswordPage />} />
 
       {/* Administrators only: anyone else is sent to /sign-in?next=... */}
       <Route element={<RequireAuth />}>
@@ -142,6 +121,8 @@ const router = createBrowserRouter(
           <Route path="/lessons/:id/insights" element={<LessonInsightsPage />} />
           {/* Problems learners reported (SCRUM-83). */}
           <Route path="/reports" element={<ReportsPage />} />
+          {/* Who can use the portal (SCRUM-81), from the account menu. */}
+          <Route path="/administrators" element={<AdministratorsPage />} />
           {/* Topics used to have their own page; they now live on the content page. */}
           <Route path="/topics" element={<Navigate to="/" replace />} />
         </Route>

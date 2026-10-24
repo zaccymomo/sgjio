@@ -36,7 +36,8 @@ def sign_in(
 
     For the admin portal, a correct password on a non-administrator account fails in
     exactly the same way as a wrong password, so the page cannot be used to discover
-    which emails are administrators (SCRUM-68 AC2).
+    which emails are administrators (SCRUM-68 AC2). A removed administrator fails the same
+    way on both front ends (SCRUM-81).
     """
     email = normalise_email(email)
 
@@ -46,7 +47,12 @@ def sign_in(
 
     user = db.scalar(select(User).where(User.email == email))
     password_ok = verify_password(password, user.password_hash if user else None)
-    allowed = user is not None and password_ok and (scope != AuthScope.ADMIN or user.is_admin)
+    allowed = (
+        user is not None
+        and password_ok
+        and not user.is_removed
+        and (scope != AuthScope.ADMIN or user.is_admin)
+    )
 
     record_attempt(db, email, scope, succeeded=allowed, ip_address=ip_address)
     if not allowed:
@@ -125,8 +131,7 @@ def register(
 
     Email format and the required fields are already checked by `RegisterRequest`; this
     covers the rules that need the database or the password policy. New accounts are
-    always ordinary users: administrators are made with `python -m app.cli create-admin`
-    (SCRUM-68).
+    always ordinary users: administrators are invited from the admin portal (SCRUM-81).
     """
     email = normalise_email(email)
 

@@ -11,12 +11,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from pydantic import AwareDatetime
 from sqlalchemy.orm import Session
 
-from app import insights, lessons, media, reports, topics
+from app import admins, insights, lessons, media, reports, topics
 from app.auth.deps import require_admin
 from app.db import get_db
 from app.models import User
 from app.problems import ContentProblem
 from app.schemas import (
+    AdminInviteRequest,
+    AdminOut,
+    AdminsOut,
     AssetOut,
     LessonChangeRequest,
     LessonCreateRequest,
@@ -415,3 +418,89 @@ def set_report_status(
         return reports.set_status(db, admin.id, report_id, body.status)
     except ContentProblem as problem:
         raise _refuse(problem) from None
+
+
+# --- Administrators (SCRUM-81) ------------------------------------------------------------
+
+ADMIN_NOT_FOUND = {404: {"description": "No administrator with that id (admin_not_found)"}}
+
+
+@router.get("/admins", response_model=AdminsOut)
+def list_admins(
+    admin: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> admins.AdminsPage:
+    """Every administrator with their last sign-in, removed ones apart, and the latest
+    changes (AC1)."""
+    return admins.list_admins(db, admin)
+
+
+@router.post(
+    "/admins",
+    response_model=AdminOut,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        409: {
+            "description": "The email has an account: email_in_use (a learner's, AC3), "
+            "already_admin, already_invited or admin_removed (these carry admin_id)"
+        },
+        422: {"description": "outside_domain until allow_other_domain is set, or a bad field"},
+    },
+)
+def invite_admin(
+    body: AdminInviteRequest, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> admins.AdminSummary:
+    """Create an administrator and email them a link to choose a password (AC2)."""
+    try:
+        invited = admins.invite_admin(db, admin, body.name, body.email, body.allow_other_domain)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+    return admins.get_summary(db, admin, invited.id)
+
+
+@router.post(
+    "/admins/{admin_id}/resend-invite",
+    response_model=AdminOut,
+    responses={**ADMIN_NOT_FOUND, 409: {"description": "Not waiting for an invite (not_invited)"}},
+)
+def resend_invite(
+    admin_id: uuid.UUID, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> admins.AdminSummary:
+    """Email a new invite link. The earlier one stops working."""
+    try:
+        admins.resend_invite(db, admin, admin_id)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+    return admins.get_summary(db, admin, admin_id)
+
+
+@router.post(
+    "/admins/{admin_id}/remove",
+    response_model=AdminOut,
+    responses={
+        **ADMIN_NOT_FOUND,
+        409: {"description": "Yourself (cannot_remove_self) or the last one (last_admin)"},
+    },
+)
+def remove_admin(
+    admin_id: uuid.UUID, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> admins.AdminSummary:
+    """Close an administrator's account, or cancel their invite: their sessions end and
+    they can no longer sign in (AC4, AC5). Safe to repeat."""
+    try:
+        admins.remove_admin(db, admin, admin_id)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+    return admins.get_summary(db, admin, admin_id)
+
+
+@router.post("/admins/{admin_id}/restore", response_model=AdminOut, responses=ADMIN_NOT_FOUND)
+def restore_admin(
+    admin_id: uuid.UUID, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> admins.AdminSummary:
+    """Give a removed administrator access again, with a new link to choose a password.
+    Safe to repeat."""
+    try:
+        admins.restore_admin(db, admin, admin_id)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+    return admins.get_summary(db, admin, admin_id)

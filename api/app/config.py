@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     login_lockout_minutes: int = 15
     reset_token_minutes: int = 5
 
+    # Inviting administrators from the portal (SCRUM-81). An invite arrives whenever it
+    # arrives, so its link lasts longer than a reset link someone has just asked for.
+    invite_link_hours: int = 72
+    # Adding an administrator outside this email domain asks for confirmation. Empty: no check.
+    admin_email_domain: str = "sgjio.example.com"
+
     # Email
     email_backend: Literal["smtp", "console", "memory"] = "smtp"
     smtp_host: str = "localhost"

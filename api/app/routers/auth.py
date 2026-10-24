@@ -2,8 +2,8 @@
 
 The sign-in routes are mounted twice: at /api/auth for the main app and at
 /api/admin/auth for the admin portal. Each uses its own cookie and its own sessions, so
-the two never mix. Registration is mounted only for the main app, because administrator
-accounts are made with `python -m app.cli create-admin` (SCRUM-68).
+the two never mix. Registration is mounted only for the main app, because administrators
+are invited from the portal instead (SCRUM-81), which mounts the invite routes.
 """
 
 from datetime import UTC, datetime
@@ -11,7 +11,9 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
+from app import admins
 from app.auth.deps import require_admin, require_user
+from app.auth.lockout import record_attempt
 from app.auth.reset import (
     check_reset_token,
     consume_reset_token,
@@ -30,6 +32,7 @@ from app.db import get_db
 from app.models import AuthScope, User
 from app.schemas import (
     ForgotPasswordRequest,
+    InviteOut,
     RegisterRequest,
     RegisterResponse,
     ResetPasswordRequest,
@@ -47,6 +50,11 @@ INVALID_CREDENTIALS = {
 RESET_LINK_INVALID = {
     "code": "reset_link_invalid",
     "message": "This reset link is no longer valid. Request a new one.",
+}
+
+INVITE_LINK_INVALID = {
+    "code": "invite_link_invalid",
+    "message": "This invite link is no longer valid.",
 }
 
 # An email already in use is a conflict; everything else registration refuses is the shape
@@ -167,6 +175,52 @@ def build_auth_router(scope: AuthScope) -> APIRouter:
         if user is None:
             raise HTTPException(status.HTTP_410_GONE, detail=RESET_LINK_INVALID)
         set_new_password(db, user, body.password)
+
+    if scope == AuthScope.ADMIN:
+
+        @router.post(
+            "/invite/check",
+            response_model=InviteOut,
+            responses={410: {"description": "Used, expired, replaced or already set up"}},
+        )
+        def check_invite_route(body: ResetTokenRequest, db: Session = Depends(get_db)) -> InviteOut:
+            """Who an invite link is for, so the page can greet them (SCRUM-81)."""
+            found = admins.invite_for_token(db, body.token)
+            if found is None:
+                raise HTTPException(status.HTTP_410_GONE, detail=INVITE_LINK_INVALID)
+            admin, inviter = found
+            return InviteOut(name=admin.name, email=admin.email, invited_by=inviter)
+
+        @router.post(
+            "/invite/accept",
+            response_model=SignInResponse,
+            responses={
+                410: {"description": "Used, expired, replaced or already set up"},
+                422: {"description": "The passwords do not match or break a password rule"},
+            },
+        )
+        def accept_invite_route(
+            body: ResetPasswordRequest,
+            request: Request,
+            response: Response,
+            db: Session = Depends(get_db),
+        ) -> SignInResponse:
+            """Choose a first password from an invite, and sign straight in (SCRUM-81 AC2)."""
+            if admins.invite_for_token(db, body.token) is None:
+                raise HTTPException(status.HTTP_410_GONE, detail=INVITE_LINK_INVALID)
+            problem = new_password_problem(body.password, body.password_confirmation)
+            if problem is not None:
+                raise problem_error(problem)
+            user = consume_reset_token(db, body.token, scope)
+            if user is None:
+                raise HTTPException(status.HTTP_410_GONE, detail=INVITE_LINK_INVALID)
+            set_new_password(db, user, body.password)
+            # A sign-in like any other, so the Administrators page shows when it happened.
+            ip_address = request.client.host if request.client else None
+            record_attempt(db, user.email, scope, succeeded=True, ip_address=ip_address)
+            token, _ = create_session(db, user, scope)
+            set_session_cookie(response, scope, token)
+            return SignInResponse(user=UserOut.model_validate(user))
 
     @router.post("/sign-out", status_code=status.HTTP_204_NO_CONTENT)
     def sign_out_route(request: Request, response: Response, db: Session = Depends(get_db)) -> None:

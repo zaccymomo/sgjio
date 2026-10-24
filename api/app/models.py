@@ -76,6 +76,18 @@ class MediaKind(str, enum.Enum):
     AUDIO = "audio"
 
 
+class AdminAction(str, enum.Enum):
+    """What happened to an administrator account, for the activity log (SCRUM-81)."""
+
+    INVITED = "invited"
+    INVITE_RESENT = "invite_resent"
+    JOINED = "joined"  # chose a password from an invite
+    INVITE_CANCELLED = "invite_cancelled"
+    REMOVED = "removed"
+    RESTORED = "restored"
+    ADDED = "added"  # with `python -m app.cli create-admin`
+
+
 class AuthScope(str, enum.Enum):
     """Which front end a session or reset link belongs to. They never mix."""
 
@@ -129,6 +141,12 @@ class User(Base):
         _enum(UserRole, "user_role"), default=UserRole.USER, nullable=False
     )
     user_type: Mapped[UserType | None] = mapped_column(_enum(UserType, "user_type"))
+    # An administrator who has been invited and has not yet chosen a password (SCRUM-81).
+    # Set again by each new invite link, so it is when the latest one was sent.
+    invited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # An administrator removed from the portal (SCRUM-81). The account is kept, closed, so
+    # it can be restored and the activity log still names it; it cannot sign in anywhere.
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
 
@@ -137,8 +155,13 @@ class User(Base):
     )
 
     @property
+    def is_removed(self) -> bool:
+        return self.removed_at is not None
+
+    @property
     def is_admin(self) -> bool:
-        return self.role == UserRole.ADMIN
+        """An administrator who can use the portal: removed ones no longer count."""
+        return self.role == UserRole.ADMIN and not self.is_removed
 
 
 class Profile(Base):
@@ -538,3 +561,27 @@ class LoginAttempt(Base):
     succeeded: Mapped[bool] = mapped_column(Boolean, nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(45))
     attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AdminEvent(Base):
+    """One change to an administrator account, for the Administrators page (SCRUM-81).
+
+    Rows are only ever added. `actor_id` is who made the change: empty when the account
+    holder did it themselves (joined, or asked for a new invite link) or it came from the
+    command line.
+    """
+
+    __tablename__ = "admin_events"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    action: Mapped[AdminAction] = mapped_column(_enum(AdminAction, "admin_action"), nullable=False)
+    admin_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+    admin: Mapped[User] = relationship(foreign_keys=[admin_id])
+    actor: Mapped[User | None] = relationship(foreign_keys=[actor_id])
