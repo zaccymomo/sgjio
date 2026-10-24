@@ -176,7 +176,8 @@ def questions_unanswered(question_ids: list[str]) -> ContentProblem:
     )
 
 
-def version_not_found() -> ContentProblem:
+def reported_version_not_found() -> ContentProblem:
+    """A report names a version this lesson never had (SCRUM-82)."""
     return ContentProblem(
         "version_not_found", "That version isn't one of this lesson's.", 422, field="version"
     )

@@ -28,7 +28,7 @@ from sqlalchemy.orm import Session
 from app.learning import published_lesson
 from app.lesson_doc import LessonDoc
 from app.models import Lesson, LessonReport, LessonVersion, ReportReason, ReportStatus, Topic
-from app.problems import card_not_found, report_not_found, version_not_found
+from app.problems import card_not_found, report_not_found, reported_version_not_found
 
 # How much of a card's text the list shows.
 EXCERPT_LENGTH = 140
@@ -74,7 +74,7 @@ def report_problem(
         )
     )
     if shown is None:
-        raise version_not_found()
+        raise reported_version_not_found()
     if not any(card.id == card_id for card in LessonDoc.model_validate(shown.doc).cards):
         raise card_not_found()
     report = LessonReport(
