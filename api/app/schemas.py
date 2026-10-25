@@ -744,6 +744,8 @@ class AttemptResultOut(BaseModel):
     score: ScoreOut
     best: ScoreOut
     first_completion: bool
+    # This completion finished every published lesson in the topic (SCRUM-55 AC1).
+    topic_completed: bool
 
 
 # --- Reported problems (SCRUM-82, SCRUM-83) ------------------------------------------------

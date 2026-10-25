@@ -17,6 +17,9 @@ Routes stay thin: they call these functions and turn a ContentProblem into an HT
   wrong (AC3), and keeps the best score: first-try correct answers out of the scored
   questions, compared as a percentage, a tie keeping the most recent (AC4, AC5). Finishing
   the same attempt again changes nothing.
+- the finish that completes the last lesson still open in a topic says so, so the page can
+  acknowledge the topic (SCRUM-55 AC1). Only a first completion can do that, so retakes in a
+  finished topic do not repeat it.
 """
 
 import random
@@ -25,7 +28,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from fractions import Fraction
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -94,6 +97,8 @@ class AttemptResult:
     best: Score
     # True when this attempt is the one that completed the lesson.
     first_completion: bool
+    # True when that completion was the last one the topic needed (SCRUM-55 AC1).
+    topic_completed: bool = False
 
 
 # --- Reading -------------------------------------------------------------------------------
@@ -246,6 +251,24 @@ def _share(score: Score) -> Fraction:
     return Fraction(score.correct, score.scored) if score.scored else Fraction(1)
 
 
+def _topic_now_complete(db: Session, user_id: uuid.UUID, lesson: Lesson) -> bool:
+    """Whether this user has completed every published lesson in the lesson's topic, by the
+    same rules as the topic's circle (app/progress.py)."""
+    not_completed = db.scalar(
+        select(func.count(Lesson.id))
+        .outerjoin(
+            LessonCompletion,
+            and_(LessonCompletion.lesson_id == Lesson.id, LessonCompletion.user_id == user_id),
+        )
+        .where(
+            Lesson.topic_id == lesson.topic_id,
+            Lesson.status == LessonStatus.PUBLISHED,
+            LessonCompletion.id.is_(None),
+        )
+    )
+    return not_completed == 0
+
+
 def finish(db: Session, user_id: uuid.UUID, attempt_id: uuid.UUID) -> AttemptResult:
     """Finish an attempt: complete the lesson and keep the best score."""
     attempt = _locked_attempt(db, user_id, attempt_id)
@@ -268,7 +291,7 @@ def finish(db: Session, user_id: uuid.UUID, attempt_id: uuid.UUID) -> AttemptRes
             first_completion=False,
         )
 
-    published_lesson(db, attempt.lesson_id)
+    lesson = published_lesson(db, attempt.lesson_id)
     answers = {a.question_id: a for a in attempt.answers}
     missing = [q.id for q in _questions(attempt.version) if q.id not in answers]
     if missing:
@@ -303,11 +326,14 @@ def finish(db: Session, user_id: uuid.UUID, attempt_id: uuid.UUID) -> AttemptRes
             completion.best_correct, completion.best_scored = score.correct, score.scored
             completion.best_attempt_id = attempt.id
         completion.updated_at = datetime.now(UTC)
+    first_completion = inserted is not None
+    topic_completed = first_completion and _topic_now_complete(db, user_id, lesson)
     db.commit()
     return AttemptResult(
         attempt_id=attempt.id,
         lesson_id=attempt.lesson_id,
         score=score,
         best=Score(completion.best_correct, completion.best_scored),
-        first_completion=inserted is not None,
+        first_completion=first_completion,
+        topic_completed=topic_completed,
     )

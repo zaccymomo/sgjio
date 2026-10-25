@@ -384,6 +384,62 @@ def test_finishing_twice_records_once(learner, db, lesson):
     assert db.scalar(select(func.count()).select_from(LessonCompletion)) == 1
 
 
+# --- Completing a topic (SCRUM-55 AC1) -----------------------------------------------------
+
+
+def _second_lesson(db, lesson, status=LessonStatus.PUBLISHED) -> Lesson:
+    other = Lesson(title="Ordering teh", topic_id=lesson.topic_id, draft=DOC, position=1)
+    db.add(other)
+    db.commit()
+    _publish(db, other, title="Ordering teh")
+    other.status = status
+    db.commit()
+    return other
+
+
+def test_completing_the_last_lesson_in_a_topic_completes_the_topic(learner, db, lesson):
+    other = _second_lesson(db, lesson)
+
+    assert _run(learner, lesson, ALL_WRONG)["topic_completed"] is False
+    assert _run(learner, other, ALL_WRONG)["topic_completed"] is True
+
+
+def test_a_one_lesson_topic_is_completed_by_its_lesson(learner, lesson):
+    assert _run(learner, lesson, ALL_RIGHT)["topic_completed"] is True
+
+
+def test_a_retake_in_a_completed_topic_does_not_complete_it_again(learner, lesson):
+    _run(learner, lesson, ALL_WRONG)
+    assert _run(learner, lesson, ALL_RIGHT)["topic_completed"] is False
+
+
+def test_finishing_twice_acknowledges_the_topic_once(learner, lesson):
+    attempt = _start(learner, lesson)
+    for question_id, option_id in ALL_RIGHT.items():
+        _answer(learner, attempt, question_id, option_id)
+
+    assert learner.post(f"/api/attempts/{attempt}/finish").json()["topic_completed"] is True
+    assert learner.post(f"/api/attempts/{attempt}/finish").json()["topic_completed"] is False
+
+
+def test_only_published_lessons_count_toward_a_topic(learner, db, lesson):
+    _second_lesson(db, lesson, status=LessonStatus.WITHDRAWN)
+    draft = Lesson(title="Draft", topic_id=lesson.topic_id, draft=DOC, position=2)
+    db.add(draft)
+    db.commit()
+
+    assert _run(learner, lesson, ALL_RIGHT)["topic_completed"] is True
+
+
+def test_another_users_completions_do_not_complete_my_topic(learner, make_user, db, lesson):
+    other = _second_lesson(db, lesson)
+    _run(learner, other, ALL_RIGHT)
+
+    make_user(**OTHER)
+    assert learner.post("/api/auth/sign-in", json=OTHER).status_code == 200
+    assert _run(learner, lesson, ALL_RIGHT)["topic_completed"] is False
+
+
 def test_a_finished_attempt_takes_no_more_answers(learner, lesson):
     attempt = _start(learner, lesson)
     for question_id, option_id in ALL_RIGHT.items():

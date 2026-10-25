@@ -6,7 +6,7 @@ import {
   type DeckSummary,
   type LearnerCard,
 } from "@sgjio/ui/lesson";
-import { Check, ChevronLeft, Flag, RotateCcw } from "lucide-react";
+import { Check, ChevronLeft, Flag, PartyPopper, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -33,6 +33,8 @@ type AttemptResult = {
   score: Score;
   best: Score;
   first_completion: boolean;
+  /** This completed the last lesson the topic needed (SCRUM-55 AC1). */
+  topic_completed: boolean;
 };
 
 type Load =
@@ -210,6 +212,25 @@ export function LessonPage() {
   function renderEnd(_summary: DeckSummary, restart: () => void) {
     return (
       <>
+        {/* SCRUM-55 AC1: only the finish that completes the topic sets this, so a retake
+            in a finished topic doesn't repeat it. */}
+        {save.status === "saved" && save.result.topic_completed && (
+          <div
+            role="status"
+            className="flex w-full items-center gap-3 rounded-2xl border border-brand/30 bg-brand-soft/60 p-4 text-left"
+          >
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+              <PartyPopper className="size-5" aria-hidden />
+            </span>
+            <span className="flex flex-col">
+              <span className="text-base font-bold text-ink">Topic complete</span>
+              <span className="text-sm text-muted">
+                You&apos;ve completed every lesson in {ready.topic.name}. You can reopen any of them
+                whenever you like.
+              </span>
+            </span>
+          </div>
+        )}
         <p role="status" className="min-h-5 text-center text-sm text-muted">
           {save.status === "saving" && "Saving your progress…"}
           {save.status === "saved" &&
