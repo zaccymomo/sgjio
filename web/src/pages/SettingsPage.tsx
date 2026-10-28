@@ -20,7 +20,11 @@ export function SettingsPage() {
   const [signingOut, setSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   // Set by the profile editor after a save.
-  const profileSaved = (useLocation().state as { profileSaved?: boolean } | null)?.profileSaved;
+  const pageState = useLocation().state as {
+    profileSaved?: boolean;
+    passwordChanged?: boolean;
+  } | null;
+  const profileSaved = pageState?.profileSaved;
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -40,6 +44,11 @@ export function SettingsPage() {
       <h1 className="text-[22px] font-bold text-ink">Settings</h1>
 
       {profileSaved && <Alert tone="success">Your profile has been updated.</Alert>}
+      {pageState?.passwordChanged && (
+        <Alert tone="success">
+          Your password has been changed. This browser is still signed in.
+        </Alert>
+      )}
 
       {/* SCRUM-41 AC1-AC2 */}
       {user && (
@@ -73,6 +82,25 @@ export function SettingsPage() {
 
       {/* SCRUM-41 AC3, AC5 */}
       <ProfileCard />
+
+      {user?.role !== "admin" && (
+        <Card>
+          <div className="space-y-3">
+            <p className="text-sm font-semibold text-ink">Account security</p>
+            <p className="text-sm text-muted">
+              Update your password or remove your account and data.
+            </p>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <Link to="/settings/change-password" className="font-semibold text-brand underline">
+                Change password
+              </Link>
+              <Link to="/settings/delete-account" className="font-semibold text-danger underline">
+                Delete account
+              </Link>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* SCRUM-59 */}
       <Card>

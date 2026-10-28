@@ -57,7 +57,7 @@ Each card has **text**, and may have an **image**, **audio** or both, and a **qu
 
 - **Text** is Markdown: `**bold**`, `*italic*` (use it for Singlish and Malay words), and lists. Keep each card under about 50 words, and the whole lesson under 2 minutes to read.
 - **A blank**, written `{{blank}}`, is filled by the card's question. One per card at most.
-- **A question** has 1 to 4 options with exactly one marked `correct: true`, and an `explanation` shown after answering. A question with a single option needs no marking: it's a tap that keeps learners doing something, and isn't scored. Without a blank, the options are shown below the text.
+- **A question** has 1 to 4 options and an `explanation` shown after answering. A scored question needs at least 2 distinct options with exactly one marked `correct: true`; every published lesson needs at least one scored question. A question with a single option needs no marking: it's a tap that keeps learners doing something, and isn't scored. Without a blank, the options are shown below the text.
 - **`why_not`** on a wrong option is shown when a learner picks it: why it isn't the norm. Worth writing for the tempting ones.
 - **Images** need `alt` text describing them, and **audio** a `transcript`.
 - **Put text in quotes** when it is on the same line as its name, as above. Without them, a comma or a colon in the text ends it early, and the import says something is wrong. Multi-line text after `|-` needs no quotes.

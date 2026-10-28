@@ -47,6 +47,15 @@ class RegisterRequest(BaseModel):
     password_confirmation: str = Field(min_length=1, max_length=256)
     # Required, so leaving it unselected is refused (SCRUM-61 AC6). Self-reported.
     user_type: UserType
+    privacy_consent: bool
+    privacy_notice_version: str
+
+    @field_validator("privacy_consent")
+    @classmethod
+    def _require_privacy_consent(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("Agree to the privacy notice before creating an account.")
+        return value
 
     @field_validator("name")
     @classmethod
@@ -66,6 +75,16 @@ class RegisterRequest(BaseModel):
         except ValidationError:
             raise ValueError("Enter an email address like name@example.com.") from None
         return value
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=256)
+    password: str = Field(min_length=1, max_length=256)
+    password_confirmation: str = Field(min_length=1, max_length=256)
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=256)
 
 
 class RegisterResponse(BaseModel):

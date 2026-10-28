@@ -11,7 +11,11 @@ export function SignInPage() {
   const [params] = useSearchParams();
   const next = safeNextPath(params.get("next"));
   // Set by the reset-password page after a new password is saved (SCRUM-63 AC5).
-  const passwordReset = (useLocation().state as { passwordReset?: boolean } | null)?.passwordReset;
+  const pageState = useLocation().state as {
+    passwordReset?: boolean;
+    accountDeleted?: boolean;
+  } | null;
+  const passwordReset = pageState?.passwordReset;
 
   // Already signed in: go straight to where they were heading.
   if (status === "signed-in") return <Navigate to={next} replace />;
@@ -32,6 +36,11 @@ export function SignInPage() {
       {passwordReset && (
         <Alert tone="success" className="mb-4">
           Your password has been reset. Sign in with your new password.
+        </Alert>
+      )}
+      {pageState?.accountDeleted && (
+        <Alert tone="success" className="mb-4">
+          Your account has been deleted.
         </Alert>
       )}
       <SignInForm

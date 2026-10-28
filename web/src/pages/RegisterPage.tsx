@@ -15,6 +15,8 @@ import {
 import { useRef, useState, type FormEvent, type RefObject } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
+const PRIVACY_NOTICE_VERSION = "2026-10-22";
+
 /** The two user types, self-reported (SCRUM-61 AC1). */
 const USER_TYPES: Array<{ value: UserType; label: string; description: string }> = [
   {
@@ -49,6 +51,8 @@ export function RegisterPage() {
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [userType, setUserType] = useState<UserType | null>(null);
+  const [privacyConsent, setPrivacyConsent] = useState(false);
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
 
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [userTypeError, setUserTypeError] = useState<string | null>(null);
@@ -61,6 +65,7 @@ export function RegisterPage() {
   const passwordRef = useRef<HTMLInputElement>(null);
   const confirmationRef = useRef<HTMLInputElement>(null);
   const userTypeRef = useRef<HTMLInputElement>(null);
+  const privacyRef = useRef<HTMLInputElement>(null);
 
   // Someone who is already signed in has no use for this page. `registered` keeps the
   // redirect from racing this page's own move to profile setup (AC8).
@@ -112,10 +117,14 @@ export function RegisterPage() {
     const { errors, missingUserType } = validate();
     setFieldErrors(errors);
     setUserTypeError(missingUserType ? "Select Newcomer or Singaporean." : null);
+    setPrivacyError(
+      privacyConsent ? null : "Agree to the privacy notice before creating an account.",
+    );
 
     // Nothing is sent while a field is wrong, and the first one is focused (AC6).
     if (focusFirstError(errors)) return;
     if (missingUserType || userType === null) return userTypeRef.current?.focus();
+    if (!privacyConsent) return privacyRef.current?.focus();
 
     setSubmitting(true);
     try {
@@ -125,6 +134,8 @@ export function RegisterPage() {
         password,
         password_confirmation: passwordConfirmation,
         user_type: userType,
+        privacy_consent: true,
+        privacy_notice_version: PRIVACY_NOTICE_VERSION,
       });
       setRegistered(true);
       // First sign-in goes to profile setup (AC8), which SCRUM-14 builds.
@@ -169,6 +180,12 @@ export function RegisterPage() {
     }
     if (error.fieldErrors.user_type) {
       setUserTypeError("Select Newcomer or Singaporean.");
+      return;
+    }
+    if (error.field === "privacy_consent" || error.fieldErrors.privacy_consent) {
+      setPrivacyError(error.message);
+      setPrivacyConsent(false);
+      privacyRef.current?.focus();
       return;
     }
     setFormError(error.message);
@@ -244,6 +261,42 @@ export function RegisterPage() {
           error={userTypeError}
           firstOptionRef={userTypeRef}
         />
+
+        <div
+          className={cn("rounded-sm border p-3", privacyError ? "border-danger" : "border-line")}
+        >
+          <label className="flex items-start gap-2 text-sm text-ink">
+            <input
+              ref={privacyRef}
+              type="checkbox"
+              checked={privacyConsent}
+              onChange={(event) => {
+                setPrivacyConsent(event.target.checked);
+                setPrivacyError(null);
+              }}
+              aria-invalid={privacyError ? true : undefined}
+              aria-describedby={privacyError ? "privacy-consent-error" : undefined}
+              className="mt-0.5 size-4 accent-brand"
+            />
+            <span>
+              I agree to the{" "}
+              <Link
+                to="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-brand underline"
+              >
+                privacy notice (opens in a new tab)
+              </Link>
+              .
+            </span>
+          </label>
+          {privacyError && (
+            <p id="privacy-consent-error" className="mt-2 text-xs text-danger">
+              {privacyError}
+            </p>
+          )}
+        </div>
 
         <Button type="submit" fullWidth loading={submitting}>
           Create account

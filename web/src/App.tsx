@@ -3,12 +3,14 @@ import { BookOpen, Home, MessageSquare, Settings, Users } from "lucide-react";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 
 import { ComingSoonPage } from "./pages/ComingSoonPage";
+import { ChangePasswordPage, DeleteAccountPage } from "./pages/AccountSecurityPages";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { HomePage } from "./pages/HomePage";
 import { LessonPage } from "./pages/LessonPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { EditProfilePage, ProfileSetupPage } from "./pages/ProfileSetupPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
 import { TopicPage } from "./pages/TopicPage";
@@ -38,6 +40,7 @@ export function App() {
           {/* Open to everyone */}
           <Route path="/sign-in" element={<SignInPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
 
@@ -64,6 +67,8 @@ export function App() {
                 element={<ComingSoonPage title="Integration portfolio" module="Module 3" />}
               />
               <Route path="settings" element={<SettingsPage />} />
+              <Route path="settings/change-password" element={<ChangePasswordPage />} />
+              <Route path="settings/delete-account" element={<DeleteAccountPage />} />
               {/* The one profile editor, reached from Settings (SCRUM-14 AC4, SCRUM-41 AC5) */}
               <Route path="settings/profile" element={<EditProfilePage />} />
             </Route>

@@ -181,7 +181,7 @@ def test_an_archived_topic_is_only_a_warning():
     ],
 )
 def test_card_blockers(card, code, field):
-    doc = assign_ids(_doc({"id": "card", **card}))
+    doc = assign_ids(_doc({"id": "card", **card}, {"text": "Valid", "question": QUESTION}))
     [issue] = issues(doc, title="T", has_topic=True)
     assert (issue.code, issue.severity, issue.card_id, issue.field) == (
         code,
@@ -204,7 +204,16 @@ def test_an_empty_option_names_the_option():
 
 def test_a_single_option_needs_no_marking():
     question = {"options": [{"text": "Shiok"}], "explanation": "Delicious."}
-    assert _codes(_doc({"text": "Say {{blank}}", "question": question})) == []
+    assert _codes(_doc({"text": "Say {{blank}}", "question": question})) == ["no_scored_question"]
+    assert (
+        _codes(
+            _doc(
+                {"text": "Say {{blank}}", "question": question},
+                {"text": "Quiz", "question": QUESTION},
+            )
+        )
+        == []
+    )
 
 
 def test_long_cards_and_lessons_are_warnings_not_blockers():

@@ -110,6 +110,8 @@ class User(Base):
         _enum(UserRole, "user_role"), default=UserRole.USER, nullable=False
     )
     user_type: Mapped[UserType | None] = mapped_column(_enum(UserType, "user_type"))
+    privacy_agreed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    privacy_notice_version: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
 

@@ -302,6 +302,13 @@ def issues(
         blocker("no_cards", "Add at least one card.")
     elif not any(card.question is not None for card in doc.cards):
         blocker("no_questions", "Add a question to at least one card.")
+    elif not any(
+        card.question is not None and len(card.question.options) >= 2 for card in doc.cards
+    ):
+        blocker(
+            "no_scored_question",
+            "Add a quiz question with at least two answer options. One-option taps are not scored.",
+        )
 
     for card in doc.cards:
         _card_issues(card, media, blocker, warning)

@@ -84,6 +84,14 @@ export function AuthProvider({ basePath, children }: { basePath: string; childre
     setState({ status: "signed-out", user: null });
   }, [basePath]);
 
+  const deleteAccount = useCallback(
+    async (password: string) => {
+      await apiFetch<void>(`${basePath}/delete-account`, { method: "POST", body: { password } });
+      setState({ status: "signed-out", user: null });
+    },
+    [basePath],
+  );
+
   const requestPasswordReset = useCallback(
     async (email: string) => {
       await apiFetch<void>(`${basePath}/forgot-password`, { method: "POST", body: { email } });
@@ -116,6 +124,7 @@ export function AuthProvider({ basePath, children }: { basePath: string; childre
       signIn,
       register,
       signOut,
+      deleteAccount,
       refresh,
       requestPasswordReset,
       checkResetLink,
@@ -126,6 +135,7 @@ export function AuthProvider({ basePath, children }: { basePath: string; childre
       signIn,
       register,
       signOut,
+      deleteAccount,
       refresh,
       requestPasswordReset,
       checkResetLink,
