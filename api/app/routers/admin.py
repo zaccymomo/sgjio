@@ -5,24 +5,31 @@ its author forgets to add the guard.
 """
 
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from pydantic import AwareDatetime
 from sqlalchemy.orm import Session
 
-from app import lessons, media, topics
+from app import admins, insights, lessons, media, reports, topics
 from app.auth.deps import require_admin
 from app.db import get_db
 from app.models import User
 from app.problems import ContentProblem
 from app.schemas import (
+    AdminInviteRequest,
+    AdminOut,
+    AdminsOut,
     AssetOut,
     LessonChangeRequest,
     LessonCreateRequest,
+    LessonInsightsOut,
     LessonOrderRequest,
     LessonOut,
     LessonSummaryOut,
     LessonUpdateRequest,
+    ReportOut,
+    ReportStatusRequest,
     TopicOrderRequest,
     TopicOut,
     TopicRequest,
@@ -87,18 +94,21 @@ def reorder_topics(
     responses=NAME_TAKEN,
 )
 def create_topic(body: TopicRequest, db: Session = Depends(get_db)) -> topics.TopicSummary:
+    """Add a topic at the end of the list, with an optional description (SCRUM-86)."""
     try:
-        return topics.create_topic(db, body.name)
+        return topics.create_topic(db, body.name, body.description or "")
     except ContentProblem as problem:
         raise _refuse(problem) from None
 
 
 @router.patch("/topics/{topic_id}", response_model=TopicOut, responses={**NOT_FOUND, **NAME_TAKEN})
-def rename_topic(
+def update_topic(
     topic_id: uuid.UUID, body: TopicRequest, db: Session = Depends(get_db)
 ) -> topics.TopicSummary:
+    """Rename a topic and change its description. Leaving `description` out keeps it;
+    an empty one clears it (SCRUM-86)."""
     try:
-        return topics.rename_topic(db, topic_id, body.name)
+        return topics.update_topic(db, topic_id, body.name, body.description)
     except ContentProblem as problem:
         raise _refuse(problem) from None
 
@@ -318,6 +328,31 @@ def restore_lesson(
         raise _refuse(problem) from None
 
 
+# --- Insights (SCRUM-84) -------------------------------------------------------------------
+
+
+@router.get(
+    "/lessons/{lesson_id}/insights",
+    response_model=LessonInsightsOut,
+    responses={
+        404: {"description": "No such lesson or version (lesson_not_found, version_not_found)"}
+    },
+)
+def lesson_insights(
+    lesson_id: uuid.UUID,
+    version: int | None = Query(None, ge=1, description="Defaults to the latest version"),
+    learners: insights.Learners = Query("all", description="Everyone, or one kind of learner"),
+    db: Session = Depends(get_db),
+) -> insights.LessonInsights:
+    """How learners do on one version of a lesson: who finished it, scores, where they
+    stop, and each question's answers. No figure is given for fewer than 5 learners, and no
+    learner is named."""
+    try:
+        return insights.lesson_insights(db, lesson_id, version, learners)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
 # --- Images and audio (SCRUM-19) -----------------------------------------------------------
 
 
@@ -352,3 +387,120 @@ async def upload_media(
         return media.store(db, data, file.filename or "", admin.id)
     except ContentProblem as problem:
         raise _refuse(problem) from None
+
+
+# --- Reported problems (SCRUM-83) ---------------------------------------------------------
+
+
+@router.get("/reports", response_model=list[ReportOut])
+def list_reports(
+    which: Literal["open", "closed"] = Query("open", alias="status"),
+    db: Session = Depends(get_db),
+) -> list[reports.ReportSummary]:
+    """Open reports newest first (`status=open`, AC1), or those marked Fixed or Dismissed,
+    most recently dealt with first (`status=closed`, AC3). Never says who sent them."""
+    return reports.list_reports(db, which)
+
+
+@router.put(
+    "/reports/{report_id}/status",
+    response_model=ReportOut,
+    responses={404: {"description": "No report with that id (report_not_found)"}},
+)
+def set_report_status(
+    report_id: uuid.UUID,
+    body: ReportStatusRequest,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> reports.ReportSummary:
+    """Mark a report Fixed or Dismissed, which keeps it for reference (AC3), or reopen it."""
+    try:
+        return reports.set_status(db, admin.id, report_id, body.status)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+
+
+# --- Administrators (SCRUM-81) ------------------------------------------------------------
+
+ADMIN_NOT_FOUND = {404: {"description": "No administrator with that id (admin_not_found)"}}
+
+
+@router.get("/admins", response_model=AdminsOut)
+def list_admins(
+    admin: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> admins.AdminsPage:
+    """Every administrator with their last sign-in, removed ones apart, and the latest
+    changes (AC1)."""
+    return admins.list_admins(db, admin)
+
+
+@router.post(
+    "/admins",
+    response_model=AdminOut,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        409: {
+            "description": "The email has an account: email_in_use (a learner's, AC3), "
+            "already_admin, already_invited or admin_removed (these carry admin_id)"
+        },
+        422: {"description": "outside_domain until allow_other_domain is set, or a bad field"},
+    },
+)
+def invite_admin(
+    body: AdminInviteRequest, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> admins.AdminSummary:
+    """Create an administrator and email them a link to choose a password (AC2)."""
+    try:
+        invited = admins.invite_admin(db, admin, body.name, body.email, body.allow_other_domain)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+    return admins.get_summary(db, admin, invited.id)
+
+
+@router.post(
+    "/admins/{admin_id}/resend-invite",
+    response_model=AdminOut,
+    responses={**ADMIN_NOT_FOUND, 409: {"description": "Not waiting for an invite (not_invited)"}},
+)
+def resend_invite(
+    admin_id: uuid.UUID, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> admins.AdminSummary:
+    """Email a new invite link. The earlier one stops working."""
+    try:
+        admins.resend_invite(db, admin, admin_id)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+    return admins.get_summary(db, admin, admin_id)
+
+
+@router.post(
+    "/admins/{admin_id}/remove",
+    response_model=AdminOut,
+    responses={
+        **ADMIN_NOT_FOUND,
+        409: {"description": "Yourself (cannot_remove_self) or the last one (last_admin)"},
+    },
+)
+def remove_admin(
+    admin_id: uuid.UUID, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> admins.AdminSummary:
+    """Close an administrator's account, or cancel their invite: their sessions end and
+    they can no longer sign in (AC4, AC5). Safe to repeat."""
+    try:
+        admins.remove_admin(db, admin, admin_id)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+    return admins.get_summary(db, admin, admin_id)
+
+
+@router.post("/admins/{admin_id}/restore", response_model=AdminOut, responses=ADMIN_NOT_FOUND)
+def restore_admin(
+    admin_id: uuid.UUID, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+) -> admins.AdminSummary:
+    """Give a removed administrator access again, with a new link to choose a password.
+    Safe to repeat."""
+    try:
+        admins.restore_admin(db, admin, admin_id)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+    return admins.get_summary(db, admin, admin_id)

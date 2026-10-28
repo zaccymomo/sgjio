@@ -28,17 +28,20 @@ function readDevice(): Device {
  * shows unsaved edits too. Answers are checked in the browser: nothing is recorded against
  * any account or progress figure (AC2). Options are shuffled afresh each time it opens, as
  * they are for learners. "Phone" shows it at phone size in a frame; "Laptop" fills the
- * window. Closing (or Esc) returns to wherever it was opened from (AC3).
+ * window. Closing (or Esc) returns to wherever it was opened from (AC3). `start` opens it at
+ * a card (from 0) instead of the cover, as lesson insights do for one question.
  */
 export function LessonPreview({
   lesson,
   doc,
   assets,
+  start,
   onClose,
 }: {
   lesson: DeckLesson;
   doc: LessonDoc;
   assets: Assets;
+  start?: number;
   onClose: () => void;
 }) {
   const [device, setDevice] = useState<Device>(readDevice);
@@ -126,6 +129,7 @@ export function LessonPreview({
               cards={cards}
               assets={assets}
               check={check}
+              start={start}
               onExit={onClose}
             />
           </div>
@@ -136,6 +140,7 @@ export function LessonPreview({
               cards={cards}
               assets={assets}
               check={check}
+              start={start}
               onExit={onClose}
             />
           </div>

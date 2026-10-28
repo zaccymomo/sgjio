@@ -55,9 +55,16 @@ type Props = {
   variant?: "full" | "embedded";
   index?: number;
   onIndexChange?: (index: number) => void;
+  /** "full" only: the card to open at instead of the cover, e.g. to preview one question. */
+  start?: number;
   onExit?: () => void;
   /** Shown in the top bar, e.g. a "Preview" label. */
   badge?: ReactNode;
+  /**
+   * Extra buttons in the top bar while a card is showing (not the cover or the end), e.g.
+   * the learner's "Report a problem" (SCRUM-82). A preview leaves it out.
+   */
+  cardActions?: (card: LearnerCard) => ReactNode;
   /** The end card's buttons. Defaults to "Start again" and, with onExit, "Close". */
   renderEnd?: (summary: DeckSummary, restart: () => void) => ReactNode;
   /**
@@ -97,15 +104,17 @@ export function LessonDeck({
   variant = "full",
   index,
   onIndexChange,
+  start,
   onExit,
   badge,
+  cardActions,
   renderEnd,
   onFinish,
 }: Props) {
   const embedded = variant === "embedded";
   const reduced = useReducedMotion();
   const [muted, setMuted] = useMuted();
-  const [step, setStep] = useState(embedded ? (index ?? 0) : COVER);
+  const [step, setStep] = useState(embedded ? (index ?? 0) : (start ?? COVER));
   const [direction, setDirection] = useState(1);
   const [started, setStarted] = useState(false);
   const regionRef = useRef<HTMLDivElement>(null);
@@ -262,6 +271,9 @@ export function LessonDeck({
     const target = event.target as HTMLElement | null;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+    // A dialog opened over the deck (such as a report form) has its own keys: Escape closes
+    // the dialog, not the lesson.
+    if (target?.closest("dialog, [role='dialog']")) return;
     if (event.key === "ArrowRight") {
       if (current === COVER) primary();
       else if (canAdvance) go(current + 1);
@@ -429,6 +441,7 @@ export function LessonDeck({
               ))}
             </div>
             {badge}
+            {card && !embedded && cardActions?.(card)}
             <button
               type="button"
               onClick={() => setMuted(!muted)}

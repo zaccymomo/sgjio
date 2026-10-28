@@ -52,9 +52,40 @@ class LessonStatus(str, enum.Enum):
     WITHDRAWN = "withdrawn"
 
 
+class ReportReason(str, enum.Enum):
+    """Why a learner reported a card (SCRUM-82 AC1)."""
+
+    WRONG = "wrong"  # wrong or outdated
+    INSENSITIVE = "insensitive"
+    TYPO = "typo"
+    MEDIA = "media"  # image or audio not working
+    OTHER = "other"
+
+
+class ReportStatus(str, enum.Enum):
+    """An open report waits for an administrator; the other two are kept for reference
+    (SCRUM-83 AC3)."""
+
+    OPEN = "open"
+    FIXED = "fixed"
+    DISMISSED = "dismissed"
+
+
 class MediaKind(str, enum.Enum):
     IMAGE = "image"
     AUDIO = "audio"
+
+
+class AdminAction(str, enum.Enum):
+    """What happened to an administrator account, for the activity log (SCRUM-81)."""
+
+    INVITED = "invited"
+    INVITE_RESENT = "invite_resent"
+    JOINED = "joined"  # chose a password from an invite
+    INVITE_CANCELLED = "invite_cancelled"
+    REMOVED = "removed"
+    RESTORED = "restored"
+    ADDED = "added"  # with `python -m app.cli create-admin`
 
 
 class AuthScope(str, enum.Enum):
@@ -112,6 +143,12 @@ class User(Base):
     user_type: Mapped[UserType | None] = mapped_column(_enum(UserType, "user_type"))
     privacy_agreed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     privacy_notice_version: Mapped[str | None] = mapped_column(String(32))
+    # An administrator who has been invited and has not yet chosen a password (SCRUM-81).
+    # Set again by each new invite link, so it is when the latest one was sent.
+    invited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # An administrator removed from the portal (SCRUM-81). The account is kept, closed, so
+    # it can be restored and the activity log still names it; it cannot sign in anywhere.
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
 
@@ -120,8 +157,13 @@ class User(Base):
     )
 
     @property
+    def is_removed(self) -> bool:
+        return self.removed_at is not None
+
+    @property
     def is_admin(self) -> bool:
-        return self.role == UserRole.ADMIN
+        """An administrator who can use the portal: removed ones no longer count."""
+        return self.role == UserRole.ADMIN and not self.is_removed
 
 
 class Profile(Base):
@@ -158,6 +200,9 @@ class Topic(Base):
     `position` is the order administrators set (SCRUM-66), which is also the order of
     the circles users see. It is a sort key, not unique: reads break ties by `created_at`,
     so a gap or a duplicate can never break a page.
+
+    `description` is a line or two shown under the name on the topic's page (SCRUM-86).
+    Empty means the topic has none; it is never null, like a lesson's `summary`.
     """
 
     __tablename__ = "topics"
@@ -168,6 +213,9 @@ class Topic(Base):
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     name: Mapped[str] = mapped_column(String(80), nullable=False)
+    description: Mapped[str] = mapped_column(
+        String(200), nullable=False, default="", server_default=""
+    )
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Defaults to 0 so rows built directly (tests, scripts) still work; the API appends.
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -414,6 +462,56 @@ class AttemptAnswer(Base):
     attempt: Mapped[LessonAttempt] = relationship(back_populates="answers")
 
 
+# --- Reported problems --------------------------------------------------------------------
+
+
+class LessonReport(Base):
+    """A problem a learner reported on one card of a lesson (SCRUM-82), for administrators to
+    fix or dismiss (SCRUM-83).
+
+    It names the version and the card it was sent from (AC3): card ids stay the same across
+    edits, so the editor can open the same card in today's draft. Reports are never deleted
+    when dealt with, only marked Fixed or Dismissed.
+
+    `reporter_id` is kept so a report belongs to someone, but administrators are never shown
+    who sent it (SCRUM-83 AC1).
+    """
+
+    __tablename__ = "lesson_reports"
+    __table_args__ = (Index("ix_lesson_reports_status_created_at", "status", "created_at"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lesson_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("lessons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("lesson_versions.id", ondelete="CASCADE"), nullable=False
+    )
+    card_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    reason: Mapped[ReportReason] = mapped_column(
+        _enum(ReportReason, "report_reason"), nullable=False
+    )
+    note: Mapped[str] = mapped_column(String(500), nullable=False, default="", server_default="")
+    reporter_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    status: Mapped[ReportStatus] = mapped_column(
+        _enum(ReportStatus, "report_status"),
+        nullable=False,
+        default=ReportStatus.OPEN,
+        server_default=ReportStatus.OPEN.value,
+    )
+    created_at: Mapped[datetime] = _created_at()
+    # When, and by which administrator, it was marked Fixed or Dismissed.
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+
+    lesson: Mapped[Lesson] = relationship()
+    version: Mapped[LessonVersion] = relationship()
+
+
 # --- Authentication support ---------------------------------------------------------------
 
 
@@ -465,3 +563,27 @@ class LoginAttempt(Base):
     succeeded: Mapped[bool] = mapped_column(Boolean, nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(45))
     attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class AdminEvent(Base):
+    """One change to an administrator account, for the Administrators page (SCRUM-81).
+
+    Rows are only ever added. `actor_id` is who made the change: empty when the account
+    holder did it themselves (joined, or asked for a new invite link) or it came from the
+    command line.
+    """
+
+    __tablename__ = "admin_events"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    action: Mapped[AdminAction] = mapped_column(_enum(AdminAction, "admin_action"), nullable=False)
+    admin_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+    admin: Mapped[User] = relationship(foreign_keys=[admin_id])
+    actor: Mapped[User | None] = relationship(foreign_keys=[actor_id])

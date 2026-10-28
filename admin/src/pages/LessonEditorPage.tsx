@@ -11,6 +11,7 @@ import {
 } from "@sgjio/ui/lesson";
 import {
   ArchiveRestore,
+  ChartColumn,
   ChevronLeft,
   CircleAlert,
   CloudOff,
@@ -70,7 +71,8 @@ type Load =
  *
  * A new lesson exists only in the page until its first change, which creates it and changes
  * the address to /lessons/:id; that way opening the editor and leaving never leaves an empty
- * lesson behind. `/lessons/new?topic=<id>` starts in that topic.
+ * lesson behind. `/lessons/new?topic=<id>` starts in that topic, and `?card=<id>` opens that
+ * card, as a reported problem does (SCRUM-83 AC2).
  */
 export function LessonEditorPage() {
   const { id = NEW } = useParams();
@@ -143,6 +145,7 @@ export function LessonEditorPage() {
         initialLesson={ready.lesson}
         topics={ready.topics}
         presetTopicId={searchParams.get("topic")}
+        presetCardId={searchParams.get("card")}
         onCreated={handleCreated}
       />
     );
@@ -245,6 +248,7 @@ function LessonEditor({
   initialLesson,
   topics: initialTopics,
   presetTopicId,
+  presetCardId,
   onCreated,
 }: {
   /** Null for a lesson that has not been saved yet. */
@@ -252,6 +256,8 @@ function LessonEditor({
   topics: Topic[];
   /** From ?topic=, for "Add lesson" on a topic. Ignored unless it is an active topic. */
   presetTopicId: string | null;
+  /** From ?card=, for a reported problem. Ignored unless the card is in the draft. */
+  presetCardId: string | null;
   onCreated: (lesson: Lesson) => void;
 }) {
   const navigate = useNavigate();
@@ -265,7 +271,12 @@ function LessonEditor({
     return { title: "", summary: "", topic_id: preset?.id ?? null, doc: { cards: [newCard()] } };
   });
   const [assets, setAssets] = useState<Record<string, Asset>>(initialLesson?.assets ?? {});
-  const [selectedId, setSelectedId] = useState<string | null>(draft.doc.cards[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () =>
+      draft.doc.cards.find((card) => card.id === presetCardId)?.id ??
+      draft.doc.cards[0]?.id ??
+      null,
+  );
   const [previewOpen, setPreviewOpen] = useState(false);
   const [action, setAction] = useState<Action | null>(null);
   const [busy, setBusy] = useState(false);
@@ -546,6 +557,13 @@ function LessonEditor({
   };
 
   const menuItems: MenuAction[] = [];
+  if (lesson?.version) {
+    menuItems.push({
+      label: "Insights",
+      icon: ChartColumn,
+      onSelect: () => navigate(`/lessons/${lesson.id}/insights`),
+    });
+  }
   if (everPublished && changed) {
     menuItems.push({
       label: "Discard changes",

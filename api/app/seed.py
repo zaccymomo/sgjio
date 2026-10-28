@@ -3,7 +3,7 @@
 Creates:
 - one administrator (administrators are not created through registration, SCRUM-68)
 - one ordinary Newcomer account, so the main app can be signed in to before SCRUM-61
-- the six topics from the Figma home screen
+- the six topics from the Figma home screen, each with a description (SCRUM-86)
 - the lessons in content/lessons, published (see content/README.md). Loading them again
   only updates lessons whose files changed.
 - some completed lessons for the Newcomer account, so the landing page circles have
@@ -11,7 +11,8 @@ Creates:
 
 Topics and lessons get a position only when they are created, appended after anything
 already there, so a fresh database gets the Figma order and re-seeding never undoes an
-order an administrator has set (SCRUM-66).
+order an administrator has set (SCRUM-66). Likewise a description is only filled in while
+a topic has none, so re-seeding never undoes an administrator's edit.
 """
 
 from sqlalchemy import func, select
@@ -34,15 +35,31 @@ from app.models import (
 from app.security import hash_password
 from app.topics import next_topic_position
 
-# In the Figma home screen's order, which is the order a fresh database starts in.
-TOPICS = [
-    "Singlish",
-    "Hawker & Food",
-    "Workplace",
-    "Public Etiquette",
-    "Festivals",
-    "Getting Around",
-]
+# Name and description, in the Figma home screen's order, which is the order a fresh
+# database starts in. Each description sums up the topic's lessons in content/lessons.
+TOPICS = {
+    "Singlish": (
+        "The little words and sentence endings you will hear every day, and why "
+        "Singaporeans often say more with fewer words."
+    ),
+    "Hawker & Food": (
+        "How to order kopi, share a table and clear up after yourself at a hawker centre."
+    ),
+    "Workplace": (
+        "How colleagues address each other, say no politely, chat over lunch and follow up on work."
+    ),
+    "Public Etiquette": (
+        "The unwritten rules of queues, trains, buses, escalators and living close to your "
+        "neighbours."
+    ),
+    "Festivals": (
+        "What Chinese New Year, Hari Raya Puasa and Deepavali mean, and how to be a good "
+        "guest when you visit someone's home."
+    ),
+    "Getting Around": (
+        "Paying your fare, catching a bus, getting a taxi or ride, and when to give up your seat."
+    ),
+}
 
 
 # How many of each topic's lessons the demo Newcomer has finished, so the landing page
@@ -159,13 +176,16 @@ def seed(db: Session) -> list[str]:
         log.append(f"user account {user.email}")
 
     next_position = next_topic_position(db)
-    for name in TOPICS:
+    for name, description in TOPICS.items():
         topic = db.scalar(select(Topic).where(func.lower(Topic.name) == name.lower()))
         if topic is None:
-            topic = Topic(name=name, position=next_position)
+            topic = Topic(name=name, description=description, position=next_position)
             next_position += 1
             db.add(topic)
             log.append(f"topic {name}")
+        elif topic.description == "":
+            topic.description = description
+            log.append(f"description for topic {topic.name}")
     db.commit()
 
     # Lessons come from the files in content/ (SCRUM-77), published as they load.

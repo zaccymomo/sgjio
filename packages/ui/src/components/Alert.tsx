@@ -1,14 +1,16 @@
-import { AlertCircle, CheckCircle2, Info } from "lucide-react";
+import { AlertCircle, TriangleAlert, CheckCircle2, Info } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "../lib/cn";
 
-type Tone = "error" | "info" | "success";
+type Tone = "error" | "info" | "success" | "warning";
 
 const tones: Record<Tone, { box: string; icon: typeof Info }> = {
   error: { box: "border-danger/30 bg-danger-soft text-danger", icon: AlertCircle },
   info: { box: "border-line bg-surface text-muted", icon: Info },
   success: { box: "border-success/30 bg-success-soft text-success", icon: CheckCircle2 },
+  // Something to check before going on, e.g. an email outside the team's domain.
+  warning: { box: "border-amber-300 bg-amber-50 text-amber-900", icon: TriangleAlert },
 };
 
 /** A general message box, e.g. "The email or password is incorrect." */

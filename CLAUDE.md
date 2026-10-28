@@ -26,11 +26,11 @@ The developer uses Anaconda. **Always run Python tools with `python -m`** from `
 ```bash
 docker compose up -d                                   # Postgres + Mailpit (http://localhost:8025)
 cd api && python -m uvicorn app.main:app --reload      # API
-python -m pytest                                       # 384 tests, uses the sgjio_test database
+python -m pytest                                       # 453 tests, uses the sgjio_test database
 python -m ruff check . && python -m ruff format .
 python -m alembic revision --autogenerate -m "..."     # then READ the generated file
 python -m alembic upgrade head
-python -m app.cli seed | create-admin | send-reset | prune-media
+python -m app.cli seed | create-admin | send-reset | prune-media | demo-activity
 python -m app.cli import-lessons [folder] [--publish]   # load lesson files (content/README.md)
 npm run dev:web | dev:admin                            # from repo root
 npm run lint && npm run format && npm run typecheck && npm run build
@@ -55,6 +55,7 @@ Seed logins: main app `newcomer@sgjio.example.com` / `UserPass123`; admin `admin
 - Errors are `{"detail": {"code", "message", ...}}`; the front end reads them via `ApiError`.
 - Sign-in never reveals whether an email exists or is an admin. Lockout: 5 consecutive failures per email per scope blocks for 15 minutes (429 with `blocked_until`).
 - Password rules: `password_rule_failures()` in `app/security.py` (8+ chars, a letter and a number).
+- Administrators (SCRUM-81, `app/admins.py`): invited from the portal's Administrators page with a 3-day set-password link (`/set-password`), all with the same access. Removing one closes the account (`users.removed_at`), never deletes it; `User.is_admin` is false for removed ones, and every change is logged in `admin_events`. `create-admin` is only for the first administrator and recovery.
 - Password reset: `request_password_reset`, `check_reset_token`, `consume_reset_token`, `set_new_password` in `auth/reset.py`. Links last 5 minutes, work once, a new request cancels old ones. Endpoints `forgot-password`, `reset-password/check` and `reset-password` exist on both `/api/auth` and `/api/admin/auth`; the main-app pages are done (SCRUM-63) using `ForgotPasswordCard`/`ResetPasswordCard` from `@sgjio/ui`, and the admin pages (SCRUM-69) can reuse them.
 
 ## Product rules that stories depend on
@@ -64,5 +65,6 @@ Seed logins: main app `newcomer@sgjio.example.com` / `UserPass123`; admin `admin
 - **Lessons are decks of cards (SCRUM-19).** A card has Markdown text (bold, italics, lists, and at most one `{{blank}}`), an optional image and/or audio, and an optional question: 1 to 4 options, exactly one correct, an explanation, optional "why not" notes on wrong options, shuffled unless the author says not. A one-option question is a tap that fills the blank and isn't scored. A lesson needs at least one question to publish, belongs to exactly one topic, and should read in under 2 minutes. The document's rules live in `api/app/lesson_doc.py` (issues: blockers vs warnings); the shared types in `packages/ui/src/lesson/types.ts`.
 - **Drafts and versions (SCRUM-52).** Editors always change a lesson's draft; publishing copies it into a numbered `lesson_versions` row, which is what users see. Statuses Draft / Published / Withdrawn; withdrawn lessons, and every version, are kept for users' history. Topic and position are not versioned.
 - **Learners see the newest version** when they start or retake a lesson. Built in SCRUM-15/16 (`/lessons/:id` in `web/`): a lesson is complete when its deck is finished; the score is first-try correct answers out of the scored questions; the best percentage is kept, and a tie keeps the most recent; "mastered" means all correct. Answers are checked on the server, and the learner's copy of a lesson never contains which option is right.
+- **Reported problems (SCRUM-82, SCRUM-83).** Learners flag a card from the flag in the lesson's top bar (`cardActions` on `LessonDeck`); `lesson_reports` keeps the lesson, version, card id, reason and note. Admins see them at `/reports` in `admin/`, never with the reporter, and mark them Fixed or Dismissed (kept). Rules in `api/app/reports.py`.
 - **Media** (images, audio) is uploaded once, stored in Postgres (`media_assets`) and served publicly at `/api/media/{id}`; lessons refer to it by id. Images become WebP at most 1600px wide.
 - Open decisions and the defaults chosen are in `docs/decisions.md`. Don't change them silently; flag it.

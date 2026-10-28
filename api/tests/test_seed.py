@@ -1,5 +1,6 @@
 """The seed sets the order of what it creates, and never reorders anything (SCRUM-66), and
-loads its lessons from content/ (SCRUM-77)."""
+loads its lessons from content/ (SCRUM-77). It gives topics a description, but never
+replaces one an administrator wrote (SCRUM-86)."""
 
 import yaml
 from sqlalchemy import select
@@ -33,7 +34,7 @@ def _lesson_order(db, topic_name: str) -> list[str]:
 
 def test_a_fresh_seed_uses_the_figma_order(db):
     seed(db)
-    assert _topic_order(db) == TOPICS
+    assert _topic_order(db) == list(TOPICS)
     for name in TOPICS:
         assert _lesson_order(db, name) == [
             f["title"] for f in _lesson_files() if f.get("topic") == name
@@ -99,3 +100,25 @@ def test_a_missing_topic_is_added_at_the_end(db):
     order = _topic_order(db)
     assert order[0] == "Workplace"
     assert order[-1] == "Getting Around"
+
+
+def test_a_fresh_seed_gives_every_topic_its_description(db):
+    seed(db)
+    descriptions = dict(db.execute(select(Topic.name, Topic.description)).all())
+    assert descriptions == TOPICS
+    assert all(0 < len(description) <= 200 for description in TOPICS.values())
+
+
+def test_reseeding_fills_an_empty_description_but_keeps_an_edited_one(db):
+    seed(db)
+    singlish = db.scalar(select(Topic).where(Topic.name == "Singlish"))
+    festivals = db.scalar(select(Topic).where(Topic.name == "Festivals"))
+    singlish.description = "Written by an administrator."
+    festivals.description = ""
+    db.commit()
+
+    assert seed(db) == ["description for topic Festivals"]
+
+    db.expire_all()
+    assert singlish.description == "Written by an administrator."
+    assert festivals.description == TOPICS["Festivals"]

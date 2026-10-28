@@ -23,7 +23,8 @@ router = APIRouter(dependencies=[Depends(require_user)])
 
 @router.get("/progress", response_model=ProgressOut)
 def get_progress(user: User = Depends(require_user), db: Session = Depends(get_db)) -> ProgressOut:
-    """Lessons completed out of lessons available, per topic and overall."""
+    """Lessons completed out of lessons available, per topic and overall, and the suggested
+    next lesson (SCRUM-6)."""
     return ProgressOut.model_validate(progress_for(db, user.id))
 
 

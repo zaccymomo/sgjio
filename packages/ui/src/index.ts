@@ -12,10 +12,17 @@ export { Logo } from "./components/Logo";
 export { PasswordField } from "./components/PasswordField";
 export { PasswordRules } from "./components/PasswordRules";
 export { Placeholder } from "./components/Placeholder";
-export { ForgotPasswordCard, ResetPasswordCard } from "./components/PasswordResetCards";
+export {
+  CheckingLink,
+  ForgotPasswordCard,
+  LinkButton,
+  NewPasswordForm,
+  ResetPasswordCard,
+} from "./components/PasswordResetCards";
 export { ProgressRing } from "./components/ProgressRing";
 export { SignInForm } from "./components/SignInForm";
 export { FullPageSpinner, Spinner } from "./components/Spinner";
+export { TextAreaField, type TextAreaFieldProps } from "./components/TextAreaField";
 export { TextField, type TextFieldProps } from "./components/TextField";
 
 export { ApiError, apiFetch } from "./lib/api";

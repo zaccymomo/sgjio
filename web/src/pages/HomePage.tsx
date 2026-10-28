@@ -1,12 +1,17 @@
-import { ErrorState, Placeholder, ProgressRing, Spinner, cn, useAuth } from "@sgjio/ui";
+import { Button, Dialog, ErrorState, ProgressRing, Spinner, cn, useAuth } from "@sgjio/ui";
+import { readingLabel } from "@sgjio/ui/lesson";
+import { ChevronRight, Info, PartyPopper, RotateCcw, Sparkles } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { type Progress, type TopicProgress, useProgress } from "../lib/progress";
+import { type Progress, type Suggestion, type TopicProgress, useProgress } from "../lib/progress";
 
 /**
  * The landing page is the portfolio (SCRUM-43): one progress circle per topic that has a
  * published lesson, plus one overall figure. Selecting a circle opens that topic
- * (SCRUM-53). The suggested lesson beside it is SCRUM-6.
+ * (SCRUM-53). Below the circles is one suggested lesson, from the topic where progress is
+ * weakest (SCRUM-6); the circles stay the way to pick any topic instead. Then a way to review
+ * the questions answered wrongly (SCRUM-44).
  */
 export function HomePage() {
   const { user } = useAuth();
@@ -29,17 +34,42 @@ export function HomePage() {
           read as "no progress". */}
       {state.status === "error" && <ErrorState message={state.message} onRetry={reload} />}
 
-      {state.status === "ready" && <ProgressSection progress={state.progress} />}
-
-      <Placeholder story="SCRUM-6" title="Suggested for you">
-        The next lesson, drawn from the topic where progress is weakest.
-      </Placeholder>
+      {state.status === "ready" && (
+        <>
+          <ProgressSection progress={state.progress} />
+          {state.progress.available > 0 && (
+            <>
+              <SuggestionSection suggestion={state.progress.suggestion} />
+              {/* SCRUM-44 AC1 */}
+              <Link
+                to="/review"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg border border-line bg-white px-3.5 py-3",
+                  "transition-colors hover:border-brand/40 hover:bg-brand-soft/40",
+                  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+                )}
+              >
+                <RotateCcw className="size-5 shrink-0 text-brand" aria-hidden />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-sm font-semibold text-ink">Review mistakes</span>
+                  <span className="text-caption text-subtle">
+                    See the right answers to questions you missed
+                  </span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-subtle" aria-hidden />
+              </Link>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
 
 function ProgressSection({ progress }: { progress: Progress }) {
   const { topics, completed, available } = progress;
+  // The circle whose explanation is open (SCRUM-46), or null when it is closed.
+  const [explaining, setExplaining] = useState<TopicProgress | null>(null);
 
   if (available === 0) {
     return (
@@ -83,12 +113,124 @@ function ProgressSection({ progress }: { progress: Progress }) {
 
       <ul className="mt-3 grid grid-cols-3 gap-2.5 md:grid-cols-4">
         {topics.map((topic) => (
-          <li key={topic.id}>
+          // The explanation button sits beside the link rather than inside it, since a
+          // button inside a link is invalid and would also open the topic.
+          <li key={topic.id} className="relative">
             <TopicCircle topic={topic} />
+            <button
+              type="button"
+              onClick={() => setExplaining(topic)}
+              aria-label={`How the ${topic.name} circle is filled`}
+              className={cn(
+                "absolute top-1 right-1 flex size-8 items-center justify-center rounded-sm",
+                "text-subtle hover:bg-surface hover:text-ink",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+              )}
+            >
+              <Info className="size-4" aria-hidden />
+            </button>
           </li>
         ))}
       </ul>
+
+      <CircleExplanation topic={explaining} onClose={() => setExplaining(null)} />
     </section>
+  );
+}
+
+/**
+ * SCRUM-6: the suggested next lesson. The figures reload on return from a lesson, so
+ * completing it brings the next suggestion straight away (AC4). With every lesson completed
+ * there is none, and the page says so (AC6).
+ */
+function SuggestionSection({ suggestion }: { suggestion: Suggestion | null }) {
+  return (
+    <section className="flex flex-col gap-2.5">
+      <h2 className="text-caption font-semibold tracking-wide text-muted uppercase">
+        Suggested for you
+      </h2>
+      {suggestion ? (
+        <Link
+          to={`/lessons/${suggestion.lesson_id}`}
+          aria-label={`Suggested lesson: ${suggestion.title}, in ${suggestion.topic_name}. ${readingLabel(suggestion.reading_seconds)}.`}
+          className={cn(
+            "flex items-center gap-3 rounded-lg border border-brand/30 bg-brand-soft/40 px-3.5 py-3",
+            "transition-colors hover:border-brand/60 hover:bg-brand-soft/70",
+            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+          )}
+        >
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+            <Sparkles className="size-5" aria-hidden />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col" aria-hidden>
+            <span className="text-sm font-semibold text-ink">{suggestion.title}</span>
+            {suggestion.summary && (
+              <span className="text-caption text-muted">{suggestion.summary}</span>
+            )}
+            <span className="text-caption text-subtle">
+              {suggestion.topic_name} · {readingLabel(suggestion.reading_seconds)}
+            </span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-subtle" aria-hidden />
+        </Link>
+      ) : (
+        <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3.5 py-3">
+          <PartyPopper className="size-5 shrink-0 text-brand" aria-hidden />
+          <p className="text-sm text-ink">
+            You&apos;ve completed every lesson available. There&apos;s nothing further for now; new
+            lessons will appear here when they&apos;re published.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * SCRUM-46: what fills a circle and how quiz results are used, in plain language.
+ * Closing it only clears the open topic, so the landing page is left as it was (AC5).
+ */
+function CircleExplanation({
+  topic,
+  onClose,
+}: {
+  topic: TopicProgress | null;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog
+      open={topic !== null}
+      title="How your circles are filled"
+      description={
+        topic && `${topic.name}: ${topic.completed} of ${topic.available} lessons completed.`
+      }
+      onClose={onClose}
+      footer={
+        <Button data-autofocus onClick={onClose}>
+          Got it
+        </Button>
+      }
+    >
+      <ul className="flex list-disc flex-col gap-2 pl-5 text-sm text-ink">
+        {/* AC1 */}
+        <li>
+          Each circle counts the lessons you&apos;ve completed out of the lessons available in that
+          topic.
+        </li>
+        {/* AC2 */}
+        <li>Finishing a lesson completes it, even if you answered some questions incorrectly.</li>
+        {/* AC3: finish() in api/app/learning.py keeps the best score. */}
+        <li>
+          Your quiz results are recorded separately and count toward your tier. We keep your best
+          result, so retaking a quiz until you get it right counts in full.
+        </li>
+        {/* AC4 */}
+        <li>
+          A circle reflects the lessons in the topic right now. When new lessons are added, the
+          circle fills a smaller share until you complete them too.
+        </li>
+      </ul>
+    </Dialog>
   );
 }
 
@@ -104,7 +246,8 @@ function TopicCircle({ topic }: { topic: TopicProgress }) {
       // sentence instead of three fragments.
       aria-label={`${name}: ${completed} of ${available} lessons completed. ${status}.`}
       className={cn(
-        "flex h-full flex-col items-center gap-1.5 rounded-lg border border-line bg-white px-2 py-3",
+        // pt-6 leaves room for the explanation button in the top-right corner.
+        "flex h-full flex-col items-center gap-1.5 rounded-lg border border-line bg-white px-2 pt-6 pb-3",
         "transition-colors hover:border-brand/40 hover:bg-brand-soft/40",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
       )}

@@ -95,6 +95,7 @@ def test_list_shows_what_the_admin_page_needs_and_no_body(admin, db):
         "cards",
         "questions",
         "cover_asset_id",
+        "open_reports",
     }
     assert row["id"] == str(lesson.id)
     assert row["topic_id"] == str(topic.id)

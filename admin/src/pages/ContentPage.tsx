@@ -11,9 +11,9 @@ import { RowMenu } from "../components/RowMenu";
 import { SortableList } from "../components/SortableList";
 import {
   ConfirmTopicDialog,
-  TopicNameDialog,
+  TopicDialog,
   type ConfirmState,
-  type NameDialogState,
+  type TopicDialogState,
 } from "../components/TopicDialogs";
 import { TopicGroup, type TopicActions } from "../components/TopicGroup";
 import {
@@ -23,6 +23,7 @@ import {
   type LessonSummary,
   type Notice,
   type Topic,
+  type TopicFields,
 } from "../lib/content";
 import {
   lessonTitle,
@@ -63,7 +64,7 @@ function messageOf(error: unknown, fallback: string): string {
 /**
  * The admin portal's landing page (SCRUM-66): every topic, in the order users see their
  * circles, each opening to its lessons in order. Topics and lessons are reordered here,
- * and topics are created, renamed, archived, restored and deleted (SCRUM-57).
+ * and topics are created, edited, archived, restored and deleted (SCRUM-57, SCRUM-86).
  */
 export function ContentPage() {
   const location = useLocation();
@@ -75,7 +76,7 @@ export function ContentPage() {
   const content = useContent(passedNotice);
   const { state, notice, setNotice, retry } = content;
   const [view, setView] = useState<View>(readView);
-  const [nameDialog, setNameDialog] = useState<NameDialogState | null>(null);
+  const [topicDialog, setTopicDialog] = useState<TopicDialogState | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
@@ -162,16 +163,24 @@ export function ContentPage() {
     }
   }
 
-  async function saveName(name: string) {
-    if (!nameDialog) return;
-    if (nameDialog.mode === "create") {
-      await content.run(() => topicApi.create(name));
-      setNotice({ tone: "success", message: `“${name}” is created, at the end of the list.` });
+  async function saveTopic(fields: TopicFields) {
+    if (!topicDialog) return;
+    if (topicDialog.mode === "create") {
+      await content.run(() => topicApi.create(fields));
+      setNotice({
+        tone: "success",
+        message: `“${fields.name}” is created, at the end of the list.`,
+      });
     } else {
-      const saved = await content.run(() => topicApi.rename(nameDialog.topic.id, name));
-      setNotice({ tone: "success", message: `Renamed to “${saved.name}”.` });
+      const { topic } = topicDialog;
+      const saved = await content.run(() => topicApi.update(topic.id, fields));
+      setNotice({
+        tone: "success",
+        message:
+          saved.name !== topic.name ? `Renamed to “${saved.name}”.` : `“${saved.name}” is saved.`,
+      });
     }
-    setNameDialog(null);
+    setTopicDialog(null);
   }
 
   async function deleteLesson() {
@@ -226,7 +235,7 @@ export function ContentPage() {
   }
 
   const actions: TopicActions = {
-    rename: (topic) => setNameDialog({ mode: "rename", topic }),
+    edit: (topic, focus) => setTopicDialog({ mode: "edit", topic, focus }),
     archive: (topic) => openConfirm("archive", topic),
     remove: (topic) => openConfirm("delete", topic),
     restore: (topic) => void restore(topic),
@@ -234,6 +243,7 @@ export function ContentPage() {
   };
   const lessonActions: LessonActions = {
     edit: (lesson) => navigate(`/lessons/${lesson.id}`),
+    insights: (lesson) => navigate(`/lessons/${lesson.id}/insights`),
     remove: (lesson) => {
       setLessonDeleteError(null);
       setLessonToDelete(lesson);
@@ -255,7 +265,7 @@ export function ContentPage() {
           <Button
             variant="secondary"
             className="flex-1 sm:flex-none"
-            onClick={() => setNameDialog({ mode: "create" })}
+            onClick={() => setTopicDialog({ mode: "create" })}
             disabled={!data}
           >
             <Plus className="size-4" aria-hidden />
@@ -289,13 +299,13 @@ export function ContentPage() {
           actions={actions}
           lessonActions={lessonActions}
           busyTopicId={busyTopicId}
-          onCreateTopic={() => setNameDialog({ mode: "create" })}
+          onCreateTopic={() => setTopicDialog({ mode: "create" })}
           notice={notice}
           onDismissNotice={() => setNotice(null)}
         />
       )}
 
-      <TopicNameDialog state={nameDialog} onClose={() => setNameDialog(null)} onSave={saveName} />
+      <TopicDialog state={topicDialog} onClose={() => setTopicDialog(null)} onSave={saveTopic} />
       <ConfirmTopicDialog
         state={confirm && confirmTopic ? { ...confirm, topic: confirmTopic } : null}
         busy={confirmBusy}

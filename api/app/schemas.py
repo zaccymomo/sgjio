@@ -1,7 +1,7 @@
 """Request and response shapes shared across routers."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -18,7 +18,7 @@ from pydantic import (
 
 from app.auth import normalise_email
 from app.lesson_doc import LessonDoc
-from app.models import LessonStatus, UserRole, UserType
+from app.models import AdminAction, LessonStatus, ReportReason, ReportStatus, UserRole, UserType
 from app.profile_options import INTERESTS, LANGUAGES, NEIGHBOURHOODS
 
 # Email syntax check for registration. Built once: TypeAdapter compiles a validator.
@@ -37,7 +37,7 @@ class UserOut(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    """A new main-app account (SCRUM-61). Administrators are made with `app.cli`, not here."""
+    """A new main-app account (SCRUM-61). Administrators are invited from the portal."""
 
     name: str = Field(min_length=1, max_length=120)
     email: str = Field(min_length=1, max_length=254)
@@ -91,6 +91,82 @@ class RegisterResponse(BaseModel):
     """Registration signs the new user in, so it answers like sign-in (SCRUM-61 AC1)."""
 
     user: UserOut
+
+
+class AdminInviteRequest(BaseModel):
+    """A new administrator, invited from the portal (SCRUM-81 AC2)."""
+
+    name: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=1, max_length=254)
+    # Set once the person adding them has confirmed an email outside ADMIN_EMAIL_DOMAIN.
+    allow_other_domain: bool = False
+
+    @field_validator("name")
+    @classmethod
+    def _require_a_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Enter their name.")
+        return value
+
+    @field_validator("email")
+    @classmethod
+    def _require_a_valid_email(cls, value: str) -> str:
+        value = normalise_email(value)
+        try:
+            _EMAIL.validate_python(value)
+        except ValidationError:
+            raise ValueError("Enter an email address like name@example.com.") from None
+        return value
+
+
+class AdminOut(BaseModel):
+    """An administrator on the Administrators page (SCRUM-81 AC1)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    email: str
+    status: Literal["active", "invited", "removed"]
+    added_at: datetime
+    added_by: str | None = Field(description="Who invited them; empty if seeded or unknown")
+    last_sign_in_at: datetime | None
+    invited_at: datetime | None = Field(description="When the latest invite was sent")
+    invite_expires_at: datetime | None
+    removed_at: datetime | None
+    removed_by: str | None
+    is_you: bool
+
+
+class AdminActivityOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    action: AdminAction
+    at: datetime
+    admin_id: uuid.UUID
+    admin_name: str
+    actor_id: uuid.UUID | None = Field(description="Empty: the person themselves, or the CLI")
+    actor_name: str | None
+
+
+class AdminsOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    admins: list[AdminOut] = Field(description="Active and invited, by name")
+    removed: list[AdminOut] = Field(description="Most recently removed first")
+    activity: list[AdminActivityOut] = Field(description="Latest changes first")
+    email_domain: str | None = Field(description="Emails outside it need confirming")
+    invite_hours: int
+
+
+class InviteOut(BaseModel):
+    """Who an invite link is for, so its page can greet them (SCRUM-81)."""
+
+    name: str
+    email: str
+    invited_by: str | None
 
 
 class SignInRequest(BaseModel):
@@ -197,14 +273,50 @@ class TopicProgressOut(BaseModel):
     available: int
 
 
+class SuggestionOut(BaseModel):
+    """The suggested next lesson beside the circles (SCRUM-6)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    lesson_id: uuid.UUID
+    title: str
+    summary: str
+    reading_seconds: int
+    topic_id: uuid.UUID
+    topic_name: str
+
+
 class ProgressOut(BaseModel):
-    """Every circle plus the overall figure, as defined in SCRUM-16 AC7."""
+    """Every circle plus the overall figure, as defined in SCRUM-16 AC7, and the suggested
+    next lesson, null once everything available is completed (SCRUM-6)."""
 
     model_config = ConfigDict(from_attributes=True)
 
     topics: list[TopicProgressOut]
     completed: int
     available: int
+    suggestion: SuggestionOut | None
+
+
+class MistakeOut(BaseModel):
+    """A question answered wrongly, as its lesson reads now (SCRUM-44)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    lesson_id: uuid.UUID
+    lesson_title: str
+    topic_name: str
+    question_id: str
+    text: str
+    chosen: str
+    correct: str
+    explanation: str
+    why_not: str
+    answered_at: datetime
+
+
+class ReviewOut(BaseModel):
+    mistakes: list[MistakeOut]
 
 
 class TopicLessonOut(BaseModel):
@@ -224,24 +336,31 @@ class TopicLessonOut(BaseModel):
 
 
 class TopicLessonsOut(BaseModel):
-    """A topic opened from its circle: its figure and its published lessons (SCRUM-53)."""
+    """A topic opened from its circle: its figure and its published lessons (SCRUM-53), and
+    its description, empty if it has none (SCRUM-86)."""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     name: str
+    description: str
     completed: int
     available: int
     lessons: list[TopicLessonOut]
 
 
 TopicName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+# Matches topics.description (String(200)). Empty means the topic has none.
+TopicDescription = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]
 
 
 class TopicRequest(BaseModel):
-    """Create or rename a topic (SCRUM-57). The name is trimmed before the length check."""
+    """Create or edit a topic (SCRUM-57, SCRUM-86). Both fields are trimmed before the length
+    check. Leaving `description` out keeps the current one (empty for a new topic); an empty
+    string clears it."""
 
     name: TopicName
+    description: TopicDescription | None = None
 
 
 class TopicOut(BaseModel):
@@ -251,6 +370,7 @@ class TopicOut(BaseModel):
 
     id: uuid.UUID
     name: str
+    description: str
     archived_at: datetime | None
     position: int
     lesson_count: int
@@ -281,6 +401,7 @@ class LessonSummaryOut(BaseModel):
     cards: int
     questions: int
     cover_asset_id: uuid.UUID | None
+    open_reports: int
 
 
 class OrderRequest(BaseModel):
@@ -434,6 +555,111 @@ class LessonOut(BaseModel):
     assets: dict[str, AssetOut]
 
 
+# --- Lesson insights (SCRUM-84) ------------------------------------------------------------
+# Shares are fractions from 0 to 1. Figures are None where fewer than 5 learners are behind
+# them, and nothing here names a learner.
+
+
+class InsightsPreviousOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    number: int
+    average_best: float
+    right_first_time: float | None
+
+
+class InsightsSummaryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    learners: int
+    share_of_learners: float
+    average_best: float
+    right_first_time: float | None
+    finish_rate: float
+    previous: InsightsPreviousOut | None
+
+
+class InsightsOptionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    text: str
+    correct: bool
+    chosen: float
+
+
+class InsightsQuestionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    number: int
+    card_number: int
+    text: str
+    right_first_time: float
+    previous_right_first_time: float | None
+    fixed_on_retake: float | None
+    newcomers: float | None
+    singaporeans: float | None
+    options: list[InsightsOptionOut]
+
+
+class InsightsFunnelStepOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    question: int | None
+    runs: int
+
+
+class InsightsScoreOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    correct: int
+    learners: int
+
+
+class InsightsTrendSeriesOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    version: int
+    finished: list[int | None]
+    average_best: list[float | None]
+    right_first_time: list[float | None]
+    finish_rate: list[float | None]
+
+
+class InsightsTrendOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    weeks: list[date]
+    series: list[InsightsTrendSeriesOut]
+
+
+class LessonInsightsOut(BaseModel):
+    """How learners do on one version of a lesson. `enough` is false until 5 learners have
+    finished that version, and then every figure is null. `doc` and `assets` are the
+    version's deck, for previewing exactly what learners saw."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    status: LessonStatus
+    topic_name: str | None
+    versions: list[VersionOut]
+    version: int | None
+    learners: Literal["all", "newcomer", "singaporean"]
+    min_learners: int
+    enough: bool
+    summary: InsightsSummaryOut | None
+    questions: list[InsightsQuestionOut] | None
+    funnel: list[InsightsFunnelStepOut] | None
+    scores: list[InsightsScoreOut] | None
+    trend: InsightsTrendOut
+    doc: dict | None
+    assets: dict[str, AssetOut]
+    reading_seconds: int
+
+
 # --- Learners (SCRUM-15, SCRUM-16) ---------------------------------------------------------
 
 
@@ -537,3 +763,53 @@ class AttemptResultOut(BaseModel):
     score: ScoreOut
     best: ScoreOut
     first_completion: bool
+    # This completion finished every published lesson in the topic (SCRUM-55 AC1).
+    topic_completed: bool
+
+
+# --- Reported problems (SCRUM-82, SCRUM-83) ------------------------------------------------
+
+MAX_REPORT_NOTE = 500
+
+
+class ReportRequest(BaseModel):
+    """A problem on one card of the version the learner was shown (SCRUM-82)."""
+
+    version: int = Field(ge=1)
+    card_id: str = Field(min_length=1, max_length=40)
+    reason: ReportReason
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=MAX_REPORT_NOTE)] = ""
+
+
+class ReportSentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    created_at: datetime
+
+
+class ReportOut(BaseModel):
+    """A reported problem as administrators see it: never who sent it (SCRUM-83 AC1)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    lesson_id: uuid.UUID
+    lesson_title: str
+    topic_name: str | None
+    version: int
+    card_id: str
+    card_number: int | None
+    card_excerpt: str
+    card_in_draft: bool
+    reason: ReportReason
+    note: str
+    status: ReportStatus
+    created_at: datetime
+    resolved_at: datetime | None
+
+
+class ReportStatusRequest(BaseModel):
+    """Fixed or Dismissed takes a report off the open list (AC3); Open puts it back."""
+
+    status: ReportStatus
