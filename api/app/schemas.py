@@ -34,6 +34,10 @@ class UserOut(BaseModel):
     role: UserRole
     user_type: UserType | None
     created_at: datetime
+    # Accounts created with Google have no password: they always sign in with Google
+    # (SCRUM-92). Settings uses these to show what applies.
+    has_password: bool
+    google_linked: bool
 
 
 class RegisterRequest(BaseModel):
@@ -84,7 +88,53 @@ class ChangePasswordRequest(BaseModel):
 
 
 class DeleteAccountRequest(BaseModel):
-    password: str = Field(min_length=1, max_length=256)
+    """Confirmed with the password, or with Google for an account that has none (SCRUM-92)."""
+
+    password: str | None = Field(default=None, max_length=256)
+    id_token: str | None = Field(default=None, max_length=4096)
+
+
+class GoogleSignup(BaseModel):
+    """The sign-up step for someone new to SGJio who continued with Google (SCRUM-92).
+    Their email comes from Google; the name starts as Google's and can be changed."""
+
+    name: str = Field(min_length=1, max_length=120)
+    user_type: UserType
+    privacy_consent: bool
+    privacy_notice_version: str
+
+    @field_validator("name")
+    @classmethod
+    def _require_a_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Enter your name.")
+        return value
+
+    @field_validator("privacy_consent")
+    @classmethod
+    def _require_privacy_consent(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError("Agree to the privacy notice before creating an account.")
+        return value
+
+
+class GoogleSignInRequest(BaseModel):
+    # The Firebase ID token from Google's sign-in window.
+    id_token: str = Field(min_length=1, max_length=4096)
+    # Sent only after an answer of "needs_signup", with the same token.
+    signup: GoogleSignup | None = None
+
+
+class GoogleSignInResponse(BaseModel):
+    """Either signed in, or the name and email to greet a new person with at sign-up."""
+
+    status: Literal["signed_in", "needs_signup"]
+    user: UserOut | None = None
+    # True when this request created the account, so the page goes to profile setup.
+    created: bool = False
+    name: str | None = None
+    email: str | None = None
 
 
 class RegisterResponse(BaseModel):

@@ -3,6 +3,7 @@ import { Heart, Languages, LogOut, MapPin, Pencil, Sparkles } from "lucide-react
 import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+import { GoogleLogo } from "../components/GoogleSignIn";
 import { isProfileComplete, useProfile, type Profile } from "../lib/profile";
 
 const USER_TYPE_LABELS: Record<UserType, string> = {
@@ -60,6 +61,15 @@ export function SettingsPage() {
               <p className="truncate text-sm text-muted">{user.email}</p>
             </div>
           </div>
+          {/* SCRUM-92 */}
+          {user.google_linked && (
+            <p className="mt-3 flex items-center gap-2 text-sm text-ink">
+              <GoogleLogo />
+              {user.has_password
+                ? "Signed in with Google or your password"
+                : "Signed in with Google"}
+            </p>
+          )}
           <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4">
             <div>
               <dt className="text-caption text-muted">User type</dt>
@@ -88,12 +98,16 @@ export function SettingsPage() {
           <div className="space-y-3">
             <p className="text-sm font-semibold text-ink">Account security</p>
             <p className="text-sm text-muted">
-              Update your password or remove your account and data.
+              {user?.has_password
+                ? "Update your password or remove your account and data."
+                : "You sign in with Google, so there's no password to change. You can remove your account and data."}
             </p>
             <div className="flex flex-wrap gap-4 text-sm">
-              <Link to="/settings/change-password" className="font-semibold text-brand underline">
-                Change password
-              </Link>
+              {user?.has_password && (
+                <Link to="/settings/change-password" className="font-semibold text-brand underline">
+                  Change password
+                </Link>
+              )}
               <Link to="/settings/delete-account" className="font-semibold text-danger underline">
                 Delete account
               </Link>

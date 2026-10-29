@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # Adding an administrator outside this email domain asks for confirmation. Empty: no check.
     admin_email_domain: str = "sgjio.example.com"
 
+    # Sign in with Google (SCRUM-92): the Firebase project whose ID tokens are accepted.
+    # Empty switches Google sign-in off.
+    firebase_project_id: str = ""
+
     # Email
     email_backend: Literal["smtp", "console", "memory"] = "smtp"
     smtp_host: str = "localhost"

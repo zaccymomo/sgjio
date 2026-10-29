@@ -10,6 +10,9 @@ export type User = {
   role: "user" | "admin";
   user_type: UserType | null;
   created_at: string;
+  /** False for an account created with Google, which signs in with Google only (SCRUM-92). */
+  has_password: boolean;
+  google_linked: boolean;
 };
 
 /** What the register form sends. Field names match the API (SCRUM-61). */
@@ -22,6 +25,22 @@ export type RegisterInput = {
   privacy_consent: boolean;
   privacy_notice_version: string;
 };
+
+/** The sign-up step for someone new who continued with Google (SCRUM-92). */
+export type GoogleSignupInput = {
+  name: string;
+  user_type: UserType;
+  privacy_consent: boolean;
+  privacy_notice_version: string;
+};
+
+/** Signed in, or new to SGJio: the name and email to greet them with at sign-up. */
+export type GoogleSignInResult =
+  | { status: "signed_in"; user: User; created: boolean }
+  | { status: "needs_signup"; name: string; email: string };
+
+/** Confirms deleting an account: its password, or a Google ID token if it has none. */
+export type DeleteAccountConfirmation = { password: string } | { id_token: string };
 
 /** What the reset-password form sends (SCRUM-63, SCRUM-69). */
 export type ResetPasswordInput = {
@@ -38,8 +57,14 @@ export type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<User>;
   /** Create an account and sign in (main app only; the admin portal has no register route). */
   register: (input: RegisterInput) => Promise<User>;
+  /**
+   * Sign in with a Google ID token (main app only). Without `signup` someone new gets
+   * "needs_signup"; sending the same token with their answers creates the account.
+   */
+  continueWithGoogle: (idToken: string, signup?: GoogleSignupInput) => Promise<GoogleSignInResult>;
   signOut: () => Promise<void>;
-  deleteAccount: (password: string) => Promise<void>;
+  /** Delete the account, then `leave()` the page as it signs out. */
+  deleteAccount: (confirmation: DeleteAccountConfirmation, leave: () => void) => Promise<void>;
   /** Email a reset link if the account exists. Resolves the same way either way. */
   requestPasswordReset: (email: string) => Promise<void>;
   /** Rejects with ApiError code "reset_link_invalid" if the link is used, expired or replaced. */

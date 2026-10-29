@@ -6,6 +6,8 @@
 - A link works once (AC6).
 - Admin-portal links are only ever issued to administrator accounts (SCRUM-69).
 - Removed administrators get no links, and their old ones stop working (SCRUM-81).
+- An account created with Google has no password: it is emailed how it signs in instead
+  (SCRUM-92).
 - Invites to the admin portal are the same kind of link, lasting INVITE_LINK_HOURS
   (SCRUM-81). An invited administrator who asks for a reset link is sent a new invite.
 
@@ -23,7 +25,7 @@ from app.auth import normalise_email
 from app.auth.sessions import end_all_sessions
 from app.config import get_settings
 from app.mailer import send_email
-from app.mailer.templates import admin_invite_email, password_reset_email
+from app.mailer.templates import admin_invite_email, google_account_email, password_reset_email
 from app.models import AdminAction, AdminEvent, AuthScope, PasswordResetToken, User
 from app.security import hash_password, hash_token, new_token
 
@@ -74,6 +76,11 @@ def request_password_reset(db: Session, email: str, scope: AuthScope) -> None:
         send_admin_invite(db, user, inviter=None)
         db.add(AdminEvent(action=AdminAction.INVITE_RESENT, admin_id=user.id))
         db.commit()
+        return
+    if not user.has_password:
+        # Created with Google (SCRUM-92): nothing to reset, so say how they sign in.
+        sign_in = f"{get_settings().web_url.rstrip('/')}/sign-in"
+        send_email(google_account_email(to=user.email, name=user.name, link=sign_in))
         return
     token = issue_reset_token(db, user, scope)
     send_email(

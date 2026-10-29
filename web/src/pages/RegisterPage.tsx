@@ -6,7 +6,6 @@ import {
   PASSWORD_HINT,
   PasswordField,
   TextField,
-  cn,
   looksLikeEmail,
   passwordRuleFailures,
   useAuth,
@@ -15,21 +14,13 @@ import {
 import { useRef, useState, type FormEvent, type RefObject } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
-const PRIVACY_NOTICE_VERSION = "2026-10-22";
-
-/** The two user types, self-reported (SCRUM-61 AC1). */
-const USER_TYPES: Array<{ value: UserType; label: string; description: string }> = [
-  {
-    value: "newcomer",
-    label: "Newcomer",
-    description: "New to Singapore and learning how things work here.",
-  },
-  {
-    value: "singaporean",
-    label: "Singaporean",
-    description: "Living here already and happy to share local know-how.",
-  },
-];
+import {
+  PRIVACY_NOTICE_VERSION,
+  PrivacyConsent,
+  UserTypeChoice,
+} from "../components/AccountChoices";
+import { GoogleOption, GoogleSignUpCard } from "../components/GoogleSignIn";
+import { useGoogleSignIn } from "../lib/useGoogleSignIn";
 
 type FieldName = "name" | "email" | "password" | "password_confirmation";
 type FieldErrors = Partial<Record<FieldName, string>>;
@@ -70,7 +61,23 @@ export function RegisterPage() {
   // Someone who is already signed in has no use for this page. `registered` keeps the
   // redirect from racing this page's own move to profile setup (AC8).
   const [registered, setRegistered] = useState(false);
-  if (status === "signed-in" && !registered) return <Navigate to="/" replace />;
+  // An existing account found through Google just signs in (SCRUM-92).
+  const google = useGoogleSignIn((created) =>
+    navigate(created ? "/profile-setup" : "/", { replace: true }),
+  );
+
+  if (google.signup) {
+    return (
+      <GoogleSignUpCard
+        signup={google.signup}
+        onCancel={google.cancelSignup}
+        onSignedUp={google.signedUp}
+      />
+    );
+  }
+  if (status === "signed-in" && !registered && !google.finished) {
+    return <Navigate to="/" replace />;
+  }
 
   /** Highlighted fields are read top to bottom, so focus the first one that has a message. */
   function focusFirstError(errors: FieldErrors) {
@@ -204,6 +211,7 @@ export function RegisterPage() {
         </>
       }
     >
+      <GoogleOption google={google} />
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
         {emailTaken && (
           <Alert tone="error">
@@ -262,110 +270,20 @@ export function RegisterPage() {
           firstOptionRef={userTypeRef}
         />
 
-        <div
-          className={cn("rounded-sm border p-3", privacyError ? "border-danger" : "border-line")}
-        >
-          <label className="flex items-start gap-2 text-sm text-ink">
-            <input
-              ref={privacyRef}
-              type="checkbox"
-              checked={privacyConsent}
-              onChange={(event) => {
-                setPrivacyConsent(event.target.checked);
-                setPrivacyError(null);
-              }}
-              aria-invalid={privacyError ? true : undefined}
-              aria-describedby={privacyError ? "privacy-consent-error" : undefined}
-              className="mt-0.5 size-4 accent-brand"
-            />
-            <span>
-              I agree to the{" "}
-              <Link
-                to="/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-brand underline"
-              >
-                privacy notice (opens in a new tab)
-              </Link>
-              .
-            </span>
-          </label>
-          {privacyError && (
-            <p id="privacy-consent-error" className="mt-2 text-xs text-danger">
-              {privacyError}
-            </p>
-          )}
-        </div>
+        <PrivacyConsent
+          checked={privacyConsent}
+          onChange={(checked) => {
+            setPrivacyConsent(checked);
+            setPrivacyError(null);
+          }}
+          error={privacyError}
+          inputRef={privacyRef}
+        />
 
         <Button type="submit" fullWidth loading={submitting}>
           Create account
         </Button>
       </form>
     </AuthCard>
-  );
-}
-
-/**
- * Newcomer or Singaporean, as two selectable cards. Native radios do the keyboard and
- * screen-reader work; the cards are the label around each one.
- */
-function UserTypeChoice({
-  value,
-  onChange,
-  error,
-  firstOptionRef,
-}: {
-  value: UserType | null;
-  onChange: (value: UserType) => void;
-  error: string | null;
-  firstOptionRef: RefObject<HTMLInputElement | null>;
-}) {
-  return (
-    <fieldset className="flex flex-col gap-1.5">
-      <legend className="mb-1.5 text-xs font-semibold text-ink">I am a</legend>
-      <div
-        className="flex flex-col gap-2"
-        aria-describedby={error ? "user-type-message" : undefined}
-      >
-        {USER_TYPES.map((option, index) => {
-          const selected = value === option.value;
-          return (
-            <label
-              key={option.value}
-              className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-sm border bg-white p-3",
-                "transition-colors focus-within:ring-2",
-                selected
-                  ? "border-brand ring-2 ring-brand/20"
-                  : error
-                    ? "border-danger focus-within:ring-danger/20"
-                    : "border-line hover:bg-surface focus-within:border-ink focus-within:ring-ink/10",
-              )}
-            >
-              <input
-                ref={index === 0 ? firstOptionRef : undefined}
-                type="radio"
-                name="user_type"
-                value={option.value}
-                checked={selected}
-                onChange={() => onChange(option.value)}
-                aria-invalid={error ? true : undefined}
-                className="mt-0.5 size-4 shrink-0 accent-brand"
-              />
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold text-ink">{option.label}</span>
-                <span className="block text-caption text-muted">{option.description}</span>
-              </span>
-            </label>
-          );
-        })}
-      </div>
-      {error && (
-        <p id="user-type-message" className="text-xs text-danger">
-          {error}
-        </p>
-      )}
-    </fieldset>
   );
 }

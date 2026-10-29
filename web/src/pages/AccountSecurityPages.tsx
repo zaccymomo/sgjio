@@ -8,8 +8,11 @@ import {
   passwordRuleFailures,
   useAuth,
 } from "@sgjio/ui";
-import { useState, type FormEvent, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+
+import { GoogleLogo } from "../components/GoogleSignIn";
+import { GoogleSignInError, googleIdToken, preloadGoogle } from "../lib/google";
 
 function AccountFormLayout({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -24,6 +27,7 @@ function AccountFormLayout({ title, children }: { title: string; children: React
 }
 
 export function ChangePasswordPage() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [current, setCurrent] = useState("");
   const [password, setPassword] = useState("");
@@ -71,6 +75,9 @@ export function ChangePasswordPage() {
     }
   }
 
+  // Accounts created with Google have no password to change (SCRUM-92).
+  if (user && !user.has_password) return <Navigate to="/settings" replace />;
+
   return (
     <AccountFormLayout title="Change password">
       <p className="text-sm text-muted">
@@ -110,8 +117,28 @@ export function ChangePasswordPage() {
 }
 
 export function DeleteAccountPage() {
-  const { deleteAccount } = useAuth();
+  const { user } = useAuth();
+
+  return (
+    <AccountFormLayout title="Delete account">
+      <Alert tone="error">
+        This cannot be undone. Your account, profile, lesson progress and quiz attempts will be
+        removed, and you will be signed out everywhere.
+      </Alert>
+      {user && !user.has_password ? <ConfirmWithGoogle /> : <ConfirmWithPassword />}
+    </AccountFormLayout>
+  );
+}
+
+/** After deleting, the sign-in page says the account is gone. */
+function useLeaveDeleted() {
   const navigate = useNavigate();
+  return () => navigate("/sign-in", { replace: true, state: { accountDeleted: true } });
+}
+
+function ConfirmWithPassword() {
+  const { deleteAccount } = useAuth();
+  const leaveDeleted = useLeaveDeleted();
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -122,8 +149,7 @@ export function DeleteAccountPage() {
     setDeleting(true);
     setError("");
     try {
-      await deleteAccount(password);
-      navigate("/sign-in", { replace: true, state: { accountDeleted: true } });
+      await deleteAccount({ password }, leaveDeleted);
     } catch (cause) {
       setError(
         cause instanceof ApiError ? cause.message : "Something went wrong. Please try again.",
@@ -134,11 +160,7 @@ export function DeleteAccountPage() {
   }
 
   return (
-    <AccountFormLayout title="Delete account">
-      <Alert tone="error">
-        This cannot be undone. Your account, profile, lesson progress and quiz attempts will be
-        removed, and you will be signed out everywhere.
-      </Alert>
+    <>
       {error && <Alert tone="error">{error}</Alert>}
       <form onSubmit={submit} className="space-y-4">
         <PasswordField
@@ -152,6 +174,62 @@ export function DeleteAccountPage() {
           Permanently delete my account
         </Button>
       </form>
-    </AccountFormLayout>
+    </>
+  );
+}
+
+/** An account created with Google has no password: signing in with Google again confirms. */
+function ConfirmWithGoogle() {
+  const { user, deleteAccount } = useAuth();
+  const leaveDeleted = useLeaveDeleted();
+  const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    void preloadGoogle().catch(() => undefined);
+  }, []);
+
+  async function confirm() {
+    setDeleting(true);
+    setError("");
+    try {
+      const idToken = await googleIdToken();
+      await deleteAccount({ id_token: idToken }, leaveDeleted);
+    } catch (cause) {
+      if (cause instanceof GoogleSignInError && cause.reason === "cancelled") {
+        setError("You didn't confirm with Google, so your account was not deleted.");
+      } else {
+        setError(
+          cause instanceof GoogleSignInError || cause instanceof ApiError
+            ? cause.message
+            : "Something went wrong. Please try again.",
+        );
+      }
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <>
+      {error && <Alert tone="error">{error}</Alert>}
+      {/* Laid out like the password form: what confirms it, then the same button. */}
+      <div className="space-y-4">
+        <div>
+          <p className="text-xs font-semibold text-ink">Confirm with Google</p>
+          <div className="mt-1.5 flex items-start gap-3 rounded-sm border border-line bg-surface p-3">
+            <GoogleLogo className="mt-0.5" />
+            <p className="text-sm text-muted">
+              Google will open and ask you to choose an account. Choose{" "}
+              <span className="font-semibold break-words text-ink">{user?.email}</span>, the one you
+              sign in with. Your account is deleted as soon as you do.
+            </p>
+          </div>
+        </div>
+        <Button onClick={() => void confirm()} loading={deleting}>
+          Permanently delete my account
+        </Button>
+      </div>
+    </>
   );
 }
