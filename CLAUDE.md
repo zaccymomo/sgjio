@@ -26,7 +26,7 @@ The developer uses Anaconda. **Always run Python tools with `python -m`** from `
 ```bash
 docker compose up -d                                   # Postgres + Mailpit (http://localhost:8025)
 cd api && python -m uvicorn app.main:app --reload      # API
-python -m pytest                                       # 495 tests, uses the sgjio_test database
+python -m pytest                                       # 532 tests, uses the sgjio_test database
 python -m ruff check . && python -m ruff format .
 python -m alembic revision --autogenerate -m "..."     # then READ the generated file
 python -m alembic upgrade head
@@ -56,6 +56,7 @@ Seed logins: main app `newcomer@sgjio.example.com` / `UserPass123`; admin `admin
 - Sign-in never reveals whether an email exists or is an admin. Lockout: 5 consecutive failures per email per scope blocks for 15 minutes (429 with `blocked_until`).
 - Password rules: `password_rule_failures()` in `app/security.py` (8+ chars, a letter and a number).
 - Administrators (SCRUM-81, `app/admins.py`): invited from the portal's Administrators page with a 3-day set-password link (`/set-password`), all with the same access. Removing one closes the account (`users.removed_at`), never deletes it; `User.is_admin` is false for removed ones, and every change is logged in `admin_events`. `create-admin` is only for the first administrator and recovery.
+- Sign in with Google (SCRUM-92, `auth/google.py`): Firebase opens Google's window in `web/` (`web/src/lib/google.ts`, hidden without `VITE_FIREBASE_*`), and `POST /api/auth/google` checks the ID token (`FIREBASE_PROJECT_ID`) and starts an ordinary app session. It links a learner account with the same verified email automatically; admin and removed accounts are never reached. Someone new gets `needs_signup` and the same token is sent again with name, user type and consent. Google-only accounts have `password_hash` NULL (`User.has_password`): forgot-password emails them how they sign in, change-password refuses, and deleting is confirmed with a fresh Google token. Tests replace `google._decode_token`.
 - Password reset: `request_password_reset`, `check_reset_token`, `consume_reset_token`, `set_new_password` in `auth/reset.py`. Links last 5 minutes, work once, a new request cancels old ones. Endpoints `forgot-password`, `reset-password/check` and `reset-password` exist on both `/api/auth` and `/api/admin/auth`; the main-app pages are done (SCRUM-63) using `ForgotPasswordCard`/`ResetPasswordCard` from `@sgjio/ui`, and the admin pages (SCRUM-69) can reuse them.
 
 ## Product rules that stories depend on

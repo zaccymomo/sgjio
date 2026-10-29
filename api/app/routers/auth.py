@@ -14,6 +14,14 @@ from sqlalchemy.orm import Session
 
 from app import admins
 from app.auth.deps import require_admin, require_user
+from app.auth.google import (
+    GoogleIdentity,
+    GoogleSignup,
+    GoogleTokenInvalid,
+    GoogleUnavailable,
+    sign_in_with_google,
+    verify_google_token,
+)
 from app.auth.lockout import blocked_until, record_attempt
 from app.auth.reset import (
     check_reset_token,
@@ -36,6 +44,8 @@ from app.schemas import (
     ChangePasswordRequest,
     DeleteAccountRequest,
     ForgotPasswordRequest,
+    GoogleSignInRequest,
+    GoogleSignInResponse,
     InviteOut,
     RegisterRequest,
     RegisterResponse,
@@ -61,6 +71,17 @@ INVITE_LINK_INVALID = {
     "code": "invite_link_invalid",
     "message": "This invite link is no longer valid.",
 }
+
+GOOGLE_UNAVAILABLE = {
+    "code": "google_sign_in_unavailable",
+    "message": "Google sign-in isn't set up on this server. Use your email and password.",
+}
+GOOGLE_TOKEN_INVALID = {
+    "code": "google_token_invalid",
+    "message": "We couldn't confirm your Google sign-in. Please try again.",
+}
+# Which status each refusal from app.auth.google is sent with.
+GOOGLE_REFUSAL_STATUS = {"privacy_notice_changed": status.HTTP_422_UNPROCESSABLE_CONTENT}
 
 # An email already in use is a conflict; everything else registration refuses is the shape
 # of what was sent, which is what 422 already means for this API.
@@ -88,6 +109,18 @@ def problem_error(problem: FieldProblem) -> HTTPException:
         detail["failures"] = problem.failures
     refused = REGISTER_PROBLEM_STATUS.get(problem.code, status.HTTP_422_UNPROCESSABLE_CONTENT)
     return HTTPException(refused, detail=detail)
+
+
+def google_identity(id_token: str) -> GoogleIdentity:
+    """Who Google says this token is for, or the API error to send back."""
+    try:
+        return verify_google_token(id_token)
+    except GoogleUnavailable:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, detail=GOOGLE_UNAVAILABLE
+        ) from None
+    except GoogleTokenInvalid:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=GOOGLE_TOKEN_INVALID) from None
 
 
 def build_auth_router(scope: AuthScope) -> APIRouter:
@@ -160,6 +193,64 @@ def build_auth_router(scope: AuthScope) -> APIRouter:
             set_session_cookie(response, scope, token)
             return RegisterResponse(user=UserOut.model_validate(result.user))
 
+        @router.post(
+            "/google",
+            response_model=GoogleSignInResponse,
+            responses={
+                401: {"description": "The Google token is invalid or expired"},
+                403: {"description": "This account cannot be signed in to with Google"},
+                422: {"description": "A sign-up field is missing, or the notice has changed"},
+                503: {"description": "Google sign-in is not set up on this server"},
+            },
+        )
+        def google_route(
+            body: GoogleSignInRequest,
+            request: Request,
+            response: Response,
+            db: Session = Depends(get_db),
+        ) -> GoogleSignInResponse:
+            """Continue with Google (SCRUM-92). Main app only: the portal never offers it.
+
+            Signs in to the linked account, or links the learner account with the same
+            verified email. Someone new gets `needs_signup` and nothing is created until
+            the same token comes back with `signup` filled in.
+            """
+            identity = google_identity(body.id_token)
+            signup = (
+                GoogleSignup(
+                    name=body.signup.name,
+                    user_type=body.signup.user_type,
+                    privacy_notice_version=body.signup.privacy_notice_version,
+                )
+                if body.signup
+                else None
+            )
+            result = sign_in_with_google(db, identity, signup)
+
+            if result.refusal is not None:
+                refusal = result.refusal
+                detail = {"code": refusal.code, "message": refusal.message}
+                if refusal.code == "privacy_notice_changed":
+                    detail["field"] = "privacy_consent"
+                refused = GOOGLE_REFUSAL_STATUS.get(refusal.code, status.HTTP_403_FORBIDDEN)
+                raise HTTPException(refused, detail=detail)
+            if result.needs_signup:
+                return GoogleSignInResponse(
+                    status="needs_signup",
+                    name=identity.name or identity.email.split("@")[0],
+                    email=identity.email,
+                )
+
+            ip_address = request.client.host if request.client else None
+            record_attempt(db, result.user.email, scope, succeeded=True, ip_address=ip_address)
+            token, _ = create_session(db, result.user, scope)
+            set_session_cookie(response, scope, token)
+            return GoogleSignInResponse(
+                status="signed_in",
+                user=UserOut.model_validate(result.user),
+                created=result.created,
+            )
+
         @router.get("/privacy-notice-version")
         def privacy_notice_version_route() -> dict[str, str]:
             return {"version": NOTICE_VERSION}
@@ -172,6 +263,15 @@ def build_auth_router(scope: AuthScope) -> APIRouter:
             user: User = Depends(require_user),
         ) -> None:
             """Keep this browser signed in; revoke all other sessions and reset links."""
+            if not user.has_password:
+                # Signed up with Google, so there is nothing to change (SCRUM-92).
+                raise HTTPException(
+                    status.HTTP_409_CONFLICT,
+                    detail={
+                        "code": "no_password",
+                        "message": "You sign in with Google, so there is no password to change.",
+                    },
+                )
             until = blocked_until(db, user.email, AuthScope.APP)
             if until is not None:
                 raise lockout_error(until)
@@ -222,7 +322,10 @@ def build_auth_router(scope: AuthScope) -> APIRouter:
             db: Session = Depends(get_db),
             user: User = Depends(require_user),
         ) -> None:
-            """Delete a regular account and dependent personal data; never self-delete admins."""
+            """Delete a regular account and dependent personal data; never self-delete admins.
+
+            Confirmed with the password, or with Google for an account that has none.
+            """
             if user.is_admin:
                 raise HTTPException(
                     status.HTTP_403_FORBIDDEN,
@@ -231,15 +334,46 @@ def build_auth_router(scope: AuthScope) -> APIRouter:
                         "message": "Administrator accounts cannot be deleted here.",
                     },
                 )
-            if not verify_password(body.password, user.password_hash):
-                raise HTTPException(
-                    status.HTTP_401_UNAUTHORIZED,
-                    detail={
-                        "code": "incorrect_password",
-                        "field": "password",
-                        "message": "Your password is incorrect.",
-                    },
-                )
+            if user.has_password:
+                if not body.password:
+                    raise HTTPException(
+                        status.HTTP_422_UNPROCESSABLE_CONTENT,
+                        detail={
+                            "code": "password_required",
+                            "field": "password",
+                            "message": "Enter your password to confirm.",
+                        },
+                    )
+                if not verify_password(body.password, user.password_hash):
+                    raise HTTPException(
+                        status.HTTP_401_UNAUTHORIZED,
+                        detail={
+                            "code": "incorrect_password",
+                            "field": "password",
+                            "message": "Your password is incorrect.",
+                        },
+                    )
+            else:
+                # No password to ask for: signing in with Google again confirms (SCRUM-92).
+                if not body.id_token:
+                    raise HTTPException(
+                        status.HTTP_422_UNPROCESSABLE_CONTENT,
+                        detail={
+                            "code": "google_confirmation_required",
+                            "message": "Confirm with Google to delete your account.",
+                        },
+                    )
+                if google_identity(body.id_token).sub != user.google_sub:
+                    raise HTTPException(
+                        status.HTTP_403_FORBIDDEN,
+                        detail={
+                            "code": "google_account_mismatch",
+                            "message": (
+                                "That's a different Google account from the one you use "
+                                "for SGJio. Confirm with the same Google account."
+                            ),
+                        },
+                    )
             db.execute(delete(LoginAttempt).where(LoginAttempt.email == user.email))
             db.delete(user)
             db.commit()

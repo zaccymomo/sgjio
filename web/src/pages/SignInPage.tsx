@@ -1,6 +1,9 @@
 import { Alert, AuthCard, SignInForm, safeNextPath, useAuth } from "@sgjio/ui";
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
+import { GoogleOption, GoogleSignUpCard } from "../components/GoogleSignIn";
+import { useGoogleSignIn } from "../lib/useGoogleSignIn";
+
 /**
  * Main-app sign-in. Working scaffold for SCRUM-62: the form and redirect are done, and
  * the story owner checks it against the full acceptance criteria.
@@ -16,9 +19,22 @@ export function SignInPage() {
     accountDeleted?: boolean;
   } | null;
   const passwordReset = pageState?.passwordReset;
+  // A new Google account goes to profile setup first, as after registering (SCRUM-92).
+  const google = useGoogleSignIn((created) =>
+    navigate(created ? "/profile-setup" : next, { replace: true }),
+  );
 
+  if (google.signup) {
+    return (
+      <GoogleSignUpCard
+        signup={google.signup}
+        onCancel={google.cancelSignup}
+        onSignedUp={google.signedUp}
+      />
+    );
+  }
   // Already signed in: go straight to where they were heading.
-  if (status === "signed-in") return <Navigate to={next} replace />;
+  if (status === "signed-in" && !google.finished) return <Navigate to={next} replace />;
 
   return (
     <AuthCard
@@ -43,6 +59,7 @@ export function SignInPage() {
           Your account has been deleted.
         </Alert>
       )}
+      <GoogleOption google={google} />
       <SignInForm
         forgotPasswordHref="/forgot-password"
         onSuccess={() => navigate(next, { replace: true })}

@@ -9,7 +9,7 @@
  * and protect routes with <RequireAuth />, which sends signed-out visitors to the
  * sign-in page with ?next= set to the page they wanted (SCRUM-62 AC7, SCRUM-68 AC6).
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 import { ErrorState } from "../components/ErrorState";
@@ -19,6 +19,9 @@ import {
   AuthContext,
   useAuth,
   type AuthStatus,
+  type DeleteAccountConfirmation,
+  type GoogleSignInResult,
+  type GoogleSignupInput,
   type RegisterInput,
   type ResetPasswordInput,
   type User,
@@ -79,15 +82,43 @@ export function AuthProvider({ basePath, children }: { basePath: string; childre
     [basePath],
   );
 
+  const continueWithGoogle = useCallback(
+    async (idToken: string, signup?: GoogleSignupInput) => {
+      const result = await apiFetch<{
+        status: GoogleSignInResult["status"];
+        user: User | null;
+        created: boolean;
+        name: string | null;
+        email: string | null;
+      }>(`${basePath}/google`, { method: "POST", body: { id_token: idToken, signup } });
+      if (result.status === "signed_in" && result.user) {
+        setState({ status: "signed-in", user: result.user });
+        return { status: "signed_in", user: result.user, created: result.created } as const;
+      }
+      return {
+        status: "needs_signup",
+        name: result.name ?? "",
+        email: result.email ?? "",
+      } as const;
+    },
+    [basePath],
+  );
+
   const signOut = useCallback(async () => {
     await apiFetch<void>(`${basePath}/sign-out`, { method: "POST" });
     setState({ status: "signed-out", user: null });
   }, [basePath]);
 
   const deleteAccount = useCallback(
-    async (password: string) => {
-      await apiFetch<void>(`${basePath}/delete-account`, { method: "POST", body: { password } });
-      setState({ status: "signed-out", user: null });
+    async (confirmation: DeleteAccountConfirmation, leave: () => void) => {
+      await apiFetch<void>(`${basePath}/delete-account`, { method: "POST", body: confirmation });
+      // Leave the page in the same render as signing out; otherwise <RequireAuth> sees the
+      // signed-out state first and sends the browser to sign-in with ?next= set instead.
+      // React Router navigates in a transition, so signing out joins that transition.
+      startTransition(() => {
+        leave();
+        setState({ status: "signed-out", user: null });
+      });
     },
     [basePath],
   );
@@ -123,6 +154,7 @@ export function AuthProvider({ basePath, children }: { basePath: string; childre
       ...state,
       signIn,
       register,
+      continueWithGoogle,
       signOut,
       deleteAccount,
       refresh,
@@ -134,6 +166,7 @@ export function AuthProvider({ basePath, children }: { basePath: string; childre
       state,
       signIn,
       register,
+      continueWithGoogle,
       signOut,
       deleteAccount,
       refresh,

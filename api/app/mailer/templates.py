@@ -73,6 +73,37 @@ def password_reset_email(
     )
 
 
+def google_account_email(*, to: str, name: str, link: str) -> EmailMessage:
+    """Sent instead of a reset link to an account created with Google (SCRUM-92), which has
+    no password to reset."""
+    subject = "How you sign in to SGJio"
+    text = (
+        f"Hi {name},\n\n"
+        "We received a request to reset your SGJio password. Your account doesn't have a "
+        "password: you sign in with Google.\n\n"
+        f'On the sign-in page, select "Continue with Google" and use {to}:\n\n{link}\n\n'
+        "If you did not ask for this, you can ignore this email.\n\nThe SGJio team"
+    )
+    body = f"""\
+<p style="margin:0 0 12px;">Hi {escape(name)},</p>
+<p style="margin:0 0 16px;">
+  We received a request to reset your SGJio password. Your account doesn't have a
+  password: you sign in with Google.
+</p>
+<p style="margin:0 0 16px;">
+  On the sign-in page, select <strong>Continue with Google</strong> and use
+  <strong>{escape(to)}</strong>.
+</p>
+{_button(link, "Go to sign in")}
+<p style="margin:0;color:{_MUTED};font-size:12px;">
+  If you did not ask for this, you can ignore this email.
+</p>
+"""
+    return EmailMessage(
+        to=to, subject=subject, text=text, html=_layout("You sign in with Google", body)
+    )
+
+
 def _duration(hours: int) -> str:
     """72 -> "3 days", 12 -> "12 hours"."""
     if hours % 24 == 0:

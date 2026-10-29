@@ -39,6 +39,7 @@ cd ..
 
 # 3. Front ends
 npm install
+cp web/.env.example web/.env.local # Windows: copy web\.env.example web\.env.local
 ```
 
 > **Always run Python tools as `python -m <tool>`** (`python -m alembic`, `python -m pytest`, `python -m uvicorn`, `python -m ruff`). This guarantees the copy inside `api/.venv` runs.
@@ -73,6 +74,33 @@ Emails the app sends appear in Mailpit at **http://localhost:8025**. To try one:
 cd api && python -m app.cli send-reset --email admin@sgjio.example.com --scope admin
 ```
 
+## Sign in with Google
+
+The main app's sign-in and register pages have **Continue with Google** (SCRUM-92). It uses the team's Firebase project, `sgjio-966a1`, whose settings are already in `web/.env.example` and `api/.env.example`, so nobody needs a Firebase account to run it. The admin portal never offers Google.
+
+**Setting it up on a copy you already had before this was added**, on any computer:
+
+1. Copy the web settings file:
+   - macOS or Linux: `cp web/.env.example web/.env.local`
+   - Windows (PowerShell or Command Prompt): `copy web\.env.example web\.env.local`
+2. Open `api/.env` in any editor and add this line at the end:
+   ```
+   FIREBASE_PROJECT_ID=sgjio-966a1
+   ```
+3. Install the new packages and update the database, as in [After pulling or merging](#after-pulling-or-merging).
+4. Restart the API and `npm run dev:web` (both read their settings only when they start).
+5. Open **http://localhost:5173/sign-in** and select **Continue with Google**.
+
+| If you see                                       | Do this                                                                                              |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| No Google button                                 | `web/.env.local` is missing or empty: repeat step 1, then restart `npm run dev:web`                  |
+| "Google sign-in isn't set up on this server"     | `FIREBASE_PROJECT_ID` is missing from `api/.env`: repeat step 2, then restart the API                |
+| Google's window doesn't open                     | Allow pop-ups for `localhost` in your browser                                                        |
+| An error inside Google's window about the domain | Use `http://localhost:5173`, not `127.0.0.1` or your computer's IP: Firebase only allows `localhost` |
+| "We couldn't confirm your Google sign-in"        | The API terminal shows why on a line starting `Google sign-in token refused`                         |
+
+**Using your own Firebase project instead** (optional): in the [Firebase console](https://console.firebase.google.com), add a project, enable **Authentication → Sign-in method → Google**, then add a web app (**Project settings → Your apps → </>**). Put its `firebaseConfig` values in `web/.env.local` and its project id in `api/.env`. Leaving both empty removes the Google button and nothing else changes.
+
 ## After pulling or merging
 
 Your database is your own (it runs in Docker on your machine), so nobody else's data reaches it. Someone else's changes may need new packages, new database tables or new lessons. Run this from the repo root each time you pull or merge `main`:
@@ -92,7 +120,7 @@ Skipping the migration step leaves your database behind the code, and pages fail
 
 Three more things to know:
 
-- **`api/.env.example` changed?** Copy any new settings into your own `api/.env`.
+- **`api/.env.example` or `web/.env.example` changed?** Copy any new settings into your own `api/.env` or `web/.env.local`.
 - **What the seed does to your data.** It is safe to run again. It adds missing accounts and topics and never touches your progress. Every lesson that has a file in `content/lessons` is reset to match its file and published as a new version if anything differed, so edits you made to one in the admin portal are replaced. Lessons you created yourself are left alone. The first time, it finds your existing lessons by title; a seeded lesson you had renamed is not recognised, and the seed adds a second copy next to it.
 - **Starting over.** If your local data is in a mess, delete it and build it again. This removes everything in your local database, but nobody else's:
 

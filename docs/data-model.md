@@ -21,7 +21,8 @@ erDiagram
         uuid id PK
         string name
         string email UK "stored lower-case"
-        string password_hash "Argon2"
+        string password_hash "Argon2; null = created with Google, no password"
+        string google_sub UK "Google's account id, once signed in with Google"
         string role "user | admin"
         string user_type "newcomer | singaporean | null for admins"
         timestamptz invited_at "admin waiting to choose a password"
@@ -155,6 +156,7 @@ erDiagram
 ## Why it looks like this
 
 - **One `users` table for users and administrators.** `role` separates them, and one email is one account. Administrators are not created by registration; they are invited from the portal (SCRUM-81), or seeded, or added with `python -m app.cli create-admin` for the first one.
+- **Signing in with Google adds a column, not a table** (SCRUM-92). `google_sub` is Google's own id for the account (not Firebase's, so links survive leaving Firebase), unique so one Google account reaches one SGJio account. An account created with Google has no `password_hash`; one that registered with a password and later used Google has both. Only one Google account per SGJio account is supported, so a separate identities table was not needed.
 - **Removed administrators are kept, closed** (`removed_at`, SCRUM-81), like archived topics: they cannot sign in anywhere, and restoring them opens the account again with a new link. An invited administrator who has not yet chosen a password has `invited_at` set, and a password nobody knows.
 - **`admin_events` is the history; the columns are the state.** Sign-in checks read `removed_at` and `invited_at`; the Administrators page reads the log for who added or removed someone, and for its activity list. Rows are only ever added, so every round of removing and restoring is kept.
 - **Users and administrators have separate sessions.** `scope` on a session or reset link says which front end it belongs to. An admin-portal session never opens main-app routes, and the reverse holds too.

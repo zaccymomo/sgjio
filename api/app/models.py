@@ -136,7 +136,11 @@ class User(Base):
     # Always stored lower-case (see app.auth.normalise_email), so the unique index is
     # effectively case-insensitive.
     email: Mapped[str] = mapped_column(String(254), unique=True, nullable=False)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    # None for an account created with Google that has never had a password (SCRUM-92).
+    password_hash: Mapped[str | None] = mapped_column(String(255))
+    # Google's own id for the account ("sub"), set when someone signs in with Google
+    # (SCRUM-92). Google's id rather than Firebase's, so links survive leaving Firebase.
+    google_sub: Mapped[str | None] = mapped_column(String(255), unique=True)
     role: Mapped[UserRole] = mapped_column(
         _enum(UserRole, "user_role"), default=UserRole.USER, nullable=False
     )
@@ -164,6 +168,14 @@ class User(Base):
     def is_admin(self) -> bool:
         """An administrator who can use the portal: removed ones no longer count."""
         return self.role == UserRole.ADMIN and not self.is_removed
+
+    @property
+    def has_password(self) -> bool:
+        return self.password_hash is not None
+
+    @property
+    def google_linked(self) -> bool:
+        return self.google_sub is not None
 
 
 class Profile(Base):
