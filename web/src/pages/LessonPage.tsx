@@ -59,7 +59,8 @@ function message(error: unknown, fallback: string): string {
  * The first answer starts an attempt at the version shown, and reaching the end card
  * finishes it, which is what completes the lesson. Leaving earlier records nothing, and
  * the lesson opens from its cover next time (AC4). Closing, or "Back to …" at the end,
- * returns to the lesson's topic (AC13).
+ * returns to the lesson's topic (AC13), or to the search results it was opened from
+ * (SCRUM-85 AC3).
  *
  * Every card has "Report a problem" in its top bar (SCRUM-82). The report form opens over
  * the deck, so sending it leaves the learner on the same card.
@@ -68,6 +69,8 @@ export function LessonPage() {
   const { lessonId = "" } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  // Where the lesson was opened from, if it can step back there when it closes.
+  const openedFrom = (location.state as { from?: "topic" | "search" } | null)?.from;
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [save, setSave] = useState<Save>({ status: "idle" });
   // The card being reported, and whether the last report was just sent (SCRUM-82).
@@ -184,12 +187,13 @@ export function LessonPage() {
 
   const backToTopic = useCallback(() => {
     if (!lesson) return navigate("/");
-    // Opened from the topic page: step back to it, so the history stays home -> topic and
-    // the browser's back button then leads home (SCRUM-53 AC3, AC4). Opened any other way,
+    // Opened from the topic page or from search results: step back to them, so the
+    // history stays home -> topic and the browser's back button then leads home
+    // (SCRUM-53 AC3, AC4), or the results show again (SCRUM-85 AC3). Opened any other way,
     // for example from a link, the topic replaces the lesson instead.
-    if ((location.state as { fromTopic?: boolean } | null)?.fromTopic) return navigate(-1);
+    if (openedFrom) return navigate(-1);
     navigate(`/topics/${lesson.topic.id}`, { replace: true });
-  }, [lesson, location.state, navigate]);
+  }, [lesson, openedFrom, navigate]);
 
   if (load.status === "loading") return <FullPageSpinner />;
   if (load.status === "error") {
@@ -251,7 +255,7 @@ export function LessonPage() {
           onClick={backToTopic}
           className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-ink text-base font-bold text-white shadow-[0_3px_0_0_#000] transition-[transform,background-color] hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand active:translate-y-[2px]"
         >
-          Back to {ready.topic.name}
+          {openedFrom === "search" ? "Back to results" : `Back to ${ready.topic.name}`}
         </button>
         <button
           type="button"

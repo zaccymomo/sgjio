@@ -20,6 +20,9 @@ Beside the circles sits one suggested lesson (SCRUM-6): the next lesson not yet 
 the topic where progress is weakest, meaning the smallest share of its lessons completed.
 Topics tie in the order administrators set, so someone with no activity at all is pointed at
 the first lesson of the first topic. With everything completed there is no suggestion.
+
+Learners can also search every topic's lessons by a word or phrase (SCRUM-85), by the same
+rules: published lessons only, as their latest version reads, in topics that aren't archived.
 """
 
 import uuid
@@ -236,3 +239,91 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
         available=len(lessons),
         lessons=lessons,
     )
+
+
+@dataclass(frozen=True)
+class SearchResult:
+    """One lesson found by learners' search (SCRUM-85), as its latest version reads."""
+
+    lesson_id: uuid.UUID
+    title: str
+    topic_id: uuid.UUID
+    topic_name: str
+    completed: bool
+    # Card text around the first match, or None when only the title matched.
+    snippet: str | None
+
+
+SNIPPET_LENGTH = 120
+SNIPPET_LEAD = 40
+
+
+def search_lessons(db: Session, user_id: uuid.UUID, query: str) -> list[SearchResult]:
+    """Published lessons whose title or card text contains `query`, ignoring case and
+    Markdown (SCRUM-85 AC2).
+
+    Only the latest published version is read, never the draft, so an edit nobody has
+    published yet can't be found. Lessons in archived topics are left out, as from the
+    circles. Title matches come first; within each group, lessons keep the order of the
+    circles and topic pages.
+    """
+    needle = " ".join(query.split()).lower()
+    if not needle:
+        return []
+
+    rows = db.execute(
+        visible_to_users(
+            select(Lesson, Topic, LessonCompletion.id)
+            .join(Topic, Topic.id == Lesson.topic_id)
+            .outerjoin(
+                LessonCompletion,
+                and_(LessonCompletion.lesson_id == Lesson.id, LessonCompletion.user_id == user_id),
+            )
+            .where(Lesson.status == LessonStatus.PUBLISHED)
+            .order_by(Topic.position, Topic.name, Lesson.position, Lesson.created_at)
+        )
+    ).all()
+
+    by_title: list[SearchResult] = []
+    by_text: list[SearchResult] = []
+    for lesson, topic, completion_id in rows:
+        version = latest_version(db, lesson.id)
+        # A published lesson always has a version; one that somehow does not could not be
+        # opened (app/learning.py), so it is passed over.
+        if version is None:
+            continue
+        title_matches = needle in " ".join(version.title.split()).lower()
+        snippet = _snippet(LessonDoc.model_validate(version.doc), needle)
+        if not title_matches and snippet is None:
+            continue
+        result = SearchResult(
+            lesson_id=lesson.id,
+            title=version.title,
+            topic_id=topic.id,
+            topic_name=topic.name,
+            completed=completion_id is not None,
+            snippet=snippet,
+        )
+        (by_title if title_matches else by_text).append(result)
+    return by_title + by_text
+
+
+def _snippet(doc: LessonDoc, needle: str) -> str | None:
+    """About SNIPPET_LENGTH characters of the first card whose text contains `needle`, cut
+    so the match sits near the start, or None if no card's text does."""
+    for card in doc.cards:
+        text = lesson_doc.plain_text(card.text)
+        at = text.lower().find(needle)
+        if at < 0:
+            continue
+        start = max(0, at - SNIPPET_LEAD)
+        end = min(len(text), start + max(SNIPPET_LENGTH, len(needle) + SNIPPET_LEAD))
+        # Cut at spaces, so the snippet never starts or ends half way through a word.
+        if start > 0:
+            space = text.find(" ", start, at)
+            start = space + 1 if space >= 0 else start
+        if end < len(text):
+            space = text.rfind(" ", at + len(needle), end)
+            end = space if space >= 0 else end
+        return ("…" if start > 0 else "") + text[start:end] + ("…" if end < len(text) else "")
+    return None

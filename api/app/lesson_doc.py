@@ -189,6 +189,20 @@ def count_words(markdown: str) -> int:
     return len(_WORD.findall(visible))
 
 
+_LIST_BULLET = re.compile(r"^\s*[-+*]\s+", re.MULTILINE)
+_MARKERS = re.compile(r"[*_`~#>]+")
+
+
+def plain_text(markdown: str) -> str:
+    """Card text as a reader sees it, on one line, for learners' search (SCRUM-85): list
+    markers, emphasis and link syntax dropped, and the blank shown as ___. So "**chope** lah"
+    reads "chope lah"."""
+    text = _LINK.sub(r"\1", _LIST_NUMBER.sub("", _LIST_BULLET.sub("", markdown)))
+    # The blank is set aside first, or its underscores would be stripped as emphasis.
+    text = _MARKERS.sub("", BLANK.sub("\0", text))
+    return " ".join(text.replace("\0", "___").split())
+
+
 def correct_option(question: ChoiceQuestion) -> Option | None:
     """The option that is right. A question with one option needs no marking: that option
     is the answer."""

@@ -114,7 +114,7 @@ function LessonRow({ lesson }: { lesson: TopicLesson }) {
     <Link
       to={`/lessons/${id}`}
       // Tells the lesson it can step back to this page when it closes (AC3, AC4).
-      state={{ fromTopic: true }}
+      state={{ from: "topic" }}
       aria-label={`${title}. ${meta}.`}
       className={cn(
         "flex items-center gap-3 rounded-lg border border-line bg-white px-3.5 py-3",

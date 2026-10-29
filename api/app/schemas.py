@@ -330,6 +330,20 @@ class TopicLessonsOut(BaseModel):
     lessons: list[TopicLessonOut]
 
 
+class LessonSearchResultOut(BaseModel):
+    """One lesson found by search (SCRUM-85): its title, topic and whether this user has
+    completed it, and the card text that matched. Never says which options are right."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    lesson_id: uuid.UUID
+    title: str
+    topic_id: uuid.UUID
+    topic_name: str
+    completed: bool
+    snippet: str | None
+
+
 TopicName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
 # Matches topics.description (String(200)). Empty means the topic has none.
 TopicDescription = Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)]

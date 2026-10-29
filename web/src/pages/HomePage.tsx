@@ -4,6 +4,7 @@ import { ChevronRight, Info, PartyPopper, RotateCcw, Sparkles } from "lucide-rea
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { LessonSearch } from "../components/LessonSearch";
 import { type Progress, type Suggestion, type TopicProgress, useProgress } from "../lib/progress";
 
 /**
@@ -12,6 +13,8 @@ import { type Progress, type Suggestion, type TopicProgress, useProgress } from 
  * (SCRUM-53). Below the circles is one suggested lesson, from the topic where progress is
  * weakest (SCRUM-6); the circles stay the way to pick any topic instead. Then a way to review
  * the questions answered wrongly (SCRUM-44).
+ *
+ * Above them all, a search bar finds a lesson in any topic by a word or phrase (SCRUM-85).
  */
 export function HomePage() {
   const { user } = useAuth();
@@ -23,6 +26,8 @@ export function HomePage() {
         <p className="text-sm font-medium text-muted">Welcome back,</p>
         <h1 className="text-[22px] font-bold text-ink">{user?.name}</h1>
       </div>
+
+      <LessonSearch />
 
       {state.status === "loading" && (
         <div className="flex justify-center py-16 text-brand">
