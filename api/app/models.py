@@ -141,6 +141,8 @@ class User(Base):
         _enum(UserRole, "user_role"), default=UserRole.USER, nullable=False
     )
     user_type: Mapped[UserType | None] = mapped_column(_enum(UserType, "user_type"))
+    privacy_agreed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    privacy_notice_version: Mapped[str | None] = mapped_column(String(32))
     # An administrator who has been invited and has not yet chosen a password (SCRUM-81).
     # Set again by each new invite link, so it is when the latest one was sent.
     invited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

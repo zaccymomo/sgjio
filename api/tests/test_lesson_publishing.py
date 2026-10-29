@@ -128,7 +128,7 @@ def test_warnings_do_not_block_publishing(admin, topic):
     assert _ok(admin, lesson, "publish")["status"] == "published"
 
 
-def test_a_lesson_whose_only_question_is_a_tap_can_be_published(admin, topic):
+def test_a_lesson_whose_only_question_is_a_tap_cannot_be_published(admin, topic):
     doc = {
         "cards": [
             {
@@ -138,10 +138,12 @@ def test_a_lesson_whose_only_question_is_a_tap_can_be_published(admin, topic):
         ]
     }
     lesson = _create(admin, topic, doc=doc)
-    assert lesson["issues"] == []
+    assert [issue["code"] for issue in lesson["issues"]] == ["no_scored_question"]
     assert lesson["stats"]["scored_questions"] == 0
 
-    assert _ok(admin, lesson, "publish")["status"] == "published"
+    response = _act(admin, lesson, "publish")
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "lesson_has_blockers"
 
 
 def test_publishing_again_after_edits_makes_a_new_version(admin, db, topic):

@@ -10,6 +10,8 @@ NEW = {
     "password": "Password123",
     "password_confirmation": "Password123",
     "user_type": "newcomer",
+    "privacy_consent": True,
+    "privacy_notice_version": "2026-10-22",
 }
 
 

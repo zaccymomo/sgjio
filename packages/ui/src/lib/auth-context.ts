@@ -19,6 +19,8 @@ export type RegisterInput = {
   password: string;
   password_confirmation: string;
   user_type: UserType;
+  privacy_consent: boolean;
+  privacy_notice_version: string;
 };
 
 /** What the reset-password form sends (SCRUM-63, SCRUM-69). */
@@ -37,6 +39,7 @@ export type AuthContextValue = {
   /** Create an account and sign in (main app only; the admin portal has no register route). */
   register: (input: RegisterInput) => Promise<User>;
   signOut: () => Promise<void>;
+  deleteAccount: (password: string) => Promise<void>;
   /** Email a reset link if the account exists. Resolves the same way either way. */
   requestPasswordReset: (email: string) => Promise<void>;
   /** Rejects with ApiError code "reset_link_invalid" if the link is used, expired or replaced. */

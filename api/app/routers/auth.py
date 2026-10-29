@@ -9,11 +9,12 @@ are invited from the portal instead (SCRUM-81), which mounts the invite routes.
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
 from app import admins
 from app.auth.deps import require_admin, require_user
-from app.auth.lockout import record_attempt
+from app.auth.lockout import blocked_until, record_attempt
 from app.auth.reset import (
     check_reset_token,
     consume_reset_token,
@@ -29,8 +30,11 @@ from app.auth.sessions import (
     set_session_cookie,
 )
 from app.db import get_db
-from app.models import AuthScope, User
+from app.models import AuthScope, AuthSession, LoginAttempt, PasswordResetToken, User
+from app.privacy import NOTICE_VERSION
 from app.schemas import (
+    ChangePasswordRequest,
+    DeleteAccountRequest,
     ForgotPasswordRequest,
     InviteOut,
     RegisterRequest,
@@ -41,6 +45,7 @@ from app.schemas import (
     SignInResponse,
     UserOut,
 )
+from app.security import hash_password, hash_token, verify_password
 
 INVALID_CREDENTIALS = {
     "code": "invalid_credentials",
@@ -60,6 +65,20 @@ INVITE_LINK_INVALID = {
 # An email already in use is a conflict; everything else registration refuses is the shape
 # of what was sent, which is what 422 already means for this API.
 REGISTER_PROBLEM_STATUS = {"email_taken": status.HTTP_409_CONFLICT}
+
+
+def lockout_error(until: datetime) -> HTTPException:
+    seconds = max(1, int((until - datetime.now(UTC)).total_seconds()))
+    return HTTPException(
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        detail={
+            "code": "too_many_attempts",
+            "message": "Too many failed password attempts. Please try again later.",
+            "blocked_until": until.isoformat(),
+            "retry_after_seconds": seconds,
+        },
+        headers={"Retry-After": str(seconds)},
+    )
 
 
 def problem_error(problem: FieldProblem) -> HTTPException:
@@ -130,6 +149,7 @@ def build_auth_router(scope: AuthScope) -> APIRouter:
                 password=body.password,
                 password_confirmation=body.password_confirmation,
                 user_type=body.user_type,
+                privacy_notice_version=body.privacy_notice_version,
             )
 
             if result.problem is not None:
@@ -139,6 +159,91 @@ def build_auth_router(scope: AuthScope) -> APIRouter:
             token, _ = create_session(db, result.user, scope)
             set_session_cookie(response, scope, token)
             return RegisterResponse(user=UserOut.model_validate(result.user))
+
+        @router.get("/privacy-notice-version")
+        def privacy_notice_version_route() -> dict[str, str]:
+            return {"version": NOTICE_VERSION}
+
+        @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+        def change_password_route(
+            body: ChangePasswordRequest,
+            request: Request,
+            db: Session = Depends(get_db),
+            user: User = Depends(require_user),
+        ) -> None:
+            """Keep this browser signed in; revoke all other sessions and reset links."""
+            until = blocked_until(db, user.email, AuthScope.APP)
+            if until is not None:
+                raise lockout_error(until)
+            if not verify_password(body.current_password, user.password_hash):
+                record_attempt(
+                    db,
+                    user.email,
+                    AuthScope.APP,
+                    False,
+                    request.client.host if request.client else None,
+                )
+                until = blocked_until(db, user.email, AuthScope.APP)
+                if until is not None:
+                    raise lockout_error(until)
+                raise HTTPException(
+                    status.HTTP_401_UNAUTHORIZED,
+                    detail={
+                        "code": "incorrect_current_password",
+                        "field": "current_password",
+                        "message": "Your current password is incorrect.",
+                    },
+                )
+            record_attempt(
+                db,
+                user.email,
+                AuthScope.APP,
+                True,
+                request.client.host if request.client else None,
+            )
+            problem = new_password_problem(body.password, body.password_confirmation)
+            if problem is not None:
+                raise problem_error(problem)
+            token = request.cookies.get(COOKIE_NAMES[AuthScope.APP])
+            user.password_hash = hash_password(body.password)
+            db.execute(
+                delete(AuthSession).where(
+                    AuthSession.user_id == user.id,
+                    AuthSession.token_hash != hash_token(token),
+                )
+            )
+            db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
+            db.commit()
+
+        @router.post("/delete-account", status_code=status.HTTP_204_NO_CONTENT)
+        def delete_account_route(
+            body: DeleteAccountRequest,
+            response: Response,
+            db: Session = Depends(get_db),
+            user: User = Depends(require_user),
+        ) -> None:
+            """Delete a regular account and dependent personal data; never self-delete admins."""
+            if user.is_admin:
+                raise HTTPException(
+                    status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "code": "admin_self_delete_forbidden",
+                        "message": "Administrator accounts cannot be deleted here.",
+                    },
+                )
+            if not verify_password(body.password, user.password_hash):
+                raise HTTPException(
+                    status.HTTP_401_UNAUTHORIZED,
+                    detail={
+                        "code": "incorrect_password",
+                        "field": "password",
+                        "message": "Your password is incorrect.",
+                    },
+                )
+            db.execute(delete(LoginAttempt).where(LoginAttempt.email == user.email))
+            db.delete(user)
+            db.commit()
+            clear_session_cookie(response, AuthScope.APP)
 
     @router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
     def forgot_password_route(body: ForgotPasswordRequest, db: Session = Depends(get_db)) -> None:

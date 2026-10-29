@@ -1,7 +1,7 @@
 """Registering and signing in: credentials, lockout and the admin-only rule together."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.auth import normalise_email
 from app.auth.lockout import blocked_until, record_attempt
 from app.models import AuthScope, User, UserRole, UserType
+from app.privacy import NOTICE_VERSION
 from app.security import (
     hash_password,
     password_needs_rehash,
@@ -126,6 +127,7 @@ def register(
     password: str,
     password_confirmation: str,
     user_type: UserType,
+    privacy_notice_version: str,
 ) -> RegisterResult:
     """Create a main-app account, or return the one problem that stopped it.
 
@@ -139,6 +141,18 @@ def register(
     if problem is not None:
         return RegisterResult(problem=problem)
 
+    if privacy_notice_version != NOTICE_VERSION:
+        return RegisterResult(
+            problem=FieldProblem(
+                field="privacy_consent",
+                code="privacy_notice_changed",
+                message=(
+                    "The privacy notice has changed. "
+                    "Please read the current version and agree again."
+                ),
+            )
+        )
+
     if db.scalar(select(User.id).where(User.email == email)) is not None:
         return RegisterResult(problem=EMAIL_TAKEN)
 
@@ -148,6 +162,8 @@ def register(
         password_hash=hash_password(password),
         role=UserRole.USER,
         user_type=user_type,
+        privacy_agreed_at=datetime.now(UTC),
+        privacy_notice_version=NOTICE_VERSION,
     )
     db.add(user)
     try:
