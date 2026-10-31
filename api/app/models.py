@@ -11,13 +11,16 @@ from datetime import datetime
 from sqlalchemy import (
     ARRAY,
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum,
     ForeignKey,
     Index,
     Integer,
     LargeBinary,
+    SmallInteger,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -95,6 +98,17 @@ class AuthScope(str, enum.Enum):
     ADMIN = "admin"
 
 
+# --- Levels (SCRUM-110) ----------------------------------------------------------------------
+
+# Users, lessons and aptitude questions share one scale of Level 1 to 5 (Epic 6, SCRUM-93).
+MIN_LEVEL = 1
+MAX_LEVEL = 5
+
+
+def _level_check(column: str = "level") -> CheckConstraint:
+    return CheckConstraint(f"{column} BETWEEN {MIN_LEVEL} AND {MAX_LEVEL}", name=f"{column}_range")
+
+
 def _enum(enum_cls: type[enum.Enum], name: str) -> Enum:
     # Stored as VARCHAR + CHECK rather than a native Postgres enum, so adding a value
     # later is a one-line migration instead of an ALTER TYPE.
@@ -130,6 +144,13 @@ class User(Base):
     """Main-app users and administrators share one table, separated by `role`."""
 
     __tablename__ = "users"
+    __table_args__ = (
+        _level_check(),
+        # A quiz is saved with its time, and replaced as a whole (SCRUM-110 AC4).
+        CheckConstraint(
+            "(quiz_results IS NULL) = (quiz_taken_at IS NULL)", name="quiz_results_with_time"
+        ),
+    )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -153,6 +174,18 @@ class User(Base):
     # An administrator removed from the portal (SCRUM-81). The account is kept, closed, so
     # it can be restored and the activity log still names it; it cannot sign in anywhere.
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When the introduction was finished or skipped (SCRUM-94); empty until then.
+    intro_finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # One level for the whole app (SCRUM-99), set by the aptitude quiz and raised by
+    # level-ups (SCRUM-105). Empty until the first quiz: see `current_level`.
+    level: Mapped[int | None] = mapped_column(SmallInteger)
+    # The latest aptitude quiz only (SCRUM-102 AC4): a list with one entry per question
+    # given, in order, each a copy of what mattered at the time (question id, topic id,
+    # level, prompt, the option chosen and whether it was correct), so editing or
+    # deactivating a question never changes these results (SCRUM-110 AC5). `quiz_taken_at`
+    # is when it was submitted, which also decides when a retake opens (SCRUM-102).
+    quiz_results: Mapped[list | None] = mapped_column(JSONB)
+    quiz_taken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
 
@@ -176,6 +209,11 @@ class User(Base):
     @property
     def google_linked(self) -> bool:
         return self.google_sub is not None
+
+    @property
+    def current_level(self) -> int:
+        """The level lessons are chosen by: Level 1 until the aptitude quiz sets one."""
+        return self.level if self.level is not None else MIN_LEVEL
 
 
 class Profile(Base):
@@ -258,10 +296,18 @@ class Lesson(Base):
 
     `key` names a lesson loaded from a file in content/, so loading the file again updates
     that lesson instead of adding another.
+
+    `level` (1 to 5) decides who sees the lesson (SCRUM-104). It is set when the lesson is
+    created and never changed (SCRUM-103), and, like the topic, is not versioned. The
+    database refuses a lesson without one; rows built in Python start at Level 1 until
+    the admin editor asks for it (SCRUM-103 AC1).
     """
 
     __tablename__ = "lessons"
-    __table_args__ = (Index("ix_lessons_topic_id_position", "topic_id", "position"),)
+    __table_args__ = (
+        Index("ix_lessons_topic_id_position", "topic_id", "position"),
+        _level_check(),
+    )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     key: Mapped[str | None] = mapped_column(String(200), unique=True)
@@ -289,6 +335,7 @@ class Lesson(Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    level: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=MIN_LEVEL)
     created_at: Mapped[datetime] = _created_at()
     # Indexed because the admin lesson list sorts by it (SCRUM-66 AC3). Reordering
     # deliberately leaves it alone: moving a lesson is not editing it.
@@ -522,6 +569,50 @@ class LessonReport(Base):
 
     lesson: Mapped[Lesson] = relationship()
     version: Mapped[LessonVersion] = relationship()
+
+
+# --- Aptitude quiz (Epic 6) ----------------------------------------------------------------
+
+
+class AptitudeQuestion(Base):
+    """One question in the aptitude quiz's bank (SCRUM-96), kept apart from lesson questions.
+
+    `options` is a list of {"id", "text"}; `correct_option_id` names exactly one of them,
+    which the database checks. A quiz gives one active question at each level (SCRUM-97),
+    so `level` is required and, like a lesson's, never changed once set.
+
+    Questions are deactivated rather than deleted, and users' results keep their own copy of
+    what they answered (`User.quiz_results`), so editing a question changes no one's past
+    result (SCRUM-96 AC6).
+    """
+
+    __tablename__ = "aptitude_questions"
+    __table_args__ = (
+        _level_check(),
+        CheckConstraint("jsonb_typeof(options) = 'array'", name="options_list"),
+        CheckConstraint(
+            "options @> jsonb_build_array(jsonb_build_object('id', correct_option_id))",
+            name="correct_option_listed",
+        ),
+        # Picking a quiz reads the active questions at each level.
+        Index("ix_aptitude_questions_level_is_active", "level", "is_active"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    topic_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("topics.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    options: Mapped[list] = mapped_column(JSONB, nullable=False)
+    correct_option_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=sql_text("true")
+    )
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _updated_at()
+
+    topic: Mapped[Topic] = relationship()
 
 
 # --- Authentication support ---------------------------------------------------------------
