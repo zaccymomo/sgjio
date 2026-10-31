@@ -10,6 +10,11 @@ Two rules from SCRUM-16 AC8 are enforced here rather than left to the caller:
   completed can never exceed available -- so a circle cannot read "13 / 12" after an
   administrator withdraws a lesson somebody had already finished (SCRUM-52)
 
+Each user sees the lessons at their own level (SCRUM-104), plus every lesson they have
+already completed at another level, so nothing they finished disappears when their level
+changes (SCRUM-110 AC6). Both figures count that same set: lessons at other levels a user
+hasn't completed are left out of "available" as well as "completed".
+
 Topics an administrator has archived (SCRUM-57) are left out entirely, so their circle
 disappears and the overall figure shrinks with it; restoring brings both back.
 
@@ -30,13 +35,21 @@ from dataclasses import dataclass
 from datetime import datetime
 from fractions import Fraction
 
-from sqlalchemy import Select, and_, func, select
+from sqlalchemy import ColumnElement, Select, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app import lesson_doc, media
 from app.lesson_doc import LessonDoc
 from app.lessons import latest_version
-from app.models import Lesson, LessonAttempt, LessonCompletion, LessonStatus, Topic
+from app.models import (
+    MIN_LEVEL,
+    Lesson,
+    LessonAttempt,
+    LessonCompletion,
+    LessonStatus,
+    Topic,
+    User,
+)
 from app.problems import topic_unavailable
 from app.topics import visible_to_users
 
@@ -70,9 +83,21 @@ class Progress:
     suggestion: Suggestion | None
 
 
-def _topic_rows(user_id: uuid.UUID) -> Select:
-    # Inner join to published lessons: a topic with no published lesson produces no row,
-    # and so gets no circle (SCRUM-43 AC1).
+def _level_of(db: Session, user_id: uuid.UUID) -> int:
+    user = db.get(User, user_id)
+    return user.current_level if user is not None else MIN_LEVEL
+
+
+def _for_this_user(level: int) -> ColumnElement[bool]:
+    """A lesson at the user's level, or one they completed at any level (SCRUM-104).
+
+    Needs `LessonCompletion` outer-joined to this user's completions."""
+    return or_(Lesson.level == level, LessonCompletion.id.is_not(None))
+
+
+def _topic_rows(user_id: uuid.UUID, level: int) -> Select:
+    # Inner join to published lessons: a topic with no published lesson this user can see
+    # produces no row, and so gets no circle (SCRUM-43 AC1, SCRUM-104 AC4).
     published_lessons = and_(Lesson.topic_id == Topic.id, Lesson.status == LessonStatus.PUBLISHED)
     this_users_completions = and_(
         LessonCompletion.lesson_id == Lesson.id,
@@ -87,6 +112,7 @@ def _topic_rows(user_id: uuid.UUID) -> Select:
         )
         .join(Lesson, published_lessons)
         .outerjoin(LessonCompletion, this_users_completions)
+        .where(_for_this_user(level))
         .group_by(Topic.id, Topic.name)
         # In the order administrators set (SCRUM-66), so the circles stay put between
         # visits; the name breaks any tie.
@@ -97,9 +123,10 @@ def _topic_rows(user_id: uuid.UUID) -> Select:
 
 def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
     """Per-topic and overall figures for one user."""
+    level = _level_of(db, user_id)
     topics = [
         TopicProgress(id=row.id, name=row.name, completed=row.completed, available=row.available)
-        for row in db.execute(_topic_rows(user_id)).all()
+        for row in db.execute(_topic_rows(user_id, level)).all()
     ]
     # The overall figure is the sum of the circles, so the two always agree on screen
     # (SCRUM-43 AC6).
@@ -107,12 +134,15 @@ def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
         topics=topics,
         completed=sum(topic.completed for topic in topics),
         available=sum(topic.available for topic in topics),
-        suggestion=_suggestion(db, user_id, topics),
+        suggestion=_suggestion(db, user_id, level, topics),
     )
 
 
-def _suggestion(db: Session, user_id: uuid.UUID, topics: list[TopicProgress]) -> Suggestion | None:
-    """The first lesson not yet completed in the weakest topic (SCRUM-6 AC2).
+def _suggestion(
+    db: Session, user_id: uuid.UUID, level: int, topics: list[TopicProgress]
+) -> Suggestion | None:
+    """The first lesson not yet completed in the weakest topic (SCRUM-6 AC2). Lessons not
+    yet completed only count at the user's level, so the suggestion is always at it.
 
     `topics` are the circles, in order, so `sorted` (which is stable) breaks a tie by the
     order administrators set. A topic with nothing left to do is never the weakest.
@@ -127,6 +157,7 @@ def _suggestion(db: Session, user_id: uuid.UUID, topics: list[TopicProgress]) ->
             .where(
                 Lesson.topic_id == topic.id,
                 Lesson.status == LessonStatus.PUBLISHED,
+                Lesson.level == level,
                 ~completed.exists(),
             )
             .order_by(Lesson.position, Lesson.created_at)
@@ -177,7 +208,8 @@ class TopicLessons:
 
 def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> TopicLessons:
     """One topic's published lessons, in the order administrators set, with this user's
-    completions (SCRUM-53). An archived or unknown topic is unavailable."""
+    completions (SCRUM-53): those at the user's level and those they completed at any level
+    (SCRUM-104). An archived or unknown topic is unavailable."""
     topic = db.scalar(visible_to_users(select(Topic).where(Topic.id == topic_id)))
     if topic is None:
         raise topic_unavailable()
@@ -199,7 +231,11 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
             and_(LessonCompletion.lesson_id == Lesson.id, LessonCompletion.user_id == user_id),
         )
         .outerjoin(last_finished, last_finished.c.lesson_id == Lesson.id)
-        .where(Lesson.topic_id == topic.id, Lesson.status == LessonStatus.PUBLISHED)
+        .where(
+            Lesson.topic_id == topic.id,
+            Lesson.status == LessonStatus.PUBLISHED,
+            _for_this_user(_level_of(db, user_id)),
+        )
         .order_by(Lesson.position, Lesson.created_at)
     ).all()
 
