@@ -4,7 +4,7 @@ levels: each user sees the lessons at their level plus every lesson they have co
 Users, lessons and aptitude questions share one scale of Level 1 to 5 (Epic 6).
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -13,8 +13,10 @@ from alembic.config import Config
 from sqlalchemy import inspect, select, text
 from sqlalchemy.exc import IntegrityError
 
+from app.aptitude import attempts, latest_attempt
 from app.db import engine
 from app.models import (
+    AptitudeAttempt,
     AptitudeQuestion,
     Lesson,
     LessonCompletion,
@@ -115,7 +117,13 @@ def test_the_new_tables_and_fields_exist():
     schema = inspect(engine)
     assert "level" in {c["name"] for c in schema.get_columns("lessons")}
     users = {c["name"] for c in schema.get_columns("users")}
-    assert {"level", "quiz_results", "quiz_taken_at", "intro_finished_at"} <= users
+    assert {"level", "intro_finished_at"} <= users
+    # Quizzes live in their own table since 0014, so every one is kept.
+    assert not {"quiz_results", "quiz_taken_at"} & users
+    quiz_attempts = {c["name"] for c in schema.get_columns("aptitude_attempts")}
+    assert {"user_id", "taken_at", "level", "results"} <= quiz_attempts
+    [attempt_fk] = schema.get_foreign_keys("aptitude_attempts")
+    assert attempt_fk["referred_table"] == "users"
     questions = {c["name"] for c in schema.get_columns("aptitude_questions")}
     assert {
         "topic_id",
@@ -183,34 +191,59 @@ def test_a_users_level_must_be_1_to_5(db, make_user):
         db.commit()
 
 
-def test_quiz_results_are_saved_with_the_time_they_were_taken(db, make_user):
-    user = db.merge(make_user())
-    user.quiz_results = []
+def _attempt(db, user: User, level: int, results: list, taken_at: datetime | None = None):
+    attempt = AptitudeAttempt(
+        user_id=user.id, level=level, results=results, taken_at=taken_at or datetime.now(UTC)
+    )
+    db.add(attempt)
+    db.commit()
+    return attempt
+
+
+@pytest.mark.parametrize("level", [None, 0, 6])
+def test_a_quiz_without_a_valid_level_is_refused(db, make_user, level):
+    user = make_user()
     with pytest.raises(IntegrityError):
-        db.commit()
+        _attempt(db, user, level=level, results=[])
 
 
-# --- AC4 and AC5: the latest quiz replaces the last, and keeps its own copy ---------------
+def test_a_quizs_results_must_be_a_list(db, make_user):
+    user = make_user()
+    with pytest.raises(IntegrityError):
+        _attempt(db, user, level=1, results={"not": "a list"})
 
 
-def test_a_retake_replaces_the_previous_results_and_level(db, make_user):
-    topic = _topic(db)
-    question = _question(db, topic)
-    user = db.merge(make_user())
-    first = [{"question_id": str(question.id), "chosen_option_id": "b", "correct": False}]
-    user.quiz_results, user.quiz_taken_at, user.level = first, datetime.now(UTC), 1
-    db.commit()
-    second = [{"question_id": str(question.id), "chosen_option_id": "a", "correct": True}]
-    user.quiz_results, user.quiz_taken_at, user.level = second, datetime.now(UTC), 2
-    db.commit()
-
-    db.expire_all()
-    stored = db.get(User, user.id)
-    assert stored.quiz_results == second
-    assert stored.level == 2
+def test_a_user_who_skipped_the_quiz_has_no_attempts_and_is_level_1(db, make_user):
+    user = make_user()
+    assert latest_attempt(db, user.id) is None
+    assert attempts(db, user.id) == []
+    assert user.current_level == 1
 
 
-def test_editing_or_deactivating_a_question_leaves_saved_results_alone(db, make_user):
+# --- AC4 and AC5: every quiz is kept, the newest is the latest, each keeps its own copy ---
+
+
+def test_a_retake_keeps_earlier_quizzes_and_becomes_the_latest(db, make_user):
+    user = make_user()
+    now = datetime.now(UTC)
+    first = _attempt(
+        db, user, level=1, results=[{"correct": False}], taken_at=now - timedelta(days=3)
+    )
+    second = _attempt(db, user, level=3, results=[{"correct": True}], taken_at=now)
+
+    assert latest_attempt(db, user.id).id == second.id
+    assert [a.id for a in attempts(db, user.id)] == [second.id, first.id]
+    assert db.get(AptitudeAttempt, first.id).results == [{"correct": False}]
+
+
+def test_another_users_quizzes_are_not_theirs(db, make_user):
+    user = make_user()
+    other = make_user(email="other@example.com")
+    _attempt(db, other, level=4, results=[])
+    assert latest_attempt(db, user.id) is None
+
+
+def test_editing_or_deactivating_a_question_leaves_past_results_alone(db, make_user):
     topic = _topic(db)
     question = _question(db, topic)
     answer = {
@@ -221,9 +254,8 @@ def test_editing_or_deactivating_a_question_leaves_saved_results_alone(db, make_
         "chosen_option_id": "a",
         "correct": True,
     }
-    user = db.merge(make_user())
-    user.quiz_results, user.quiz_taken_at, user.level = [answer], datetime.now(UTC), 1
-    db.commit()
+    user = make_user()
+    attempt = _attempt(db, user, level=1, results=[answer])
 
     question.prompt = "Reworded"
     question.options = [{"id": "c", "text": "New"}, {"id": "d", "text": "Other"}]
@@ -232,7 +264,15 @@ def test_editing_or_deactivating_a_question_leaves_saved_results_alone(db, make_
     db.commit()
 
     db.expire_all()
-    assert db.get(User, user.id).quiz_results == [answer]
+    assert db.get(AptitudeAttempt, attempt.id).results == [answer]
+
+
+def test_deleting_an_account_deletes_its_quizzes(db, make_user):
+    user = make_user()
+    _attempt(db, user, level=2, results=[])
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM users WHERE id = :id"), {"id": user.id})
+    assert db.scalar(select(AptitudeAttempt)) is None
 
 
 # --- AC6 and SCRUM-16: lessons at your level, plus every one you completed -----------------
@@ -325,5 +365,44 @@ def test_the_migration_puts_existing_lessons_at_level_1_and_rolls_back():
         with engine.connect() as conn:
             row = conn.execute(text("SELECT title, summary, position, level FROM lessons")).one()
         assert tuple(row) == ("Old lesson", "Kept as it was", 3, 1)
+    finally:
+        command.upgrade(config, "head")
+
+
+def test_0014_moves_a_saved_quiz_into_attempts_and_rolls_back():
+    config = _config()
+    try:
+        command.downgrade(config, "0013")
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO users (id, name, email, role, level, quiz_results, quiz_taken_at)"
+                    " VALUES (gen_random_uuid(), 'Q', 'q@example.com', 'user', 3,"
+                    " '[{\"correct\": true}]', '2026-10-30T10:00:00+00')"
+                )
+            )
+        command.upgrade(config, "head")
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT level, results, taken_at FROM aptitude_attempts")).one()
+        assert row.level == 3
+        assert row.results == [{"correct": True}]
+        assert row.taken_at == datetime(2026, 10, 30, 10, tzinfo=UTC)
+
+        # Rolling back puts the latest quiz back on the user.
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO aptitude_attempts (id, user_id, taken_at, level, results) "
+                    "SELECT gen_random_uuid(), id, '2026-10-31T10:00:00+00', 4, "
+                    "'[{\"correct\": false}]' FROM users WHERE email = 'q@example.com'"
+                )
+            )
+        command.downgrade(config, "0013")
+        with engine.connect() as conn:
+            back = conn.execute(
+                text("SELECT quiz_results, quiz_taken_at FROM users WHERE email = 'q@example.com'")
+            ).one()
+        assert back.quiz_results == [{"correct": False}]
+        assert back.quiz_taken_at == datetime(2026, 10, 31, 10, tzinfo=UTC)
     finally:
         command.upgrade(config, "head")

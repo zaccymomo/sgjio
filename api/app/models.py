@@ -144,13 +144,7 @@ class User(Base):
     """Main-app users and administrators share one table, separated by `role`."""
 
     __tablename__ = "users"
-    __table_args__ = (
-        _level_check(),
-        # A quiz is saved with its time, and replaced as a whole (SCRUM-110 AC4).
-        CheckConstraint(
-            "(quiz_results IS NULL) = (quiz_taken_at IS NULL)", name="quiz_results_with_time"
-        ),
-    )
+    __table_args__ = (_level_check(),)
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -176,17 +170,11 @@ class User(Base):
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # When the introduction was finished or skipped (SCRUM-94); empty until then.
     intro_finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # One level for the whole app (SCRUM-99), set by the aptitude quiz and raised by
-    # level-ups (SCRUM-105). Empty until the first quiz: see `current_level`.
+    # One level for the whole app (SCRUM-99): set by each aptitude quiz and raised by
+    # level-ups (SCRUM-105), so it can differ from the latest quiz's. Empty until the
+    # first quiz, and for someone who skipped it (SCRUM-98): see `current_level`. Every
+    # quiz taken is kept in `aptitude_attempts`.
     level: Mapped[int | None] = mapped_column(SmallInteger)
-    # The latest aptitude quiz only (SCRUM-102 AC4): a list with one entry per question
-    # given, in order, each a copy of what mattered at the time (question id, topic id,
-    # level, prompt, the option chosen and whether it was correct), so editing or
-    # deactivating a question never changes these results (SCRUM-110 AC5). `quiz_taken_at`
-    # is when it was submitted; nothing limits how soon it can be retaken (SCRUM-102).
-    # All three stay empty for someone who skipped the quiz (SCRUM-98): they are Level 1.
-    quiz_results: Mapped[list | None] = mapped_column(JSONB)
-    quiz_taken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
 
@@ -583,8 +571,8 @@ class AptitudeQuestion(Base):
     so `level` is required and, like a lesson's, never changed once set.
 
     Questions are deactivated rather than deleted, and users' results keep their own copy of
-    what they answered (`User.quiz_results`), so editing a question changes no one's past
-    result (SCRUM-96 AC6).
+    what they answered (`AptitudeAttempt.results`), so editing a question changes no one's
+    past result (SCRUM-96 AC6).
     """
 
     __tablename__ = "aptitude_questions"
@@ -614,6 +602,40 @@ class AptitudeQuestion(Base):
     updated_at: Mapped[datetime] = _updated_at()
 
     topic: Mapped[Topic] = relationship()
+
+
+class AptitudeAttempt(Base):
+    """One aptitude quiz a user took (SCRUM-97). Every quiz is kept, never overwritten
+    (SCRUM-110 AC4); users are shown their latest, the one with the newest `taken_at`
+    (`app/aptitude.py`), and earlier ones are history (SCRUM-102 AC3).
+
+    `results` is a list with one entry per question given, in order, each a copy of what
+    mattered at the time (question id, topic id, level, prompt, the option chosen and
+    whether it was correct), so editing or deactivating a question never changes a past
+    result (SCRUM-110 AC5). `level` is the level this quiz gave (SCRUM-99); the user's
+    current level is `User.level`, which level-ups can raise afterwards (SCRUM-105).
+
+    Only submitted quizzes are stored: one left part way is not (SCRUM-97 AC6). A user who
+    skipped the quiz (SCRUM-98) simply has none.
+    """
+
+    __tablename__ = "aptitude_attempts"
+    __table_args__ = (
+        _level_check(),
+        CheckConstraint("jsonb_typeof(results) = 'array'", name="results_list"),
+        # A user's quizzes, newest first: their latest, and their history.
+        Index("ix_aptitude_attempts_user_id_taken_at", "user_id", "taken_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    taken_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    results: Mapped[list] = mapped_column(JSONB, nullable=False)
 
 
 # --- Authentication support ---------------------------------------------------------------
