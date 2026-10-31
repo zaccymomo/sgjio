@@ -183,7 +183,8 @@ class User(Base):
     # given, in order, each a copy of what mattered at the time (question id, topic id,
     # level, prompt, the option chosen and whether it was correct), so editing or
     # deactivating a question never changes these results (SCRUM-110 AC5). `quiz_taken_at`
-    # is when it was submitted, which also decides when a retake opens (SCRUM-102).
+    # is when it was submitted; nothing limits how soon it can be retaken (SCRUM-102).
+    # All three stay empty for someone who skipped the quiz (SCRUM-98): they are Level 1.
     quiz_results: Mapped[list | None] = mapped_column(JSONB)
     quiz_taken_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _created_at()
