@@ -13,6 +13,9 @@ export type User = {
   /** False for an account created with Google, which signs in with Google only (SCRUM-92). */
   has_password: boolean;
   google_linked: boolean;
+  level: number | null;
+  current_level: number;
+  intro_finished_at: string | null;
 };
 
 /** What the register form sends. Field names match the API (SCRUM-61). */

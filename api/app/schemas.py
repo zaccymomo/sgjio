@@ -38,6 +38,9 @@ class UserOut(BaseModel):
     # (SCRUM-92). Settings uses these to show what applies.
     has_password: bool
     google_linked: bool
+    level: int | None
+    current_level: int
+    intro_finished_at: datetime | None
 
 
 class RegisterRequest(BaseModel):
@@ -346,6 +349,8 @@ class ProgressOut(BaseModel):
     completed: int
     available: int
     suggestion: SuggestionOut | None
+    level: int
+    aptitude_taken: bool
 
 
 class MistakeOut(BaseModel):
@@ -383,6 +388,7 @@ class TopicLessonOut(BaseModel):
     best_correct: int | None
     best_scored: int | None
     last_attempted_at: datetime | None
+    level: int
 
 
 class TopicLessonsOut(BaseModel):
@@ -466,6 +472,91 @@ class LessonSummaryOut(BaseModel):
     questions: int
     cover_asset_id: uuid.UUID | None
     open_reports: int
+    level: int
+
+
+# --- Aptitude quiz (SCRUM-96, SCRUM-97) -------------------------------------------------
+
+
+class AptitudeOptionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=40)
+    text: str = Field(min_length=1, max_length=300)
+    correct: bool = False
+
+
+class AptitudeQuestionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    topic_id: uuid.UUID
+    level: int = Field(ge=1, le=5)
+    prompt: str = Field(min_length=1, max_length=1000)
+    options: list[AptitudeOptionIn] = Field(min_length=2, max_length=6)
+    is_active: bool = True
+
+
+class AptitudeQuestionUpdate(BaseModel):
+    """Level is deliberately absent and extra fields are rejected: it is immutable."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    topic_id: uuid.UUID | None = None
+    prompt: str | None = Field(default=None, min_length=1, max_length=1000)
+    options: list[AptitudeOptionIn] | None = Field(default=None, min_length=2, max_length=6)
+    is_active: bool | None = None
+
+
+class AptitudeOptionOut(BaseModel):
+    id: str
+    text: str
+
+
+class AptitudeQuestionOut(BaseModel):
+    id: uuid.UUID
+    topic_id: uuid.UUID
+    topic_name: str
+    level: int
+    prompt: str
+    options: list[AptitudeOptionOut]
+    correct_option_id: str
+    is_active: bool
+    updated_at: datetime
+
+
+class AptitudeBankOut(BaseModel):
+    ready: bool
+    counts_by_level: dict[int, int]
+    counts_by_topic: dict[str, int]
+    questions: list[AptitudeQuestionOut]
+
+
+class AptitudeQuizQuestionOut(BaseModel):
+    id: uuid.UUID
+    topic: str
+    level: int
+    prompt: str
+    options: list[AptitudeOptionOut]
+
+
+class AptitudeQuizOut(BaseModel):
+    questions: list[AptitudeQuizQuestionOut]
+
+
+class AptitudeAnswerIn(BaseModel):
+    question_id: uuid.UUID
+    option_id: str = Field(min_length=1, max_length=40)
+
+
+class AptitudeSubmitIn(BaseModel):
+    answers: list[AptitudeAnswerIn] = Field(min_length=5, max_length=5)
+
+
+class AptitudeResultOut(BaseModel):
+    level: int
+    correct: int
+    total: int
+    taken_at: datetime
 
 
 class OrderRequest(BaseModel):

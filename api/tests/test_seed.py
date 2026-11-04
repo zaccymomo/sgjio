@@ -7,8 +7,8 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.content_import import find_lesson_files
-from app.models import Lesson, LessonStatus, Topic
-from app.seed import TOPICS, seed
+from app.models import AptitudeAttempt, Lesson, LessonStatus, Topic, User
+from app.seed import TEST_USERS, TOPICS, seed
 
 
 def _lesson_files() -> list[dict]:
@@ -54,6 +54,25 @@ def test_the_seed_publishes_the_lessons_in_content(db):
         db.scalars(select(Lesson.title).where(Lesson.status == LessonStatus.DRAFT))
     ) == sorted(drafts)
     assert len(published) >= 12  # SCRUM-77 AC1: at least 4 topics with 3 lessons each
+
+
+def test_seeded_topics_have_multiple_lesson_levels(db):
+    seed(db)
+    for topic in db.scalars(select(Topic)):
+        levels = set(db.scalars(select(Lesson.level).where(Lesson.topic_id == topic.id)))
+        assert len(levels) > 1
+
+
+def test_seeded_level_users_and_skipped_user_are_ready_to_demo(db):
+    seed(db)
+    for email, (_, expected_level) in TEST_USERS.items():
+        user = db.scalar(select(User).where(User.email == email))
+        assert user is not None
+        assert user.current_level == (expected_level or 1)
+        attempts = list(
+            db.scalars(select(AptitudeAttempt).where(AptitudeAttempt.user_id == user.id))
+        )
+        assert len(attempts) == (0 if expected_level is None else 1)
 
 
 def test_seeding_again_changes_nothing(db):

@@ -81,6 +81,8 @@ class Progress:
     available: int
     # None once every lesson available has been completed (SCRUM-6 AC6).
     suggestion: Suggestion | None
+    level: int
+    aptitude_taken: bool
 
 
 def _level_of(db: Session, user_id: uuid.UUID) -> int:
@@ -124,6 +126,8 @@ def _topic_rows(user_id: uuid.UUID, level: int) -> Select:
 def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
     """Per-topic and overall figures for one user."""
     level = _level_of(db, user_id)
+    from app.aptitude import latest_attempt
+
     topics = [
         TopicProgress(id=row.id, name=row.name, completed=row.completed, available=row.available)
         for row in db.execute(_topic_rows(user_id, level)).all()
@@ -135,6 +139,8 @@ def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
         completed=sum(topic.completed for topic in topics),
         available=sum(topic.available for topic in topics),
         suggestion=_suggestion(db, user_id, level, topics),
+        level=level,
+        aptitude_taken=latest_attempt(db, user_id) is not None,
     )
 
 
@@ -194,6 +200,7 @@ class TopicLesson:
     best_scored: int | None
     # When this user last finished it (SCRUM-54), empty until the lesson is completed.
     last_attempted_at: datetime | None
+    level: int
 
 
 @dataclass(frozen=True)
@@ -264,6 +271,7 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
                 last_attempted_at=(
                     (last_finished_at or completion.completed_at) if completion else None
                 ),
+                level=lesson.level,
             )
         )
 

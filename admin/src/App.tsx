@@ -13,6 +13,7 @@ import {
 
 import { AccountMenu } from "./components/AccountMenu";
 import { AdministratorsPage } from "./pages/AdministratorsPage";
+import { AptitudeQuestionsPage } from "./pages/AptitudeQuestionsPage";
 import { ContentPage } from "./pages/ContentPage";
 import { ForgotPasswordPage, ResetPasswordPage, SetPasswordPage } from "./pages/PasswordPages";
 import { ReportsPage } from "./pages/ReportsPage";
@@ -44,6 +45,7 @@ function SignedInLayout() {
             </HeaderLink>
             {/* SCRUM-83 */}
             <HeaderLink to="/reports">Reports</HeaderLink>
+            <HeaderLink to="/aptitude-questions">Aptitude quiz</HeaderLink>
           </nav>
           {/* Who you are, Administrators (SCRUM-81) and Sign out. */}
           <AccountMenu />
@@ -123,6 +125,7 @@ const router = createBrowserRouter(
           <Route path="/reports" element={<ReportsPage />} />
           {/* Who can use the portal (SCRUM-81), from the account menu. */}
           <Route path="/administrators" element={<AdministratorsPage />} />
+          <Route path="/aptitude-questions" element={<AptitudeQuestionsPage />} />
           {/* Topics used to have their own page; they now live on the content page. */}
           <Route path="/topics" element={<Navigate to="/" replace />} />
         </Route>

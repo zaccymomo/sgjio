@@ -462,4 +462,6 @@ def test_a_completion_survives_withdrawal_but_leaves_the_figures(learner, db, le
         "completed": 0,
         "available": 0,
         "suggestion": None,
+        "level": 1,
+        "aptitude_taken": False,
     }

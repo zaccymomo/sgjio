@@ -15,6 +15,7 @@ import { ReviewPage } from "./pages/ReviewPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
 import { TopicPage } from "./pages/TopicPage";
+import { AptitudeIntroPage, AptitudeQuizPage, AptitudeResultsPage } from "./pages/AptitudePages";
 
 // The five tabs from the Figma bottom bar.
 const NAV: NavItem[] = [
@@ -53,6 +54,9 @@ export function App() {
               <Route index element={<HomePage />} />
               {/* Where registration lands a new account (SCRUM-61 AC8) */}
               <Route path="profile-setup" element={<ProfileSetupPage />} />
+              <Route path="aptitude" element={<AptitudeIntroPage />} />
+              <Route path="aptitude/quiz" element={<AptitudeQuizPage />} />
+              <Route path="aptitude/results" element={<AptitudeResultsPage />} />
               {/* A progress circle leads here (SCRUM-43 AC9) */}
               <Route path="topics/:topicId" element={<TopicPage />} />
               {/* "Review mistakes" on the landing page leads here (SCRUM-44 AC1) */}

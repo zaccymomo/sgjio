@@ -1,0 +1,82 @@
+# Version-controlled aptitude bank. Stable keys make re-seeding idempotent.
+questions:
+  - key: queue-at-mrt
+    topic: Public Etiquette
+    level: 1
+    prompt: A queue has formed beside an MRT train door. What should you do?
+    options:
+      - { id: back, text: Join the back of the queue, correct: true }
+      - { id: front, text: Stand at the front near the door }
+      - { id: middle, text: Step into the middle of the queue }
+  - key: chope-seat
+    topic: Hawker & Food
+    level: 1
+    prompt: At a busy hawker centre, a tissue packet has been left on an empty table. What does it usually mean?
+    options:
+      - { id: reserved, text: Someone has reserved or “choped” the seat, correct: true }
+      - { id: rubbish, text: The table definitely needs cleaning }
+      - { id: free, text: Anyone should throw it away and sit down }
+  - key: tap-same-card
+    topic: Getting Around
+    level: 2
+    prompt: When paying for an MRT trip with a contactless card, what should you do?
+    options:
+      - { id: same, text: Tap the same card or device when entering and leaving, correct: true }
+      - { id: different, text: Use a different card when leaving }
+      - { id: once, text: Tap only when entering }
+  - key: return-tray
+    topic: Hawker & Food
+    level: 2
+    prompt: After eating at a hawker centre, where should your tray and used crockery go?
+    options:
+      - { id: station, text: The appropriate tray-return station, correct: true }
+      - { id: table, text: Leave everything on the table }
+      - { id: floor, text: Place it beside a bin }
+  - key: singlish-can
+    topic: Singlish
+    level: 3
+    prompt: In everyday Singlish, what can “Can!” mean when it is used as a complete reply?
+    options:
+      - { id: yes, text: Yes, that is possible or acceptable, correct: true }
+      - { id: maybe, text: I am definitely unsure }
+      - { id: no, text: No, that cannot happen }
+  - key: names-at-work
+    topic: Workplace
+    level: 3
+    prompt: You are unsure how a new colleague prefers to be addressed. What is the safest approach?
+    options:
+      - { id: ask, text: Ask politely what they prefer to be called, correct: true }
+      - { id: title, text: Invent a formal title for them }
+      - { id: surname, text: Always use only their surname }
+  - key: escalator-side
+    topic: Public Etiquette
+    level: 4
+    prompt: On an escalator where other people are standing to one side, what is the common local convention?
+    options:
+      - { id: left, text: Stand on the left and leave the right for people passing, correct: true }
+      - { id: right, text: Stand on the right and leave the left for passing }
+      - { id: both, text: Block both sides with bags }
+  - key: visiting-home-shoes
+    topic: Festivals
+    level: 4
+    prompt: When entering someone’s home in Singapore, what should you do if you are unsure about shoes?
+    options:
+      - { id: cues, text: Look for cues and ask the host, correct: true }
+      - { id: keep, text: Always keep them on without asking }
+      - { id: outside, text: Leave them at the lift lobby }
+  - key: kopi-o-kosong
+    topic: Hawker & Food
+    level: 5
+    prompt: What does “kopi-o kosong” order?
+    options:
+      - { id: black, text: Black coffee without sugar, correct: true }
+      - { id: milk, text: Coffee with condensed milk and sugar }
+      - { id: tea, text: Tea without milk }
+  - key: hari-raya-greeting
+    topic: Festivals
+    level: 5
+    prompt: Which is an appropriate greeting during Hari Raya Puasa?
+    options:
+      - { id: selamat, text: Selamat Hari Raya, correct: true }
+      - { id: gongxi, text: Gong Xi Fa Cai }
+      - { id: deepavali, text: Happy Deepavali }
