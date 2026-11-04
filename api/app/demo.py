@@ -124,6 +124,7 @@ def demo_activity(db: Session, now: datetime | None = None, seed: int = 84) -> l
             password_hash=password,
             role=UserRole.USER,
             user_type=UserType.SINGAPOREAN if singaporean else UserType.NEWCOMER,
+            intro_finished_at=now,
         )
         db.add(user)
         people.append((user, singaporean, rng.gauss(0, 0.08)))

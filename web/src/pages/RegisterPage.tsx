@@ -59,11 +59,11 @@ export function RegisterPage() {
   const privacyRef = useRef<HTMLInputElement>(null);
 
   // Someone who is already signed in has no use for this page. `registered` keeps the
-  // redirect from racing this page's own move to profile setup (AC8).
+  // redirect from racing this page's own move to the introduction (SCRUM-94 AC1).
   const [registered, setRegistered] = useState(false);
   // An existing account found through Google just signs in (SCRUM-92).
   const google = useGoogleSignIn((created) =>
-    navigate(created ? "/profile-setup" : "/", { replace: true }),
+    navigate(created ? "/intro" : "/", { replace: true }),
   );
 
   if (google.signup) {
@@ -145,8 +145,8 @@ export function RegisterPage() {
         privacy_notice_version: PRIVACY_NOTICE_VERSION,
       });
       setRegistered(true);
-      // First sign-in goes to profile setup (AC8), which SCRUM-14 builds.
-      navigate("/profile-setup", { replace: true });
+      // First sign-in shows the introduction, then profile setup (SCRUM-94 AC1).
+      navigate("/intro", { replace: true });
     } catch (error) {
       showApiError(error);
     } finally {

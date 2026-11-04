@@ -9,7 +9,7 @@ import logging
 from fastapi import FastAPI
 
 from app.models import AuthScope
-from app.routers import admin, health, lessons, media, profile, progress, review
+from app.routers import admin, health, lessons, media, onboarding, profile, progress, review
 from app.routers.auth import build_auth_router
 
 logging.basicConfig(level=logging.INFO)
@@ -27,6 +27,7 @@ app = FastAPI(
 app.include_router(health.router, prefix="/api", tags=["Health"])
 app.include_router(progress.router, prefix="/api", tags=["Progress"])
 app.include_router(profile.router, prefix="/api", tags=["Profile"])
+app.include_router(onboarding.router, prefix="/api", tags=["Onboarding"])
 app.include_router(media.router, prefix="/api", tags=["Media"])
 app.include_router(lessons.router, prefix="/api", tags=["Lessons (learners)"])
 app.include_router(review.router, prefix="/api", tags=["Review (learners)"])

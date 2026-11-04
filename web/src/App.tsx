@@ -5,7 +5,9 @@ import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 import { ChangePasswordPage, DeleteAccountPage } from "./pages/AccountSecurityPages";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
+import { RequireIntro } from "./components/RequireIntro";
 import { HomePage } from "./pages/HomePage";
+import { IntroPage } from "./pages/IntroPage";
 import { LessonPage } from "./pages/LessonPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { EditProfilePage, ProfileSetupPage } from "./pages/ProfileSetupPage";
@@ -47,33 +49,38 @@ export function App() {
 
           {/* Signed in only: anyone else is sent to /sign-in?next=... */}
           <Route element={<RequireAuth />}>
-            {/* A lesson fills the screen, without the app's bars (SCRUM-15) */}
-            <Route path="lessons/:lessonId" element={<LessonPage />} />
-            <Route element={<SignedInLayout />}>
-              <Route index element={<HomePage />} />
-              {/* Where registration lands a new account (SCRUM-61 AC8) */}
-              <Route path="profile-setup" element={<ProfileSetupPage />} />
-              {/* A progress circle leads here (SCRUM-43 AC9) */}
-              <Route path="topics/:topicId" element={<TopicPage />} />
-              {/* "Review mistakes" on the landing page leads here (SCRUM-44 AC1) */}
-              <Route path="review" element={<ReviewPage />} />
-              <Route
-                path="practice"
-                element={<ComingSoonPage title="AI scenario practice" module="Module 4" />}
-              />
-              <Route
-                path="buddies"
-                element={<ComingSoonPage title="Buddy matching" module="Module 2" />}
-              />
-              <Route
-                path="portfolio"
-                element={<ComingSoonPage title="Integration portfolio" module="Module 3" />}
-              />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="settings/change-password" element={<ChangePasswordPage />} />
-              <Route path="settings/delete-account" element={<DeleteAccountPage />} />
-              {/* The one profile editor, reached from Settings (SCRUM-14 AC4, SCRUM-41 AC5) */}
-              <Route path="settings/profile" element={<EditProfilePage />} />
+            {/* Shown on first sign-in, and from Settings on request (SCRUM-94) */}
+            <Route path="intro" element={<IntroPage />} />
+            {/* Everything else waits until the introduction is finished or skipped */}
+            <Route element={<RequireIntro />}>
+              {/* A lesson fills the screen, without the app's bars (SCRUM-15) */}
+              <Route path="lessons/:lessonId" element={<LessonPage />} />
+              <Route element={<SignedInLayout />}>
+                <Route index element={<HomePage />} />
+                {/* Where the introduction leads a new account (SCRUM-94 AC1, SCRUM-61 AC8) */}
+                <Route path="profile-setup" element={<ProfileSetupPage />} />
+                {/* A progress circle leads here (SCRUM-43 AC9) */}
+                <Route path="topics/:topicId" element={<TopicPage />} />
+                {/* "Review mistakes" on the landing page leads here (SCRUM-44 AC1) */}
+                <Route path="review" element={<ReviewPage />} />
+                <Route
+                  path="practice"
+                  element={<ComingSoonPage title="AI scenario practice" module="Module 4" />}
+                />
+                <Route
+                  path="buddies"
+                  element={<ComingSoonPage title="Buddy matching" module="Module 2" />}
+                />
+                <Route
+                  path="portfolio"
+                  element={<ComingSoonPage title="Integration portfolio" module="Module 3" />}
+                />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="settings/change-password" element={<ChangePasswordPage />} />
+                <Route path="settings/delete-account" element={<DeleteAccountPage />} />
+                {/* The one profile editor, reached from Settings (SCRUM-14 AC4, SCRUM-41 AC5) */}
+                <Route path="settings/profile" element={<EditProfilePage />} />
+              </Route>
             </Route>
           </Route>
 

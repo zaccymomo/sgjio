@@ -38,6 +38,9 @@ class UserOut(BaseModel):
     # (SCRUM-92). Settings uses these to show what applies.
     has_password: bool
     google_linked: bool
+    # Empty until the introduction is finished or skipped; the main app shows it until
+    # then (SCRUM-94).
+    intro_finished_at: datetime | None
 
 
 class RegisterRequest(BaseModel):

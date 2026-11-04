@@ -15,6 +15,8 @@ order an administrator has set (SCRUM-66). Likewise a description is only filled
 a topic has none, so re-seeding never undoes an administrator's edit.
 """
 
+from datetime import UTC, datetime
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -93,6 +95,8 @@ def _get_or_create_user(
         password_hash=hash_password(password),
         role=role,
         user_type=user_type,
+        # The seed login goes straight to Home; register to see the introduction (SCRUM-94).
+        intro_finished_at=datetime.now(UTC) if role == UserRole.USER else None,
     )
     db.add(user)
     return user, True
