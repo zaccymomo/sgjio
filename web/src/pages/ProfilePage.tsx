@@ -9,9 +9,8 @@ import { Initials } from "./SettingsPage";
 /**
  * The Profile tab (SCRUM-100), which took the place of the Settings tab: who you are, and
  * the level you have reached in each topic as a radar chart that grows as you complete
- * lessons, until every spoke is full. For a Newcomer who took the aptitude quiz, its levels
- * show as a dashed outline inside, and the results it gave are a link away. Settings opens
- * from the gear at the top.
+ * lessons, until every spoke is full. A Newcomer's aptitude test results are a link away
+ * (or the test itself, if they skipped it). Settings opens from the gear at the top.
  */
 export function ProfilePage() {
   const { user } = useAuth();
@@ -74,12 +73,10 @@ export function ProfilePage() {
               </p>
               <div className="mt-3 rounded-lg border border-line bg-white p-3">
                 <TopicRadar
-                  showQuiz
                   topics={state.progress.topics.map((topic) => ({
                     id: topic.id,
                     name: topic.name,
                     level: topic.level,
-                    quizLevel: topic.quiz_level,
                   }))}
                 />
                 {/* The same figures in words, and the only view with fewer than three topics. */}
@@ -117,7 +114,7 @@ export function ProfilePage() {
                 to="/aptitude/results"
                 className="mt-3 inline-flex items-center gap-0.5 text-sm font-semibold text-brand hover:underline"
               >
-                See what your quiz exempted
+                See your aptitude test results
                 <ChevronRight className="size-4" aria-hidden />
               </Link>
             ) : (
@@ -125,7 +122,7 @@ export function ProfilePage() {
                 to="/aptitude"
                 className="mt-3 inline-flex items-center gap-0.5 text-sm font-semibold text-brand hover:underline"
               >
-                Take the quiz to find your starting point
+                Take the aptitude test to find your starting point
                 <ChevronRight className="size-4" aria-hidden />
               </Link>
             ))}

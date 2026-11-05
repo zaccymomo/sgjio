@@ -66,10 +66,8 @@ class TopicProgress:
     # Exempted and not also completed, so the two parts never double count.
     exempted: int
     available: int
-    # The level reached in this topic, 0 to 5 (SCRUM-100), and the level the aptitude quiz
-    # gave it, or None if the quiz did not cover it (not taken, skipped, or added since).
+    # The level reached in this topic, 0 to 5 (SCRUM-100).
     level: int
-    quiz_level: int | None
 
 
 @dataclass(frozen=True)
@@ -131,7 +129,7 @@ def level_reached(quiz_level: int | None, lessons: list[tuple[int, bool]]) -> in
     `lessons` is each published lesson's level and whether it is covered (completed or
     exempted). The level is the highest one at which every lesson at that level and below
     is covered, counting only levels that have lessons, so a level with none neither holds
-    the user back nor lifts them. It is never below what the aptitude quiz gave the topic.
+    the user back nor lifts them. It is never below what the aptitude test gave the topic.
     Covering every lesson reaches Level 5, so a finished topic fills its spoke on the chart.
     """
     reached = 0
@@ -144,7 +142,7 @@ def level_reached(quiz_level: int | None, lessons: list[tuple[int, bool]]) -> in
     return max(reached, quiz_level or 0)
 
 
-def _levels(db: Session, user_id: uuid.UUID, quiz: dict[uuid.UUID, int]) -> dict[uuid.UUID, int]:
+def _levels(db: Session, user_id: uuid.UUID) -> dict[uuid.UUID, int]:
     """`level_reached` for every topic with a published lesson, by topic id."""
     covered = or_(
         select(LessonCompletion.id)
@@ -159,6 +157,7 @@ def _levels(db: Session, user_id: uuid.UUID, quiz: dict[uuid.UUID, int]) -> dict
         )
     ):
         lessons.setdefault(row.topic_id, []).append((row.level, row.covered))
+    quiz = exemption_levels(db, user_id)
     return {
         topic_id: level_reached(quiz.get(topic_id), topic_lessons)
         for topic_id, topic_lessons in lessons.items()
@@ -167,8 +166,7 @@ def _levels(db: Session, user_id: uuid.UUID, quiz: dict[uuid.UUID, int]) -> dict
 
 def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
     """Per-topic and overall figures for one user."""
-    quiz = exemption_levels(db, user_id)
-    levels = _levels(db, user_id, quiz)
+    levels = _levels(db, user_id)
     topics = [
         TopicProgress(
             id=row.id,
@@ -177,7 +175,6 @@ def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
             exempted=row.exempted,
             available=row.available,
             level=levels.get(row.id, 0),
-            quiz_level=quiz.get(row.id),
         )
         for row in db.execute(_topic_rows(user_id)).all()
     ]

@@ -162,7 +162,7 @@ const DATE = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", 
 function rowMeta(lesson: TopicLesson): string {
   const { last_attempted_at, best_correct, best_scored, reading_seconds, questions } = lesson;
   if (lesson.exempted && !lesson.completed) {
-    return `Exempted by aptitude quiz · Level ${lesson.level}`;
+    return `Exempted by aptitude test · Level ${lesson.level}`;
   }
   if (!last_attempted_at) {
     return [

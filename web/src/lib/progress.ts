@@ -10,8 +10,6 @@ export type TopicProgress = {
   available: number;
   /** The level reached in the topic, 0 to 5 (SCRUM-100): drawn on the Profile chart. */
   level: number;
-  /** The level the aptitude quiz gave the topic, or null if the quiz did not cover it. */
-  quiz_level: number | null;
 };
 
 /** The suggested next lesson (SCRUM-6), from the topic where progress is weakest. */

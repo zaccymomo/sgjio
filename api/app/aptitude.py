@@ -164,15 +164,15 @@ def has_taken_quiz(db: Session, user_id: uuid.UUID) -> bool:
 
 def _eligible(db: Session, user: User) -> None:
     if user.user_type != UserType.NEWCOMER:
-        raise AptitudeError("quiz_for_newcomers", "The aptitude quiz is for Newcomers.", 403)
+        raise AptitudeError("quiz_for_newcomers", "The aptitude test is for Newcomers.", 403)
     if user.profile is None:
         raise AptitudeError(
-            "profile_required", "Complete your profile before starting the quiz.", 409
+            "profile_required", "Complete your profile before starting the aptitude test.", 409
         )
     if has_taken_quiz(db, user.id):
         raise AptitudeError(
             "quiz_already_completed",
-            "You have already completed the onboarding quiz.",
+            "You have already completed the aptitude test.",
             409,
         )
 
@@ -184,7 +184,7 @@ def _ready_topics(db: Session) -> list[Topic]:
         detail = ", ".join(missing) if missing else "all topics"
         raise AptitudeError(
             "aptitude_not_ready",
-            f"The quiz is not ready. Add active questions at every level for {detail}.",
+            f"The aptitude test is not ready. Add active questions at every level for {detail}.",
             409,
         )
     topic_ids = [row["topic_id"] for row in status["topics"]]
@@ -224,7 +224,7 @@ def _pick(
     )
     if not choices:
         raise AptitudeError(
-            "aptitude_not_ready", "The quiz question bank changed. Restart it.", 409
+            "aptitude_not_ready", "The aptitude test's questions changed. Start it again.", 409
         )
     return _public_question(choose(choices), topic_index, topic_count)
 
@@ -247,7 +247,8 @@ def _trace(db: Session, topics: list[Topic], answers) -> tuple[list[dict], int, 
     for answer in answers:
         if topic_index >= len(topics):
             raise AptitudeError(
-                "answers_after_finish", "Restart the quiz and answer each question once."
+                "answers_after_finish",
+                "Start the aptitude test again and answer each question once.",
             )
         if answer.question_id in seen:
             raise AptitudeError("question_repeated", "Answer each question once.")
@@ -257,7 +258,9 @@ def _trace(db: Session, topics: list[Topic], answers) -> tuple[list[dict], int, 
             or question.topic_id != topics[topic_index].id
             or question.level != level
         ):
-            raise AptitudeError("invalid_quiz_path", "The answers do not follow the quiz order.")
+            raise AptitudeError(
+                "invalid_quiz_path", "The answers do not follow the aptitude test's order."
+            )
         option = next((item for item in question.options if item["id"] == answer.option_id), None)
         if option is None:
             raise AptitudeError("option_not_found", "Choose an answer offered for every question.")

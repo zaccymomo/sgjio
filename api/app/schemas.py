@@ -334,10 +334,8 @@ class TopicProgressOut(BaseModel):
     completed: int
     exempted: int
     available: int
-    # SCRUM-100: the level reached in the topic, 0 to 5, and the one the aptitude quiz
-    # gave it (null if the quiz did not cover it).
+    # SCRUM-100: the level reached in the topic, 0 to 5, drawn on the Profile tab's chart.
     level: int
-    quiz_level: int | None
 
 
 class SuggestionOut(BaseModel):

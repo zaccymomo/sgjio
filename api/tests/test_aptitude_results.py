@@ -73,9 +73,9 @@ def _placements(client) -> dict[str, dict]:
     return {row["topic"]: row for row in response.json()["placements"]}
 
 
-def _levels(client) -> dict[str, tuple[int, int | None]]:
+def _levels(client) -> dict[str, int]:
     topics = client.get("/api/progress").json()["topics"]
-    return {t["name"]: (t["level"], t["quiz_level"]) for t in topics}
+    return {t["name"]: t["level"] for t in topics}
 
 
 # --- AC1 and AC2: how many lessons each topic's placement exempts ------------------------
@@ -216,7 +216,7 @@ def test_level_reached_rules():
     assert level_reached(None, []) == 0
 
 
-def test_progress_carries_the_level_reached_and_the_quiz_level(client, db, make_user):
+def test_progress_carries_the_level_reached_in_each_topic(client, db, make_user):
     hawker, singlish, festivals = (
         _topic(db, "Hawker", 0),
         _topic(db, "Singlish", 1),
@@ -230,17 +230,17 @@ def test_progress_carries_the_level_reached_and_the_quiz_level(client, db, make_
     # Festivals is left out of the quiz, as for a topic added after it was taken.
     _quiz(db, user, {hawker: 2, singlish: 0})
 
-    assert _levels(client) == {"Hawker": (2, 2), "Singlish": (0, 0), "Festivals": (0, None)}
+    assert _levels(client) == {"Hawker": 2, "Singlish": 0, "Festivals": 0}
 
-    # Completing lessons in order raises the level; the quiz level stays as it was.
+    # Completing lessons raises the level, but only once every lesson below is covered.
     _complete(db, user, lessons["Hawker", 3])
     _complete(db, user, lessons["Singlish", 1])
     _complete(db, user, lessons["Festivals", 2])
-    assert _levels(client) == {"Hawker": (3, 2), "Singlish": (1, 0), "Festivals": (0, None)}
+    assert _levels(client) == {"Hawker": 3, "Singlish": 1, "Festivals": 0}
 
     # Finishing every lesson in a topic fills it.
     _complete(db, user, lessons["Hawker", 5])
-    assert _levels(client)["Hawker"] == (5, 2)
+    assert _levels(client)["Hawker"] == 5
 
 
 def test_a_user_who_skipped_the_quiz_has_levels_from_lessons_alone(client, db, make_user):
@@ -249,6 +249,6 @@ def test_a_user_who_skipped_the_quiz_has_levels_from_lessons_alone(client, db, m
     _lesson(db, hawker, "Second", 2)
     user = _sign_in(client, make_user)
 
-    assert _levels(client) == {"Hawker": (0, None)}
+    assert _levels(client) == {"Hawker": 0}
     _complete(db, user, first)
-    assert _levels(client) == {"Hawker": (1, None)}
+    assert _levels(client) == {"Hawker": 1}

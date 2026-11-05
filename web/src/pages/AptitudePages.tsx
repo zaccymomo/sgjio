@@ -30,8 +30,8 @@ export function AptitudeIntroPage() {
   if (user?.user_type !== "newcomer") {
     return (
       <div className="mx-auto flex max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-6">
-        <h1 className="text-2xl font-bold text-ink">No placement quiz needed</h1>
-        <p className="text-sm text-muted">The onboarding aptitude quiz is for Newcomers.</p>
+        <h1 className="text-2xl font-bold text-ink">No aptitude test needed</h1>
+        <p className="text-sm text-muted">The aptitude test is for Newcomers.</p>
         <Button onClick={() => navigate("/", { replace: true })}>Go to my lessons</Button>
       </div>
     );
@@ -40,9 +40,9 @@ export function AptitudeIntroPage() {
   if (completed) {
     return (
       <div className="mx-auto flex max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-6">
-        <h1 className="text-2xl font-bold text-ink">Quiz already completed</h1>
+        <h1 className="text-2xl font-bold text-ink">Aptitude test already completed</h1>
         <p className="text-sm text-muted">
-          Your starting point for each topic has been saved. The onboarding quiz can only be taken
+          Your starting point for each topic has been saved. The aptitude test can only be taken
           once during this version of SGJio.
         </p>
         <Link className="text-sm font-semibold text-brand" to="/aptitude/results">
@@ -82,7 +82,7 @@ export function AptitudeIntroPage() {
       </div>
       {error && <Alert tone="error">{error}</Alert>}
       <Button loading={busy === "start"} onClick={() => void run("start")}>
-        Take the quiz now
+        Take the aptitude test now
       </Button>
       <Button variant="secondary" loading={busy === "skip"} onClick={() => void run("skip")}>
         Skip for now
@@ -107,7 +107,9 @@ export function AptitudeQuizPage() {
       .start()
       .then((step) => setQuestion(step.question))
       .catch((cause: unknown) =>
-        setError(cause instanceof ApiError ? cause.message : "The quiz could not be started."),
+        setError(
+          cause instanceof ApiError ? cause.message : "The aptitude test could not be started.",
+        ),
       );
   }, []);
 
@@ -232,7 +234,7 @@ export function AptitudeResultsPage() {
         </p>
         {available > 0 && (
           <p className="mt-1 text-sm text-muted">
-            The quiz exempted you from{" "}
+            The aptitude test exempted you from{" "}
             <span className="font-semibold text-ink">
               {exempted} of {available} {available === 1 ? "lesson" : "lessons"}
             </span>
@@ -263,7 +265,7 @@ export function AptitudeResultsPage() {
       >
         Go to my lessons
       </Link>
-      <p className="text-center text-xs text-muted">This onboarding quiz cannot be retaken.</p>
+      <p className="text-center text-xs text-muted">The aptitude test cannot be retaken.</p>
     </div>
   );
 }

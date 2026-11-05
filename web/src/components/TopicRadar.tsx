@@ -5,38 +5,28 @@ export type RadarTopic = {
   name: string;
   /** 0 to 5. */
   level: number;
-  /** The level the aptitude quiz gave the topic, drawn as a dashed outline when shown. */
-  quizLevel?: number | null;
 };
 
 const LEVELS = [1, 2, 3, 4, 5];
-const WIDTH = 360;
+const WIDTH = 420;
 const HEIGHT = 290;
 const CX = WIDTH / 2;
 const CY = HEIGHT / 2;
 const RADIUS = 92;
-/** Longest line in a spoke's label before it wraps. */
+/** Longest line in a spoke's label before it wraps; longer words are cut short. */
 const LINE = 16;
 
 /**
  * A radar of the level in each topic, one spoke per topic on the same 0 to 5 scale
- * (SCRUM-100). The results page draws what the aptitude quiz gave; the Profile tab draws
- * the level reached since, with the quiz's as a dashed outline inside it.
+ * (SCRUM-100). The aptitude test results page draws the level the test gave each topic;
+ * the Profile tab draws the level reached since, which grows as lessons are completed.
  *
  * The spokes follow the order of the topics given (the order administrators set), so the
  * shape never jumps about between visits. Every level is also written beside its spoke, and
  * the caller lists the topics in text too, so nothing depends on reading the shape. Fewer
  * than three topics make no shape at all, so nothing is drawn.
  */
-export function TopicRadar({
-  topics,
-  showQuiz = false,
-  className,
-}: {
-  topics: RadarTopic[];
-  showQuiz?: boolean;
-  className?: string;
-}) {
+export function TopicRadar({ topics, className }: { topics: RadarTopic[]; className?: string }) {
   if (topics.length < 3) return null;
 
   const point = (index: number, level: number) => {
@@ -44,15 +34,14 @@ export function TopicRadar({
     const distance = (RADIUS * level) / 5;
     return [CX + Math.cos(angle) * distance, CY + Math.sin(angle) * distance] as const;
   };
-  const outline = (levelOf: (topic: RadarTopic) => number) =>
-    topics.map((topic, index) => point(index, levelOf(topic)).join(",")).join(" ");
-  const quizShown = showQuiz && topics.some((topic) => topic.quizLevel != null);
+  const outline = (levelOf: (topic: RadarTopic, index: number) => number) =>
+    topics.map((topic, index) => point(index, levelOf(topic, index)).join(",")).join(" ");
 
   return (
-    <figure className={cn("m-0 flex flex-col items-center gap-2", className)}>
+    <figure className={cn("m-0 flex justify-center", className)}>
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="h-auto w-full max-w-sm"
+        className="h-auto w-full max-w-md"
         role="img"
         aria-label={`Level in each topic: ${topics
           .map((topic) => `${topic.name}, Level ${topic.level}`)
@@ -62,7 +51,7 @@ export function TopicRadar({
         {LEVELS.map((level) => (
           <polygon
             key={level}
-            points={topics.map((_, index) => point(index, level).join(",")).join(" ")}
+            points={outline(() => level)}
             className={cn("stroke-line", level === 5 ? "fill-surface" : "fill-none")}
             strokeWidth={1}
           />
@@ -80,15 +69,6 @@ export function TopicRadar({
           );
         })}
 
-        {quizShown && (
-          <polygon
-            points={outline((topic) => topic.quizLevel ?? 0)}
-            className="fill-none stroke-brand-light"
-            strokeWidth={2}
-            strokeDasharray="4 3"
-            strokeLinejoin="round"
-          />
-        )}
         <polygon
           points={outline((topic) => topic.level)}
           className="fill-brand/15 stroke-brand"
@@ -104,9 +84,6 @@ export function TopicRadar({
               <circle cx={x} cy={y} r={10} className="fill-transparent">
                 <title>
                   {topic.name}: Level {topic.level}
-                  {quizShown && topic.quizLevel != null
-                    ? ` (Level ${topic.quizLevel} from your quiz)`
-                    : ""}
                 </title>
               </circle>
             </g>
@@ -117,19 +94,6 @@ export function TopicRadar({
           <SpokeLabel key={topic.id} topic={topic} at={point(index, 6.1)} />
         ))}
       </svg>
-
-      {quizShown && (
-        <figcaption className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-2xs text-muted">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-xs border-2 border-brand bg-brand/15" />
-            Your level now
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-0 w-3.5 border-t-2 border-dashed border-brand-light" />
-            From your quiz
-          </span>
-        </figcaption>
-      )}
     </figure>
   );
 }
@@ -156,15 +120,17 @@ function SpokeLabel({ topic, at: [x, y] }: { topic: RadarTopic; at: readonly [nu
   );
 }
 
-/** A topic name on at most two lines, broken between words. */
+/** A topic name on at most two lines, broken between words, each at most LINE long. */
 function wrap(name: string): string[] {
-  if (name.length <= LINE) return [name];
-  const words = name.split(" ");
-  let first = "";
-  while (words.length && (first + " " + words[0]).trim().length <= LINE) {
-    first = (first + " " + words.shift()).trim();
+  const words = name.trim().split(/\s+/);
+  const lines: string[] = [];
+  while (words.length && lines.length < 2) {
+    let line = words.shift() ?? "";
+    while (words.length && `${line} ${words[0]}`.length <= LINE) line += ` ${words.shift()}`;
+    lines.push(line);
   }
-  if (!first) first = words.shift() ?? "";
-  const rest = words.join(" ");
-  return rest ? [first, rest.length > LINE + 4 ? `${rest.slice(0, LINE + 2)}…` : rest] : [first];
+  // Whatever is left over, and any single word too long for a line, is cut short.
+  const last = lines.length - 1;
+  if (words.length) lines[last] = `${lines[last]} ${words.join(" ")}`;
+  return lines.map((line) => (line.length > LINE ? `${line.slice(0, LINE - 1).trimEnd()}…` : line));
 }

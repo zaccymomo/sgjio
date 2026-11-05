@@ -46,14 +46,14 @@ export function HomePage() {
               <div>
                 <p className="text-sm font-semibold text-ink">Find your starting point</p>
                 <p className="text-caption text-muted">
-                  Take the quiz to exempt lessons in topics you already understand.
+                  Take the aptitude test to exempt lessons in topics you already understand.
                 </p>
               </div>
               <Link
                 to="/aptitude"
                 className="shrink-0 rounded-sm bg-ink px-3 py-2 text-xs font-semibold text-white"
               >
-                Take quiz
+                Take test
               </Link>
             </section>
           )}
@@ -119,8 +119,8 @@ function ProgressSection({ progress }: { progress: Progress }) {
 
       {exempted > 0 && (
         <p className="mt-1 text-right text-caption text-muted">
-          Includes {exempted} {exempted === 1 ? "lesson" : "lessons"} exempted by your aptitude quiz
-          · {/* SCRUM-100: back to the quiz results that explain it. */}
+          Includes {exempted} {exempted === 1 ? "lesson" : "lessons"} exempted by your aptitude test
+          · {/* SCRUM-100: back to the aptitude test results that explain it. */}
           <Link
             to="/aptitude/results"
             className="font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
@@ -142,6 +142,19 @@ function ProgressSection({ progress }: { progress: Progress }) {
           style={{ width: `${(exempted / available) * 100}%` }}
         />
       </div>
+      {/* The two reds, named once for the bar and every circle below (SCRUM-100). */}
+      {exempted > 0 && (
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-2xs text-muted">
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-brand" aria-hidden />
+            Completed by you
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-brand-light" aria-hidden />
+            Exempted by your aptitude test
+          </span>
+        </div>
+      )}
 
       {/* AC7: with nothing completed, point at the suggestion rather than leaving a
           screen of empty circles with no next step. */}
@@ -256,6 +269,7 @@ function CircleExplanation({
         {/* AC1 */}
         <li>
           Each circle counts lessons you completed and lessons exempted by your topic placement.
+          Exempted lessons are shown in a lighter red.
         </li>
         {/* AC2 */}
         <li>Finishing a lesson completes it, even if you answered some questions incorrectly.</li>
