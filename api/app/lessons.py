@@ -6,8 +6,11 @@ Routes stay thin: they call these functions and turn a ContentProblem into an HT
 - the list has every lesson of every status, without its cards, ordered as the admin
   portal shows it: by topic order, then by order within the topic. Lessons with no topic
   come last, and lessons in archived topics are included.
-- lessons are ordered within their topic, and lessons with no topic among themselves.
-  Moving a lesson to another topic belongs to the lesson editor, not to reordering.
+- lessons are ordered within their topic, and lessons with no topic among themselves: by
+  level first (Level 1 at the top, as learners see them, SCRUM-104 AC4), then by the order
+  administrators set within each level. A reorder can only move a lesson among lessons at
+  its own level. Moving a lesson to another topic belongs to the lesson editor, not to
+  reordering.
 - a reorder must list every lesson in that topic (or with no topic) exactly once, of any
   status, and say which order it replaces; a page that was out of date is refused rather
   than guessed at.
@@ -53,6 +56,7 @@ from app.problems import (
     lesson_has_blockers,
     lesson_not_deletable,
     lesson_not_found,
+    lesson_order_mixes_levels,
     lesson_out_of_date,
     lesson_status_conflict,
     level_locked,
@@ -195,6 +199,7 @@ def list_lessons(db: Session) -> list[LessonSummary]:
             Topic.position.nulls_last(),
             Topic.created_at,
             Topic.id,
+            Lesson.level,
             Lesson.position,
             Lesson.created_at,
             Lesson.id,
@@ -251,21 +256,26 @@ def reorder_lessons(
     """Put one topic's lessons (or those with no topic) in the order `ids`, replacing the
     order `previous_ids`.
 
-    See check_reorder for what is refused. The group's lessons are locked first, so two
-    reorders of the same topic run one after the other instead of interleaving.
+    See check_reorder for what is refused; the new order must also keep the levels in order
+    (lesson_order_mixes_levels), since lessons are listed by level first. The group's
+    lessons are locked first, so two reorders of the same topic run one after the other
+    instead of interleaving.
     """
     if topic_id is not None and db.get(Topic, topic_id) is None:
         raise topic_not_found()
-    current = list(
-        db.scalars(
-            select(Lesson.id)
-            .where(_in_group(topic_id))
-            .order_by(Lesson.position, Lesson.created_at, Lesson.id)
-            .with_for_update()
-        )
-    )
+    rows = db.execute(
+        select(Lesson.id, Lesson.level)
+        .where(_in_group(topic_id))
+        .order_by(Lesson.level, Lesson.position, Lesson.created_at, Lesson.id)
+        .with_for_update()
+    ).all()
+    current = [row.id for row in rows]
+    levels = {row.id: row.level for row in rows}
     try:
         check_reorder(ids, previous_ids, current)
+        in_order = [levels[lesson_id] for lesson_id in ids]
+        if in_order != sorted(in_order):
+            raise lesson_order_mixes_levels()
     except ContentProblem:
         db.rollback()
         raise
@@ -355,7 +365,8 @@ def update_lesson(
 ) -> LessonDetail:
     """Change the draft's `title`, `summary`, `doc` or the lesson's `topic_id` or `level`:
     whichever `changes` holds. A different level is refused once the lesson has been
-    published (level_locked); sending the level it already has is fine.
+    published (level_locked); sending the level it already has is fine. A new level puts
+    the lesson at the end of that level in its topic.
 
     A save that changes nothing leaves "last updated" alone, since the ORM only writes (and
     only bumps updated_at) when a value differs. A new topic puts the lesson at the end of
@@ -368,6 +379,7 @@ def update_lesson(
             if latest_version(db, lesson.id) is not None:
                 raise level_locked()
             lesson.level = changes["level"]
+            lesson.position = next_lesson_position(db, lesson.topic_id)
         if "topic_id" in changes and changes["topic_id"] != lesson.topic_id:
             topic_id = changes["topic_id"]
             if topic_id is None:

@@ -159,14 +159,22 @@ def list_lessons(db: Session = Depends(get_db)) -> list[lessons.LessonSummary]:
 @router.put(
     "/lessons/order",
     response_model=list[LessonSummaryOut],
-    responses={**NOT_FOUND, **OUT_OF_DATE},
+    responses={
+        **NOT_FOUND,
+        409: {
+            "description": "The page was out of date (order_out_of_date), or the order mixes "
+            "levels (lesson_order_mixes_levels)"
+        },
+    },
 )
 def reorder_lessons(
     body: LessonOrderRequest, db: Session = Depends(get_db)
 ) -> list[lessons.LessonSummary]:
     """Set the order of one topic's lessons, or of those with no topic (`topic_id: null`).
     List every lesson in that group exactly once, plus the order the page showed; a page
-    that was out of date gets 409 order_out_of_date. Returns every lesson, in order."""
+    that was out of date gets 409 order_out_of_date. Lessons are ordered by level first, so
+    an order that puts a higher level above a lower one gets 409 lesson_order_mixes_levels.
+    Returns every lesson, in order."""
     try:
         return lessons.reorder_lessons(db, body.topic_id, body.ids, body.previous_ids)
     except ContentProblem as problem:

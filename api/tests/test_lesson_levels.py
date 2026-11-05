@@ -311,3 +311,67 @@ def test_a_file_with_a_level_outside_1_to_5_is_refused(db, tmp_path):
 
     assert result.action == "failed"
     assert _imported(db) is None
+
+
+# --- Order: by level first, reordered only within a level ----------------------------------
+
+
+def _order(admin, topic: Topic) -> list[str]:
+    return [row["title"] for row in admin.get(URL).json() if row["topic_id"] == str(topic.id)]
+
+
+def _ids(admin, topic: Topic) -> dict[str, str]:
+    return {row["title"]: row["id"] for row in admin.get(URL).json()}
+
+
+def _reorder(admin, topic: Topic, titles: list[str]):
+    ids = _ids(admin, topic)
+    return admin.put(
+        f"{URL}/order",
+        json={
+            "topic_id": str(topic.id),
+            "ids": [ids[title] for title in titles],
+            "previous_ids": [ids[title] for title in _order(admin, topic)],
+        },
+    )
+
+
+def test_lessons_are_listed_by_level_then_by_order(admin, topic):
+    _create(admin, topic, 3, "Third")
+    _create(admin, topic, 1, "First")
+    _create(admin, topic, 2, "Second")
+    _create(admin, topic, 1, "Also first")
+
+    assert _order(admin, topic) == ["First", "Also first", "Second", "Third"]
+
+
+def test_lessons_reorder_within_a_level(admin, topic):
+    _create(admin, topic, 1, "a")
+    _create(admin, topic, 1, "b")
+    _create(admin, topic, 2, "c")
+
+    response = _reorder(admin, topic, ["b", "a", "c"])
+
+    assert response.status_code == 200
+    assert _order(admin, topic) == ["b", "a", "c"]
+
+
+def test_a_lesson_cannot_move_above_a_lower_level(admin, topic):
+    _create(admin, topic, 1, "a")
+    _create(admin, topic, 2, "b")
+
+    response = _reorder(admin, topic, ["b", "a"])
+
+    assert response.status_code == 409
+    assert _code(response) == "lesson_order_mixes_levels"
+    assert _order(admin, topic) == ["a", "b"]
+
+
+def test_a_new_level_puts_a_draft_at_the_end_of_that_level(admin, topic):
+    _create(admin, topic, 2, "Level 2 first")
+    _create(admin, topic, 2, "Level 2 second")
+    moving = _create(admin, topic, 1, "Moving")
+
+    _save(admin, moving, level=2)
+
+    assert _order(admin, topic) == ["Level 2 first", "Level 2 second", "Moving"]

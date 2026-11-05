@@ -100,6 +100,15 @@ def level_locked() -> ContentProblem:
     )
 
 
+def lesson_order_mixes_levels() -> ContentProblem:
+    return ContentProblem(
+        "lesson_order_mixes_levels",
+        "Lessons are ordered by level first, so a lesson can only move among lessons at its "
+        "own level.",
+        409,
+    )
+
+
 def order_out_of_date() -> ContentProblem:
     return ContentProblem(
         "order_out_of_date",

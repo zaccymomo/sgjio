@@ -11,9 +11,9 @@ import {
 import { useId } from "react";
 
 import type { LessonSummary, Topic } from "../lib/content";
-import { lessonTitle, type Group } from "../lib/filter";
+import { byLevel, lessonTitle, withLevelReordered, type Group } from "../lib/filter";
 import { formatDate, plural, topicSummary } from "../lib/format";
-import { LEVEL_DESCRIPTIONS, LEVELS, levelLabel } from "../lib/levels";
+import { LEVEL_DESCRIPTIONS, LEVELS, levelLabel, type Level } from "../lib/levels";
 import { DragHandle } from "./DragHandle";
 import { LessonRow } from "./LessonRow";
 import { lessonMenuGroups, moveItems, type LessonActions } from "./menuItems";
@@ -165,49 +165,64 @@ export function TopicGroup({
                   Showing {lessons.length} of {plural(allLessons.length, "lesson")}
                 </p>
               )}
-              {lessonReorder ? (
-                <SortableList
-                  items={lessons}
-                  getId={(lesson) => lesson.id}
-                  getLabel={lessonTitle}
-                  disabled={lessonReorder.disabled}
-                  onReorder={lessonReorder.onReorder}
-                  onDragChange={lessonReorder.onDragChange}
-                  className={lessonListClass}
-                  itemClassName="bg-surface"
-                  renderItem={(lesson, lessonControls) => (
-                    <LessonRow
-                      lesson={lesson}
-                      handle={<DragHandle reorder={lessonControls} />}
-                      menu={
-                        <RowMenu
-                          name={lessonTitle(lesson)}
-                          groups={lessonMenuGroups(lesson, lessonControls, lessonActions)}
-                          moveKey={lessonControls.moveKey}
-                        />
+              {byLevel(lessons).map((run) => (
+                <section key={run.level} aria-label={levelLabel(run.level)}>
+                  <h3
+                    className="pt-3 pb-1 pl-12 text-2xs font-bold tracking-wide text-muted uppercase"
+                    title={LEVEL_DESCRIPTIONS[run.level as Level]}
+                  >
+                    {levelLabel(run.level)}
+                  </h3>
+                  {lessonReorder ? (
+                    <SortableList
+                      items={run.lessons}
+                      getId={(lesson) => lesson.id}
+                      getLabel={lessonTitle}
+                      disabled={lessonReorder.disabled}
+                      onReorder={(ids, previousIds) =>
+                        lessonReorder.onReorder(
+                          withLevelReordered(allLessons, ids),
+                          withLevelReordered(allLessons, previousIds),
+                        )
                       }
+                      onDragChange={lessonReorder.onDragChange}
+                      className={lessonListClass}
+                      itemClassName="bg-surface"
+                      renderItem={(lesson, lessonControls) => (
+                        <LessonRow
+                          lesson={lesson}
+                          handle={<DragHandle reorder={lessonControls} />}
+                          menu={
+                            <RowMenu
+                              name={lessonTitle(lesson)}
+                              groups={lessonMenuGroups(lesson, lessonControls, lessonActions)}
+                              moveKey={lessonControls.moveKey}
+                            />
+                          }
+                        />
+                      )}
+                      renderOverlay={(lesson) => <LessonOverlay lesson={lesson} />}
                     />
-                  )}
-                  renderOverlay={(lesson) => <LessonOverlay lesson={lesson} />}
-                />
-              ) : (
-                <ul className={lessonListClass}>
-                  {lessons.map((lesson) => (
-                    <li key={lesson.id}>
-                      <LessonRow
-                        lesson={lesson}
-                        handle={handleSpace}
-                        menu={
-                          <RowMenu
-                            name={lessonTitle(lesson)}
-                            groups={lessonMenuGroups(lesson, undefined, lessonActions)}
+                  ) : (
+                    <ul className={lessonListClass}>
+                      {run.lessons.map((lesson) => (
+                        <li key={lesson.id}>
+                          <LessonRow
+                            lesson={lesson}
+                            handle={handleSpace}
+                            menu={
+                              <RowMenu
+                                name={lessonTitle(lesson)}
+                                groups={lessonMenuGroups(lesson, undefined, lessonActions)}
+                              />
+                            }
                           />
-                        }
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              ))}
             </>
           )}
         </div>
