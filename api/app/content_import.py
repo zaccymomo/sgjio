@@ -205,7 +205,9 @@ def import_file(db: Session, path: Path, root: Path, publish: bool = False) -> R
     latest = lessons.latest_version(db, lesson.id)
     if data.level is not None and data.level != lesson.level:
         if latest is None:
+            # Like the editor: a new level puts the draft at the end of that level.
             lesson.level = data.level
+            lesson.position = lessons.next_lesson_position(db, lesson.topic_id)
             result.action = "updated" if result.action == "unchanged" else result.action
         else:
             result.problems.append(

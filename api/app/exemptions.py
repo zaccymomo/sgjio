@@ -2,8 +2,9 @@
 
 Each user has at most one `topic_exemptions` row per topic: the highest level they are
 exempted up to there, 0 to 5. Exempted lessons are never stored. A lesson is exempted for a
-user when its topic's exemption level is at least the lesson's level (SCRUM-104 AC1), and as
-a lesson's level never changes (SCRUM-103), this is worked out whenever it is needed (AC5).
+user when its topic's exemption level is at least the lesson's level (SCRUM-104 AC1). Only
+published lessons count, and a lesson's level is fixed from its first publish (SCRUM-103), so
+this is worked out whenever it is needed (AC5).
 That is also why a lesson published later at an exempted level is exempted too (SCRUM-104
 AC3). A topic with no row, as for a user who skipped the quiz, exempts nothing.
 """

@@ -367,11 +367,50 @@ def test_a_lesson_cannot_move_above_a_lower_level(admin, topic):
     assert _order(admin, topic) == ["a", "b"]
 
 
-def test_a_new_level_puts_a_draft_at_the_end_of_that_level(admin, topic):
+def test_a_new_level_puts_a_draft_at_the_end_of_that_level(admin, db, topic):
+    """Created first, so without the move it would head its new level."""
+    moving = _create(admin, topic, 1, "Moving")
     _create(admin, topic, 2, "Level 2 first")
     _create(admin, topic, 2, "Level 2 second")
-    moving = _create(admin, topic, 1, "Moving")
 
     _save(admin, moving, level=2)
 
     assert _order(admin, topic) == ["Level 2 first", "Level 2 second", "Moving"]
+
+
+def test_a_new_level_and_topic_in_one_save_ends_up_last_in_the_new_topic(admin, db, topic):
+    other = Topic(name="Festivals", position=1)
+    db.add(other)
+    db.commit()
+    moving = _create(admin, topic, 1, "Moving")
+    _create(admin, other, 2, "Already there")
+
+    response = _save(admin, moving, level=2, topic_id=str(other.id))
+
+    assert response.status_code == 200
+    assert response.json()["level"] == 2
+    assert _order(admin, other) == ["Already there", "Moving"]
+
+
+def test_sending_a_null_level_changes_nothing(admin, topic):
+    lesson = _create(admin, topic, 3)
+
+    response = _save(admin, lesson, level=None)
+
+    assert response.status_code == 200
+    assert response.json()["level"] == 3
+
+
+def test_a_file_changing_a_draft_s_level_puts_it_at_the_end_of_that_level(admin, db, tmp_path):
+    _write(tmp_path, 1)
+    import_folder(db, tmp_path)
+    draft = _imported(db)
+    for title, position in [("Level 2 first", 1), ("Level 2 second", 2)]:
+        db.add(Lesson(title=title, topic_id=draft.topic_id, level=2, position=position))
+    db.commit()
+    _write(tmp_path, 2)
+
+    import_folder(db, tmp_path)
+
+    topic = db.get(Topic, draft.topic_id)
+    assert _order(admin, topic) == ["Level 2 first", "Level 2 second", "Ordering kopi"]

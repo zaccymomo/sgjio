@@ -20,7 +20,7 @@ lessons/02-hawker-food/01-ordering-kopi/
   kopi-o-kosong.mp3    audio its cards use (MP3, M4A, WAV or Ogg; keep it under 20 seconds)
 ```
 
-Number prefixes set the order new lessons take in their topic. After that, the order is whatever administrators set in the portal; files never move a lesson.
+Lessons are listed by level first (see `level` below); within a level, number prefixes set the order new lessons take in their topic. After that, the order is whatever administrators set in the portal; files never move a lesson.
 
 ## lesson.yaml
 

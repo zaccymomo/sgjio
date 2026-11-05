@@ -659,11 +659,13 @@ class LessonUpdateRequest(LessonFields):
 
     updated_at: AwareDatetime
     # Can change only until the lesson is first published (level_locked).
-    level: LessonLevel = MIN_LEVEL
+    level: LessonLevel | None = None
 
     def changes(self) -> dict:
         """Only the lesson fields the request actually sent, `doc` still as a model."""
         sent = self.model_fields_set & {*LessonFields.model_fields, "level"}
+        if self.level is None:
+            sent.discard("level")  # "level": null changes nothing, like leaving it out
         return {name: getattr(self, name) for name in sent}
 
 

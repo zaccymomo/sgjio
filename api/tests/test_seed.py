@@ -179,3 +179,21 @@ def test_reseeding_fills_an_empty_description_but_keeps_an_edited_one(db):
     db.expire_all()
     assert singlish.description == "Written by an administrator."
     assert festivals.description == TOPICS["Festivals"]
+
+
+def test_reseeding_reports_a_published_lesson_keeping_its_level(db):
+    """SCRUM-103: a published lesson's level is fixed, so a file that now says another
+    level is reported rather than applied or silently ignored."""
+    seed(db)
+    lesson = db.scalar(
+        select(Lesson).where(Lesson.key.is_not(None), Lesson.status == LessonStatus.PUBLISHED)
+    )
+    file_level = lesson.level
+    lesson.level = 5 if file_level != 5 else 4
+    db.commit()
+
+    log = seed(db)
+
+    assert any(lesson.key in line and "level not changed" in line for line in log)
+    db.expire_all()
+    assert db.get(Lesson, lesson.id).level != file_level

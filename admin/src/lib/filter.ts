@@ -9,7 +9,7 @@ import type { LessonStatus, LessonSummary, Topic } from "./content";
  *   its topic on screen, opened, showing only the matching lessons
  * - the status, level and topic filters apply on top of the search
  * - lessons with no topic form their own group, which no topic name can match
- * - within a group, lessons run by level first (as learners see them) and then in the
+ * - within a group, lessons run by level first (as on learners' topic pages) and then in the
  *   order administrators set; they can only be reordered within a level (`byLevel`)
  */
 

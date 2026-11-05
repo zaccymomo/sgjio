@@ -368,6 +368,8 @@ def seed(db: Session) -> list[str]:
             raise RuntimeError(f"Could not load {result.path}: {'; '.join(result.problems)}")
         if result.action != "unchanged" or result.published:
             log.append(result.describe().strip())
+        # E.g. a published lesson keeping its level although its file now says another.
+        log.extend(f"{result.key}: {problem}" for problem in result.problems)
 
     log.extend(_seed_aptitude_questions(db))
     log.extend(_seed_test_users(db))

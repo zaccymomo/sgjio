@@ -67,11 +67,17 @@ export const topicApi = {
   remove: (id: string) => apiFetch<void>(`${TOPICS}/${id}`, { method: "DELETE" }),
 };
 
-/** The server refuses a reorder of a list that has changed since it was loaded. */
+/**
+ * The server refuses a reorder of a list that has changed since it was loaded. A reorder
+ * that mixes levels can only come from a page that missed a lesson's level changing, so it
+ * is treated the same way: load the latest rather than show an error.
+ */
 function isOutOfDate(error: unknown): boolean {
   return (
     error instanceof ApiError &&
-    (error.code === "order_out_of_date" || error.code === "topic_not_found")
+    (error.code === "order_out_of_date" ||
+      error.code === "topic_not_found" ||
+      error.code === "lesson_order_mixes_levels")
   );
 }
 

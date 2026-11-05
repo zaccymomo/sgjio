@@ -7,7 +7,7 @@ Routes stay thin: they call these functions and turn a ContentProblem into an HT
   portal shows it: by topic order, then by order within the topic. Lessons with no topic
   come last, and lessons in archived topics are included.
 - lessons are ordered within their topic, and lessons with no topic among themselves: by
-  level first (Level 1 at the top, as learners see them, SCRUM-104 AC4), then by the order
+  level first (Level 1 at the top, as learners' topic pages do, SCRUM-104 AC4), then by the order
   administrators set within each level. A reorder can only move a lesson among lessons at
   its own level. Moving a lesson to another topic belongs to the lesson editor, not to
   reordering.
