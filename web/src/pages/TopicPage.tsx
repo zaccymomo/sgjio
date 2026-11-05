@@ -13,6 +13,11 @@ import { type Topic, type TopicLesson, useTopic } from "../lib/topic";
  *
  * Its description, if it has one, sits under the title (SCRUM-86).
  *
+ * Every published lesson is listed, lowest level first (SCRUM-104 AC4). One the aptitude
+ * quiz exempted the user from, and that they haven't completed, is labelled "Exempted"
+ * (AC5) and counts in the figure as completed (AC8), but opens like any other (AC6).
+ * Completing it shows the score instead (AC7).
+ *
  * Selecting a lesson opens it (AC2). The lesson says it came from here, so finishing or
  * closing it steps back to this page rather than stacking a second copy on top (AC3); that
  * keeps the browser's back button, like the "All topics" link, leading home (AC4).
@@ -107,7 +112,7 @@ function TopicDetail({ topic }: { topic: Topic }) {
 }
 
 function LessonRow({ lesson }: { lesson: TopicLesson }) {
-  const { id, title, completed } = lesson;
+  const { id, title, completed, exempted } = lesson;
   const meta = rowMeta(lesson);
 
   return (
@@ -115,7 +120,7 @@ function LessonRow({ lesson }: { lesson: TopicLesson }) {
       to={`/lessons/${id}`}
       // Tells the lesson it can step back to this page when it closes (AC3, AC4).
       state={{ from: "topic" }}
-      aria-label={`${title}. ${meta}.`}
+      aria-label={`${title}. ${exempted ? "Exempted. " : ""}${meta}.`}
       className={cn(
         "flex items-center gap-3 rounded-lg border border-line bg-white px-3.5 py-3",
         "transition-colors hover:border-brand/40 hover:bg-brand-soft/40",
@@ -126,11 +131,22 @@ function LessonRow({ lesson }: { lesson: TopicLesson }) {
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand text-white">
           <Check className="size-4" strokeWidth={3} aria-hidden />
         </span>
+      ) : exempted ? (
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-brand text-brand">
+          <Check className="size-3.5" strokeWidth={3} aria-hidden />
+        </span>
       ) : (
         <span className="size-6 shrink-0 rounded-full border-2 border-line" aria-hidden />
       )}
       <span className="flex min-w-0 flex-1 flex-col" aria-hidden>
-        <span className="text-sm font-semibold text-ink">{title}</span>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="text-sm font-semibold text-ink">{title}</span>
+          {exempted && (
+            <span className="rounded-sm bg-brand-soft px-1.5 py-0.5 text-2xs font-semibold text-brand">
+              Exempted
+            </span>
+          )}
+        </span>
         <span className="text-caption text-subtle">{meta}</span>
       </span>
       <ChevronRight className="size-4 shrink-0 text-subtle" aria-hidden />

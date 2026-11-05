@@ -234,6 +234,11 @@ function CircleExplanation({
           A circle reflects the lessons in the topic right now. When new lessons are added, the
           circle fills a smaller share until you complete them too.
         </li>
+        {/* SCRUM-104 AC10: exemptions count in the circles (api/app/progress.py). */}
+        <li>
+          Lessons you were exempted from by the aptitude quiz count as completed. You can still open
+          them whenever you like.
+        </li>
       </ul>
     </Dialog>
   );

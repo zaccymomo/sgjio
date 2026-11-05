@@ -12,7 +12,9 @@ Two rules from SCRUM-16 AC8 are enforced here rather than left to the caller:
 
 Lessons are not hidden by level: every user sees every published lesson (SCRUM-104 AC4).
 Users have no level of their own since SCRUM-113; the aptitude quiz gives each topic an
-exemption level instead (`app/exemptions.py`).
+exemption level instead (`app/exemptions.py`). A lesson the user is exempted from counts as
+completed in the circles, the overall figure and the topic page (SCRUM-104 AC8), once even if
+they also finished it, while "available" is unchanged. Exemptions count nowhere else.
 
 Topics an administrator has archived (SCRUM-57) are left out entirely, so their circle
 disappears and the overall figure shrinks with it; restoring brings both back.
@@ -34,10 +36,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from fractions import Fraction
 
-from sqlalchemy import Select, and_, func, select
+from sqlalchemy import Select, and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app import lesson_doc, media
+from app.exemptions import exemption_levels, is_exempted
 from app.lesson_doc import LessonDoc
 from app.lessons import latest_version
 from app.models import (
@@ -92,7 +95,11 @@ def _topic_rows(user_id: uuid.UUID) -> Select:
         select(
             Topic.id,
             Topic.name,
-            func.count(LessonCompletion.id).label("completed"),
+            # Each lesson is one row (a user completes a lesson at most once), so a lesson
+            # both completed and exempted is still counted once (SCRUM-104 AC8).
+            func.count(
+                case((or_(LessonCompletion.id.is_not(None), is_exempted(user_id)), Lesson.id))
+            ).label("completed"),
             func.count(Lesson.id).label("available"),
         )
         .join(Lesson, published_lessons)
@@ -168,6 +175,11 @@ class TopicLesson:
     # Scored questions only: a one-option tap is not a quiz question.
     questions: int
     completed: bool
+    # Level 1 to 5 (SCRUM-103); the list runs from the lowest (SCRUM-104 AC4).
+    level: int
+    # Exempted by the aptitude quiz and not completed (SCRUM-104 AC5). Completing it shows
+    # the score instead (AC7), so this is never true beside `completed`.
+    exempted: bool
     # The best result so far (SCRUM-16), empty until the lesson is completed.
     best_correct: int | None
     best_scored: int | None
@@ -186,11 +198,14 @@ class TopicLessons:
 
 
 def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> TopicLessons:
-    """One topic's published lessons, in the order administrators set, with this user's
-    completions (SCRUM-53). An archived or unknown topic is unavailable."""
+    """One topic's published lessons, lowest level first and then in the order
+    administrators set (SCRUM-104 AC4), with this user's completions (SCRUM-53) and
+    exemptions. An archived or unknown topic is unavailable."""
     topic = db.scalar(visible_to_users(select(Topic).where(Topic.id == topic_id)))
     if topic is None:
         raise topic_unavailable()
+    # Only this topic's exemption applies to its lessons (SCRUM-104 AC2).
+    exempted_up_to = exemption_levels(db, user_id).get(topic.id, 0)
 
     # Only finished attempts count: one left half way is never recorded (SCRUM-15 AC4).
     last_finished = (
@@ -213,7 +228,7 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
             Lesson.topic_id == topic.id,
             Lesson.status == LessonStatus.PUBLISHED,
         )
-        .order_by(Lesson.position, Lesson.created_at)
+        .order_by(Lesson.level, Lesson.position, Lesson.created_at)
     ).all()
 
     lessons = []
@@ -234,6 +249,8 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
                 reading_seconds=stats.reading_seconds,
                 questions=stats.scored_questions,
                 completed=completion is not None,
+                level=lesson.level,
+                exempted=completion is None and lesson.level <= exempted_up_to,
                 best_correct=completion.best_correct if completion else None,
                 best_scored=completion.best_scored if completion else None,
                 # A completion recorded before attempts were (or seeded) has no attempt;
@@ -248,7 +265,7 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
         id=topic.id,
         name=topic.name,
         description=topic.description,
-        completed=sum(1 for lesson in lessons if lesson.completed),
+        completed=sum(1 for lesson in lessons if lesson.completed or lesson.exempted),
         available=len(lessons),
         lessons=lessons,
     )

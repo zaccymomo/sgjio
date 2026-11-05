@@ -383,6 +383,9 @@ class TopicLessonOut(BaseModel):
     reading_seconds: int
     questions: int
     completed: bool
+    level: int
+    # Exempted by the aptitude quiz and not completed (SCRUM-104 AC5).
+    exempted: bool
     best_correct: int | None
     best_scored: int | None
     last_attempted_at: datetime | None
