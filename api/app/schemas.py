@@ -18,7 +18,16 @@ from pydantic import (
 
 from app.auth import normalise_email
 from app.lesson_doc import LessonDoc
-from app.models import AdminAction, LessonStatus, ReportReason, ReportStatus, UserRole, UserType
+from app.models import (
+    MAX_LEVEL,
+    MIN_LEVEL,
+    AdminAction,
+    LessonStatus,
+    ReportReason,
+    ReportStatus,
+    UserRole,
+    UserType,
+)
 from app.profile_options import INTERESTS, LANGUAGES, NEIGHBOURHOODS
 
 # Email syntax check for registration. Built once: TypeAdapter compiles a validator.
@@ -442,6 +451,8 @@ class TopicOut(BaseModel):
     position: int
     lesson_count: int
     published_count: int
+    # Published lessons at Level 1 to 5, in that order (SCRUM-103 AC5).
+    published_by_level: list[int]
 
 
 # --- Content order (SCRUM-66) -------------------------------------------------------------
@@ -462,6 +473,7 @@ class LessonSummaryOut(BaseModel):
     status: LessonStatus
     updated_at: datetime
     position: int
+    level: int
     deletable: bool
     has_unpublished_changes: bool
     version: int | None
@@ -508,6 +520,7 @@ LessonTitle = Annotated[str, StringConstraints(strip_whitespace=True, max_length
 LessonSummaryText = Annotated[
     str, StringConstraints(strip_whitespace=True, max_length=MAX_LESSON_SUMMARY)
 ]
+LessonLevel = Annotated[int, Field(ge=MIN_LEVEL, le=MAX_LEVEL)]
 
 
 class LessonFields(BaseModel):
@@ -521,8 +534,10 @@ class LessonFields(BaseModel):
 
 
 class LessonCreateRequest(LessonFields):
-    """A new draft. Every field is optional, so a script can create a whole lesson in one
-    request and then publish it."""
+    """A new draft. Only `level` is required (SCRUM-103 AC1); the rest may be filled in
+    later, or all sent at once so a script can create a whole lesson and then publish it."""
+
+    level: LessonLevel
 
 
 class LessonUpdateRequest(LessonFields):
@@ -533,10 +548,12 @@ class LessonUpdateRequest(LessonFields):
     """
 
     updated_at: AwareDatetime
+    # Can change only until the lesson is first published (level_locked).
+    level: LessonLevel = MIN_LEVEL
 
     def changes(self) -> dict:
         """Only the lesson fields the request actually sent, `doc` still as a model."""
-        sent = self.model_fields_set & set(LessonFields.model_fields)
+        sent = self.model_fields_set & {*LessonFields.model_fields, "level"}
         return {name: getattr(self, name) for name in sent}
 
 
@@ -598,7 +615,8 @@ class AssetOut(BaseModel):
 class LessonOut(BaseModel):
     """One lesson as the editor needs it: the draft, what still blocks publishing, counts,
     and the images and audio its cards use. `deletable` is true only for a lesson that has
-    never been published; `version` is the latest published one."""
+    never been published, which is also when its `level` can still change; `version` is the
+    latest published one."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -611,6 +629,7 @@ class LessonOut(BaseModel):
     published_at: datetime | None
     withdrawn_at: datetime | None
     position: int
+    level: int
     created_at: datetime
     updated_at: datetime
     deletable: bool

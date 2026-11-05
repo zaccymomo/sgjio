@@ -112,6 +112,7 @@ def test_get_returns_the_draft_with_everything_the_editor_needs(admin, db):
         "published_at",
         "withdrawn_at",
         "position",
+        "level",
         "created_at",
         "updated_at",
         "deletable",
@@ -148,7 +149,7 @@ def test_get_an_unknown_lesson_is_not_found(admin):
 
 
 def test_create_an_empty_draft(admin, db):
-    response = admin.post(URL, json={})
+    response = admin.post(URL, json={"level": 1})
 
     assert response.status_code == 201
     body = response.json()
@@ -168,6 +169,7 @@ def test_create_a_whole_lesson_in_one_request(admin, db):
     response = admin.post(
         URL,
         json={
+            "level": 2,
             "title": "  Ordering kopi  ",
             "summary": " Coffee in code ",
             "topic_id": str(topic.id),
@@ -200,7 +202,7 @@ def test_ids_sent_by_the_editor_are_kept(admin):
     card["question"]["id"] = "q-1"
     card["question"]["options"][0]["id"] = "opt-1"
 
-    body = admin.post(URL, json={"doc": {"cards": [card]}}).json()
+    body = admin.post(URL, json={"level": 1, "doc": {"cards": [card]}}).json()
 
     [saved] = body["doc"]["cards"]
     assert saved["id"] == "card-1"
@@ -210,7 +212,9 @@ def test_ids_sent_by_the_editor_are_kept(admin):
 
 
 def test_a_repeated_id_is_refused(admin, db):
-    response = admin.post(URL, json={"doc": {"cards": [_card(id="same"), _card(id="same")]}})
+    response = admin.post(
+        URL, json={"level": 1, "doc": {"cards": [_card(id="same"), _card(id="same")]}}
+    )
 
     assert response.status_code == 422
     assert response.json()["detail"][0]["loc"] == ["body", "doc"]
@@ -223,7 +227,7 @@ def test_create_puts_the_draft_at_the_end_of_its_topic(admin, db):
     _lesson(db, topic, "First", position=0)
     _lesson(db, topic, "Second", position=5)
 
-    admin.post(URL, json={"title": "New", "topic_id": str(topic.id)})
+    admin.post(URL, json={"level": 1, "title": "New", "topic_id": str(topic.id)})
 
     assert _group_titles(admin, topic) == ["First", "Second", "New"]
 
@@ -231,13 +235,13 @@ def test_create_puts_the_draft_at_the_end_of_its_topic(admin, db):
 def test_create_without_a_topic_goes_at_the_end_of_lessons_with_no_topic(admin, db):
     _lesson(db, None, "Loose", position=3)
 
-    admin.post(URL, json={"title": "New"})
+    admin.post(URL, json={"level": 1, "title": "New"})
 
     assert _group_titles(admin, None) == ["Loose", "New"]
 
 
 def test_create_in_an_unknown_topic_is_refused(admin, db):
-    response = admin.post(URL, json={"topic_id": str(uuid.uuid4())})
+    response = admin.post(URL, json={"level": 1, "topic_id": str(uuid.uuid4())})
 
     assert response.status_code == 404
     assert response.json()["detail"] == {
@@ -251,7 +255,7 @@ def test_create_in_an_unknown_topic_is_refused(admin, db):
 def test_create_in_an_archived_topic_is_refused(admin, db):
     topic = _topic(db, "Old", archived=True)
 
-    response = admin.post(URL, json={"topic_id": str(topic.id)})
+    response = admin.post(URL, json={"level": 1, "topic_id": str(topic.id)})
 
     assert response.status_code == 409
     assert _code(response) == "topic_archived"
@@ -274,7 +278,7 @@ def test_create_in_an_archived_topic_is_refused(admin, db):
     ],
 )
 def test_create_refuses_malformed_lessons(admin, db, body):
-    response = admin.post(URL, json=body)
+    response = admin.post(URL, json={"level": 1, **body})
     assert response.status_code == 422
     assert db.query(Lesson).count() == 0
 
@@ -283,6 +287,7 @@ def test_limits_are_accepted_up_to_the_limit(admin):
     response = admin.post(
         URL,
         json={
+            "level": 5,
             "title": f"  {'x' * MAX_LESSON_TITLE}  ",
             "summary": "x" * MAX_LESSON_SUMMARY,
             "doc": {
@@ -588,11 +593,11 @@ def test_a_new_draft_changes_nobodys_progress(admin, db, make_user):
     assert admin.post("/api/auth/sign-in", json=USER).status_code == 200
     before = admin.get("/api/progress").json()
 
-    draft = admin.post(URL, json={"title": "Draft", "topic_id": str(topic.id)}).json()
+    draft = admin.post(URL, json={"level": 1, "title": "Draft", "topic_id": str(topic.id)}).json()
     _save(admin, draft["id"], doc={"cards": [_card("Still a draft")]})
     # A draft in a topic with no published lessons must not add a circle either.
     other = _topic(db, "Hawker", position=1)
-    admin.post(URL, json={"title": "Draft", "topic_id": str(other.id)})
+    admin.post(URL, json={"level": 1, "title": "Draft", "topic_id": str(other.id)})
 
     after = admin.get("/api/progress").json()
     assert after == before

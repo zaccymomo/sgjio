@@ -89,6 +89,7 @@ def test_list_shows_what_the_admin_page_needs_and_no_body(admin, db):
         "status",
         "updated_at",
         "position",
+        "level",
         "deletable",
         "has_unpublished_changes",
         "version",

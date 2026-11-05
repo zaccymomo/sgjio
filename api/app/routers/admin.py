@@ -190,10 +190,13 @@ CHANGED = {409: {"description": "Changed since it was loaded (lesson_out_of_date
     responses=TOPIC_REFUSED,
 )
 def create_lesson(body: LessonCreateRequest, db: Session = Depends(get_db)) -> lessons.LessonDetail:
-    """Create a draft at the end of its topic. Every field may be empty; `doc` may hold the
-    whole deck, so a script can write a lesson in one request."""
+    """Create a draft at the end of its topic. `level` (1 to 5) is required; every other field
+    may be empty, and `doc` may hold the whole deck, so a script can write a lesson in one
+    request."""
     try:
-        return lessons.create_lesson(db, body.title, body.summary, body.topic_id, body.doc)
+        return lessons.create_lesson(
+            db, body.title, body.summary, body.topic_id, body.doc, level=body.level
+        )
     except ContentProblem as problem:
         raise _refuse(problem) from None
     except ValueError as error:
@@ -217,18 +220,19 @@ def get_lesson(lesson_id: uuid.UUID, db: Session = Depends(get_db)) -> lessons.L
         **TOPIC_REFUSED,
         409: {
             "description": "Changed since it was loaded (lesson_out_of_date), the topic is "
-            "archived (topic_archived), or a published lesson would lose its topic "
-            "(topic_required)"
+            "archived (topic_archived), a published lesson would lose its topic "
+            "(topic_required), or a published lesson's level would change (level_locked)"
         },
     },
 )
 def update_lesson(
     lesson_id: uuid.UUID, body: LessonUpdateRequest, db: Session = Depends(get_db)
 ) -> lessons.LessonDetail:
-    """Change the draft's title, summary or cards, or the lesson's topic; fields left out
-    are kept. Works whatever the status: users keep seeing the published version until the
-    draft is published. A new topic moves the lesson to the end of it straight away. Send
-    the `updated_at` the editor loaded."""
+    """Change the draft's title, summary or cards, or the lesson's topic or level; fields
+    left out are kept. Works whatever the status: users keep seeing the published version
+    until the draft is published. A new topic moves the lesson to the end of it straight
+    away; the level can only change before the lesson is first published. Send the
+    `updated_at` the editor loaded."""
     try:
         return lessons.update_lesson(db, lesson_id, body.updated_at, body.changes())
     except ContentProblem as problem:

@@ -22,7 +22,7 @@ from sqlalchemy import Select, case, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Lesson, LessonStatus, Topic
+from app.models import MAX_LEVEL, MIN_LEVEL, Lesson, LessonStatus, Topic
 from app.problems import ContentProblem, check_reorder, topic_not_found
 
 
@@ -40,6 +40,9 @@ def _not_empty() -> ContentProblem:
     )
 
 
+LEVELS = range(MIN_LEVEL, MAX_LEVEL + 1)
+
+
 @dataclass(frozen=True)
 class TopicSummary:
     id: uuid.UUID
@@ -49,6 +52,8 @@ class TopicSummary:
     position: int
     lesson_count: int
     published_count: int
+    # Published lessons at Level 1 to 5, in that order (SCRUM-103 AC5).
+    published_by_level: list[int]
 
 
 def visible_to_users(query: Select) -> Select:
@@ -87,6 +92,12 @@ def _summary_query() -> Select:
             func.count(Lesson.id)
             .filter(Lesson.status == LessonStatus.PUBLISHED)
             .label("published_count"),
+            *(
+                func.count(Lesson.id).filter(
+                    Lesson.status == LessonStatus.PUBLISHED, Lesson.level == level
+                )
+                for level in LEVELS
+            ),
         )
         .outerjoin(Lesson, Lesson.topic_id == Topic.id)
         .group_by(Topic.id)
@@ -94,13 +105,21 @@ def _summary_query() -> Select:
     )
 
 
+def _from_row(row) -> TopicSummary:
+    """A row of _summary_query: the topic's fields, then one count per level."""
+    fields = tuple(row)
+    split = len(fields) - len(LEVELS)
+    return TopicSummary(*fields[:split], published_by_level=list(fields[split:]))
+
+
 def _summary(db: Session, topic_id: uuid.UUID) -> TopicSummary:
-    return TopicSummary(*db.execute(_summary_query().where(Topic.id == topic_id)).one())
+    return _from_row(db.execute(_summary_query().where(Topic.id == topic_id)).one())
 
 
 def list_topics(db: Session) -> list[TopicSummary]:
-    """Every topic, archived included, in order, with lesson counts over every status."""
-    return [TopicSummary(*row) for row in db.execute(_summary_query()).all()]
+    """Every topic, archived included, in order, with lesson counts over every status and
+    published lessons at each level."""
+    return [_from_row(row) for row in db.execute(_summary_query()).all()]
 
 
 def next_topic_position(db: Session) -> int:

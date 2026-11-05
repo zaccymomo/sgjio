@@ -25,6 +25,8 @@ Routes stay thin: they call these functions and turn a ContentProblem into an HT
 - a lesson can be moved into any active topic, but not into an archived one. A lesson that
   is already in an archived topic keeps saving there. A lesson that has been published
   always keeps a topic.
+- a lesson's level (1 to 5) is chosen when it is created and can change until it is first
+  published, then never again (SCRUM-103): users' exemptions depend on it (SCRUM-104).
 """
 
 import uuid
@@ -36,7 +38,15 @@ from sqlalchemy.orm import Session
 
 from app import lesson_doc, media
 from app.lesson_doc import Issue, LessonDoc, Stats
-from app.models import Lesson, LessonReport, LessonStatus, LessonVersion, ReportStatus, Topic
+from app.models import (
+    MIN_LEVEL,
+    Lesson,
+    LessonReport,
+    LessonStatus,
+    LessonVersion,
+    ReportStatus,
+    Topic,
+)
 from app.problems import (
     ContentProblem,
     check_reorder,
@@ -45,6 +55,7 @@ from app.problems import (
     lesson_not_found,
     lesson_out_of_date,
     lesson_status_conflict,
+    level_locked,
     topic_archived,
     topic_not_found,
     topic_required,
@@ -60,6 +71,7 @@ class LessonSummary:
     status: LessonStatus
     updated_at: datetime
     position: int
+    level: int
     deletable: bool
     has_unpublished_changes: bool
     # The latest version's number, or None for a lesson never published.
@@ -91,6 +103,7 @@ class LessonDetail:
     published_at: datetime | None
     withdrawn_at: datetime | None
     position: int
+    level: int
     created_at: datetime
     updated_at: datetime
     deletable: bool
@@ -137,6 +150,7 @@ def _detail(db: Session, lesson: Lesson) -> LessonDetail:
         published_at=lesson.published_at,
         withdrawn_at=lesson.withdrawn_at,
         position=lesson.position,
+        level=lesson.level,
         created_at=lesson.created_at,
         updated_at=lesson.updated_at,
         deletable=latest is None,
@@ -198,6 +212,7 @@ def list_lessons(db: Session) -> list[LessonSummary]:
                 status=lesson.status,
                 updated_at=lesson.updated_at,
                 position=lesson.position,
+                level=lesson.level,
                 deletable=version is None,
                 has_unpublished_changes=lesson.has_unpublished_changes,
                 version=version,
@@ -305,6 +320,7 @@ def create_lesson(
     topic_id: uuid.UUID | None = None,
     doc: LessonDoc | None = None,
     key: str | None = None,
+    level: int = MIN_LEVEL,
 ) -> LessonDetail:
     """A new draft, at the end of its topic (or of the lessons with no topic)."""
     if topic_id is not None:
@@ -317,6 +333,7 @@ def create_lesson(
         draft=prepare_doc(db, doc or LessonDoc()),
         status=LessonStatus.DRAFT,
         position=next_lesson_position(db, topic_id),
+        level=level,
     )
     db.add(lesson)
     db.commit()
@@ -336,8 +353,9 @@ def _for_change(db: Session, lesson_id: uuid.UUID, expected_updated_at: datetime
 def update_lesson(
     db: Session, lesson_id: uuid.UUID, expected_updated_at: datetime, changes: dict
 ) -> LessonDetail:
-    """Change the draft's `title`, `summary`, `doc` or the lesson's `topic_id`: whichever
-    `changes` holds.
+    """Change the draft's `title`, `summary`, `doc` or the lesson's `topic_id` or `level`:
+    whichever `changes` holds. A different level is refused once the lesson has been
+    published (level_locked); sending the level it already has is fine.
 
     A save that changes nothing leaves "last updated" alone, since the ORM only writes (and
     only bumps updated_at) when a value differs. A new topic puts the lesson at the end of
@@ -346,6 +364,10 @@ def update_lesson(
     """
     try:
         lesson = _for_change(db, lesson_id, expected_updated_at)
+        if "level" in changes and changes["level"] != lesson.level:
+            if latest_version(db, lesson.id) is not None:
+                raise level_locked()
+            lesson.level = changes["level"]
         if "topic_id" in changes and changes["topic_id"] != lesson.topic_id:
             topic_id = changes["topic_id"]
             if topic_id is None:

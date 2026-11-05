@@ -90,6 +90,16 @@ def topic_required() -> ContentProblem:
     )
 
 
+def level_locked() -> ContentProblem:
+    return ContentProblem(
+        "level_locked",
+        "A lesson's level can't be changed once it has been published, so learners' "
+        "exemptions stay the same. To offer it at another level, write a new lesson.",
+        409,
+        field="level",
+    )
+
+
 def order_out_of_date() -> ContentProblem:
     return ContentProblem(
         "order_out_of_date",
