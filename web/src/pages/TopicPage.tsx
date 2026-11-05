@@ -1,8 +1,9 @@
 import { Alert, ErrorState, ProgressRing, Spinner, cn } from "@sgjio/ui";
 import { readingLabel } from "@sgjio/ui/lesson";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
+import { LessonMark } from "../components/LessonMark";
 import { type Topic, type TopicLesson, useTopic } from "../lib/topic";
 
 /**
@@ -77,15 +78,32 @@ function TopicDetail({ topic }: { topic: Topic }) {
       ) : (
         <>
           <section className="flex items-center gap-3.5 rounded-lg border border-line bg-surface p-3.5">
-            <ProgressRing completed={completed} available={available} size={48} />
+            <ProgressRing
+              completed={completed}
+              exempted={exempted}
+              available={available}
+              size={48}
+            />
             <div>
               <p className="text-sm font-bold text-ink">
                 {completed} of {available} {plural(available, "lesson")} covered
               </p>
               <p className="text-caption text-muted">
-                {exempted > 0
-                  ? `${exempted} exempted by your topic placement`
-                  : `${questions} quiz ${plural(questions, "question")} in this topic`}
+                {exempted > 0 ? (
+                  <>
+                    {exempted} exempted by your topic placement ·{" "}
+                    {/* SCRUM-100: back to the quiz results that explain it. */}
+                    <Link
+                      to="/aptitude/results"
+                      state={{ back: { label: name } }}
+                      className="font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                    >
+                      See why
+                    </Link>
+                  </>
+                ) : (
+                  `${questions} quiz ${plural(questions, "question")} in this topic`
+                )}
               </p>
             </div>
           </section>
@@ -124,13 +142,7 @@ function LessonRow({ lesson }: { lesson: TopicLesson }) {
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
       )}
     >
-      {completed || exempted ? (
-        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand text-white">
-          <Check className="size-4" strokeWidth={3} aria-hidden />
-        </span>
-      ) : (
-        <span className="size-6 shrink-0 rounded-full border-2 border-line" aria-hidden />
-      )}
+      <LessonMark completed={completed} exempted={exempted} />
       <span className="flex min-w-0 flex-1 flex-col" aria-hidden>
         <span className="text-sm font-semibold text-ink">{title}</span>
         <span className="text-caption text-subtle">{meta}</span>
@@ -151,7 +163,7 @@ const DATE = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", 
 function rowMeta(lesson: TopicLesson): string {
   const { last_attempted_at, best_correct, best_scored, reading_seconds, questions } = lesson;
   if (lesson.exempted && !lesson.completed) {
-    return `Exempted by aptitude quiz · Level ${lesson.level}`;
+    return `Exempted by aptitude test · Level ${lesson.level}`;
   }
   if (!last_attempted_at) {
     return [

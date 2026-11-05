@@ -46,14 +46,14 @@ export function HomePage() {
               <div>
                 <p className="text-sm font-semibold text-ink">Find your starting point</p>
                 <p className="text-caption text-muted">
-                  Take the quiz to exempt lessons in topics you already understand.
+                  Take the aptitude test to exempt lessons in topics you already understand.
                 </p>
               </div>
               <Link
                 to="/aptitude"
                 className="shrink-0 rounded-sm bg-ink px-3 py-2 text-xs font-semibold text-white"
               >
-                Take quiz
+                Take test
               </Link>
             </section>
           )}
@@ -119,16 +119,43 @@ function ProgressSection({ progress }: { progress: Progress }) {
 
       {exempted > 0 && (
         <p className="mt-1 text-right text-caption text-muted">
-          Includes {exempted} {exempted === 1 ? "lesson" : "lessons"} exempted by your aptitude quiz
+          Includes {exempted} {exempted === 1 ? "lesson" : "lessons"} exempted by your aptitude test
+          · {/* SCRUM-100: back to the aptitude test results that explain it. */}
+          <Link
+            to="/aptitude/results"
+            state={{ back: { label: "Home" } }}
+            className="font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            See why
+          </Link>
         </p>
       )}
 
-      <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-line">
+      {/* Lessons the user completed in full red, then those the quiz exempted in a lighter
+          red (SCRUM-100), as in the circles. */}
+      <div className="mt-2.5 flex h-1.5 w-full overflow-hidden rounded-full bg-line">
         <div
-          className="h-full rounded-full bg-brand transition-[width] duration-500"
-          style={{ width: `${(completed / available) * 100}%` }}
+          className="h-full bg-brand transition-[width] duration-500"
+          style={{ width: `${((completed - exempted) / available) * 100}%` }}
+        />
+        <div
+          className="h-full bg-brand-light transition-[width] duration-500"
+          style={{ width: `${(exempted / available) * 100}%` }}
         />
       </div>
+      {/* The two reds, named once for the bar and every circle below (SCRUM-100). */}
+      {exempted > 0 && (
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-2xs text-muted">
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-brand" aria-hidden />
+            Completed by you
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-brand-light" aria-hidden />
+            Exempted by your aptitude test
+          </span>
+        </div>
+      )}
 
       {/* AC7: with nothing completed, point at the suggestion rather than leaving a
           screen of empty circles with no next step. */}
@@ -243,6 +270,7 @@ function CircleExplanation({
         {/* AC1 */}
         <li>
           Each circle counts lessons you completed and lessons exempted by your topic placement.
+          Exempted lessons are shown in a lighter red.
         </li>
         {/* AC2 */}
         <li>Finishing a lesson completes it, even if you answered some questions incorrectly.</li>
@@ -262,16 +290,17 @@ function CircleExplanation({
 }
 
 function TopicCircle({ topic }: { topic: TopicProgress }) {
-  const { id, name, completed, available } = topic;
+  const { id, name, completed, exempted, available } = topic;
   const isComplete = completed >= available;
   const status = isComplete ? "Complete" : completed === 0 ? "Not started" : "In progress";
+  const includes = exempted > 0 ? `, including ${exempted} exempted` : "";
 
   return (
     <Link
       to={`/topics/${id}`}
       // One label for the whole tile: the ring, the name and the status read as a
       // sentence instead of three fragments.
-      aria-label={`${name}: ${completed} of ${available} lessons completed. ${status}.`}
+      aria-label={`${name}: ${completed} of ${available} lessons completed${includes}. ${status}.`}
       className={cn(
         // pt-6 leaves room for the explanation button in the top-right corner.
         "flex h-full flex-col items-center gap-1.5 rounded-lg border border-line bg-white px-2 pt-6 pb-3",
@@ -279,7 +308,7 @@ function TopicCircle({ topic }: { topic: TopicProgress }) {
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
       )}
     >
-      <ProgressRing completed={completed} available={available} />
+      <ProgressRing completed={completed} exempted={exempted} available={available} />
       <span className="text-center text-xs font-semibold text-ink" aria-hidden>
         {name}
       </span>

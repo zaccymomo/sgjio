@@ -10,19 +10,23 @@ import random
 import uuid
 from collections.abc import Callable, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.exemptions import is_exempted
 from app.models import (
     MAX_LEVEL,
     MIN_LEVEL,
     AptitudeAttempt,
     AptitudeQuestion,
+    Lesson,
+    LessonStatus,
     Topic,
     TopicExemption,
     User,
     UserType,
 )
+from app.topics import visible_to_users
 
 # Offered last on every quiz question and always scored as wrong, so a learner who does not
 # know the answer is not nudged into a lucky guess that would exempt them from lessons.
@@ -169,15 +173,15 @@ def has_taken_quiz(db: Session, user_id: uuid.UUID) -> bool:
 
 def _eligible(db: Session, user: User) -> None:
     if user.user_type != UserType.NEWCOMER:
-        raise AptitudeError("quiz_for_newcomers", "The aptitude quiz is for Newcomers.", 403)
+        raise AptitudeError("quiz_for_newcomers", "The aptitude test is for Newcomers.", 403)
     if user.profile is None:
         raise AptitudeError(
-            "profile_required", "Complete your profile before starting the quiz.", 409
+            "profile_required", "Complete your profile before starting the aptitude test.", 409
         )
     if has_taken_quiz(db, user.id):
         raise AptitudeError(
             "quiz_already_completed",
-            "You have already completed the onboarding quiz.",
+            "You have already completed the aptitude test.",
             409,
         )
 
@@ -189,7 +193,7 @@ def _ready_topics(db: Session) -> list[Topic]:
         detail = ", ".join(missing) if missing else "all topics"
         raise AptitudeError(
             "aptitude_not_ready",
-            f"The quiz is not ready. Add active questions at every level for {detail}.",
+            f"The aptitude test is not ready. Add active questions at every level for {detail}.",
             409,
         )
     topic_ids = [row["topic_id"] for row in status["topics"]]
@@ -234,7 +238,7 @@ def _pick(
     )
     if not choices:
         raise AptitudeError(
-            "aptitude_not_ready", "The quiz question bank changed. Restart it.", 409
+            "aptitude_not_ready", "The aptitude test's questions changed. Start it again.", 409
         )
     return _public_question(choose(choices), topic_index, topic_count)
 
@@ -257,7 +261,8 @@ def _trace(db: Session, topics: list[Topic], answers) -> tuple[list[dict], int, 
     for answer in answers:
         if topic_index >= len(topics):
             raise AptitudeError(
-                "answers_after_finish", "Restart the quiz and answer each question once."
+                "answers_after_finish",
+                "Start the aptitude test again and answer each question once.",
             )
         if answer.question_id in seen:
             raise AptitudeError("question_repeated", "Answer each question once.")
@@ -267,7 +272,9 @@ def _trace(db: Session, topics: list[Topic], answers) -> tuple[list[dict], int, 
             or question.topic_id != topics[topic_index].id
             or question.level != level
         ):
-            raise AptitudeError("invalid_quiz_path", "The answers do not follow the quiz order.")
+            raise AptitudeError(
+                "invalid_quiz_path", "The answers do not follow the aptitude test's order."
+            )
         option = next(
             (item for item in _quiz_options(question) if item["id"] == answer.option_id), None
         )
@@ -336,12 +343,36 @@ def submit_quiz(db: Session, user: User, answers) -> AptitudeAttempt:
 
 
 def result_out(db: Session, attempt: AptitudeAttempt) -> dict:
+    """The quiz's placement in each topic it covered, with how many of the topic's lessons
+    that exempts (SCRUM-100 AC1).
+
+    The counts are worked out now, over currently published lessons, so they always agree
+    with the circles: a lesson published since at an exempted level counts (SCRUM-104 AC3).
+    A lesson the user has also completed still counts as exempted here, so the figure does
+    not shrink as they study. Topics archived since the quiz are left out, as from the
+    circles.
+    """
+    published = Lesson.status == LessonStatus.PUBLISHED
+    counts = {
+        row.topic_id: row
+        for row in db.execute(
+            select(
+                Lesson.topic_id,
+                func.count(Lesson.id).label("available"),
+                func.count(Lesson.id).filter(is_exempted(attempt.user_id)).label("exempted"),
+            )
+            .where(published)
+            .group_by(Lesson.topic_id)
+        )
+    }
     placements = list(
         db.execute(
-            select(TopicExemption, Topic)
-            .join(Topic, Topic.id == TopicExemption.topic_id)
-            .where(TopicExemption.user_id == attempt.user_id)
-            .order_by(Topic.position, Topic.name)
+            visible_to_users(
+                select(TopicExemption, Topic)
+                .join(Topic, Topic.id == TopicExemption.topic_id)
+                .where(TopicExemption.user_id == attempt.user_id)
+                .order_by(Topic.position, Topic.name)
+            )
         )
     )
     return {
@@ -353,6 +384,8 @@ def result_out(db: Session, attempt: AptitudeAttempt) -> dict:
                 "topic_id": exemption.topic_id,
                 "topic": topic.name,
                 "level": exemption.level,
+                "exempted": counts[topic.id].exempted if topic.id in counts else 0,
+                "available": counts[topic.id].available if topic.id in counts else 0,
             }
             for exemption, topic in placements
         ],

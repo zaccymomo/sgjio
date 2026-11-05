@@ -14,6 +14,9 @@
   /* Colours */
   --color-brand: #f43f5e; /* primary red: badges, progress rings, active tab */
   --color-brand-soft: #fff1f2; /* red tint behind brand elements */
+  /* Not in Figma (SCRUM-100): the share of a circle or chart the aptitude quiz exempted,
+     beside the full brand red of lessons the user completed. Always paired with text. */
+  --color-brand-light: #fda4af;
   --color-ink: #111827; /* headings, dark cards, primary buttons */
   --color-muted: #4b5563; /* body text and labels */
   --color-subtle: #9ca3af; /* secondary text, inactive icons */
