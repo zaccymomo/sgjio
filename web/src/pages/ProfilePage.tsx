@@ -2,7 +2,7 @@ import { Alert, ErrorState, Spinner, cn, useAuth } from "@sgjio/ui";
 import { Settings } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
-import { AboutYouCard, ProfileCard } from "../components/ProfileCards";
+import { AboutYouCard, Card, ProfileCard } from "../components/ProfileCards";
 import { TopicRadar } from "../components/TopicRadar";
 import { useProgress } from "../lib/progress";
 
@@ -39,7 +39,7 @@ export function ProfilePage() {
 
       {profileSaved && <Alert tone="success">Your profile has been updated.</Alert>}
 
-      {/* SCRUM-41 AC1-AC2, as it was on Settings */}
+      {/* SCRUM-41 AC1-AC2 */}
       {user && <AboutYouCard user={user} />}
 
       {state.status === "loading" && (
@@ -51,44 +51,37 @@ export function ProfilePage() {
       {state.status === "error" && <ErrorState message={state.message} onRetry={reload} />}
 
       {state.status === "ready" && (
-        <section className="rounded-lg border border-line bg-surface p-3.5">
-          <h2 className="text-caption font-semibold tracking-wide text-muted uppercase">
-            Your level in each topic
-          </h2>
-
+        <Card
+          title="Your level in each topic"
+          description="Grows as you complete each topic's lessons, level by level."
+        >
           {state.progress.topics.length === 0 ? (
-            <p className="mt-2 text-sm text-muted">
+            <p className="text-sm text-muted">
               Your levels appear here as soon as the first lesson is published.
             </p>
           ) : (
             <>
-              <p className="mt-1 text-caption text-muted">
-                A topic&apos;s level rises once you&apos;ve covered every lesson at that level and
-                below. Cover all of a topic&apos;s lessons to fill its spoke.
-              </p>
-              <div className="mt-3 rounded-lg border border-line bg-white p-3">
-                <TopicRadar
-                  topics={state.progress.topics.map((topic) => ({
-                    id: topic.id,
-                    name: topic.name,
-                    level: topic.level,
-                  }))}
-                />
-                {/* The chart needs three topics to make a shape; with fewer, say it in words. */}
-                {state.progress.topics.length < 3 && (
-                  <ul className="flex flex-col gap-1 text-sm">
-                    {state.progress.topics.map((topic) => (
-                      <li key={topic.id} className="flex justify-between gap-3">
-                        <span className="text-ink">{topic.name}</span>
-                        <span className="font-semibold text-brand">Level {topic.level}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+              <TopicRadar
+                topics={state.progress.topics.map((topic) => ({
+                  id: topic.id,
+                  name: topic.name,
+                  level: topic.level,
+                }))}
+              />
+              {/* The chart needs three topics to make a shape; with fewer, say it in words. */}
+              {state.progress.topics.length < 3 && (
+                <ul className="flex flex-col gap-1 text-sm">
+                  {state.progress.topics.map((topic) => (
+                    <li key={topic.id} className="flex justify-between gap-3">
+                      <span className="text-ink">{topic.name}</span>
+                      <span className="font-semibold text-brand">Level {topic.level}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </>
           )}
-        </section>
+        </Card>
       )}
 
       <ProfileCard />

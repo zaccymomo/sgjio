@@ -1,4 +1,4 @@
-import { ErrorState, Spinner, formatDate, type User, type UserType } from "@sgjio/ui";
+import { ErrorState, Spinner, type User, type UserType } from "@sgjio/ui";
 import { Heart, Languages, MapPin, Pencil, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
@@ -6,8 +6,9 @@ import { Link } from "react-router-dom";
 import { isProfileComplete, useProfile, type Profile } from "../lib/profile";
 
 /**
- * The pieces of the Profile tab that used to sit on Settings (SCRUM-41), moved as they were
- * when Profile took over "about you" and Settings kept "your account" (SCRUM-100).
+ * The pieces of the Profile tab that used to sit on Settings (SCRUM-41), moved when Profile
+ * took over "about you" and Settings kept "your account" (SCRUM-100). Every section of both
+ * pages is the same white `Card`, with the same heading style.
  */
 
 const USER_TYPE_LABELS: Record<UserType, string> = {
@@ -15,31 +16,30 @@ const USER_TYPE_LABELS: Record<UserType, string> = {
   singaporean: "Singaporean",
 };
 
-/** Your name, user type and when you joined (SCRUM-41 AC1-AC2). */
+const JOINED = new Intl.DateTimeFormat("en-SG", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+/** Your name, user type (self-reported) and when you joined (SCRUM-41 AC1-AC2). */
 export function AboutYouCard({ user }: { user: User }) {
   return (
     <Card>
       <div className="flex items-center gap-3">
         <Initials name={user.name} />
-        <p className="min-w-0 truncate text-base font-semibold text-ink">{user.name}</p>
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold text-ink">{user.name}</p>
+          <p className="text-sm text-muted">
+            {user.user_type
+              ? `${USER_TYPE_LABELS[user.user_type]} (self-reported)`
+              : "User type not set"}
+          </p>
+          <p className="text-sm text-muted">
+            Member since {JOINED.format(new Date(user.created_at))}
+          </p>
+        </div>
       </div>
-      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4">
-        <div>
-          <dt className="text-caption text-muted">User type</dt>
-          <dd className="mt-0.5 text-sm font-medium text-ink">
-            {user.user_type ? USER_TYPE_LABELS[user.user_type] : "Not set"}
-            {user.user_type && (
-              <span className="block text-caption font-normal text-subtle">Self-reported</span>
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-caption text-muted">Member since</dt>
-          <dd className="mt-0.5 text-sm font-medium text-ink">
-            {formatDate(new Date(user.created_at))}
-          </dd>
-        </div>
-      </dl>
     </Card>
   );
 }
@@ -50,7 +50,7 @@ export function ProfileCard() {
 
   if (state.status === "loading") {
     return (
-      <Card title="Your profile">
+      <Card title="About you">
         <div className="flex justify-center py-6 text-brand">
           <Spinner className="size-5" label="Loading your profile" />
         </div>
@@ -59,7 +59,7 @@ export function ProfileCard() {
   }
   if (state.status === "error") {
     return (
-      <Card title="Your profile">
+      <Card title="About you">
         <ErrorState message={state.message} onRetry={reload} />
       </Card>
     );
@@ -91,7 +91,7 @@ export function ProfileCard() {
 
   return (
     <Card
-      title="Your profile"
+      title="About you"
       action={
         <Link
           to="/settings/profile"
@@ -119,10 +119,13 @@ export function ProfileCard() {
 
 export function Card({
   title,
+  description,
   action,
   children,
 }: {
   title?: string;
+  /** A line under the title saying what the card shows. */
+  description?: string;
   action?: ReactNode;
   children: ReactNode;
 }) {
@@ -130,7 +133,12 @@ export function Card({
     <section className="rounded-lg border border-line bg-white p-4 sm:p-5">
       {(title || action) && (
         <div className="mb-4 flex items-center justify-between gap-3">
-          {title && <h2 className="text-base font-semibold text-ink">{title}</h2>}
+          {title && (
+            <div>
+              <h2 className="text-base font-semibold text-ink">{title}</h2>
+              {description && <p className="mt-0.5 text-sm text-muted">{description}</p>}
+            </div>
+          )}
           {action}
         </div>
       )}
