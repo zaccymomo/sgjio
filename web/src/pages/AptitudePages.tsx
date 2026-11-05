@@ -302,29 +302,31 @@ type Placement = QuizResult["placements"][number];
  */
 function PlacementRow({ placement }: { placement: Placement }) {
   const { topic_id, topic, level, exempted, available } = placement;
-  const lessons = (count: number) => `${count} ${count === 1 ? "lesson" : "lessons"}`;
 
   const [count, detail] =
     available === 0
       ? ["No lessons yet", "Its lessons will appear when they're published"]
       : exempted === 0
-        ? ["No lessons exempted", "You'll start from the first lesson"]
+        ? ["None exempted", "You'll start from the first lesson"]
         : exempted === available
-          ? [`All ${lessons(available)} exempted`, `Up to Level ${level}`]
-          : [`${exempted} of ${lessons(available)} exempted`, `Up to Level ${level}`];
+          ? ["All lessons exempted", `Up to Level ${level}`]
+          : [
+              `${exempted} ${exempted === 1 ? "lesson" : "lessons"} exempted`,
+              `Up to Level ${level}`,
+            ];
 
+  // The name and the count share the first line; the detail has the whole second line to
+  // itself, so it never has to wrap beside the count.
   return (
-    <li className="flex items-center justify-between gap-3 p-3 text-sm">
-      <span className="flex min-w-0 flex-col">
-        <Link
-          to={`/topics/${topic_id}`}
-          className="w-fit rounded-sm font-medium text-ink underline-offset-2 hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-        >
-          {topic}
-        </Link>
-        <span className="text-caption text-muted">{detail}</span>
-      </span>
-      <span className="shrink-0 text-right font-semibold text-brand">{count}</span>
+    <li className="grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-0.5 p-3 text-sm">
+      <Link
+        to={`/topics/${topic_id}`}
+        className="w-fit rounded-sm font-medium text-ink underline-offset-2 hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      >
+        {topic}
+      </Link>
+      <span className="text-right font-semibold text-brand">{count}</span>
+      <span className="col-span-2 text-caption text-muted">{detail}</span>
     </li>
   );
 }

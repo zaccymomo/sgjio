@@ -1,19 +1,23 @@
-import { ErrorState, Spinner, cn, formatDate, useAuth } from "@sgjio/ui";
+import { Alert, ErrorState, Spinner, cn, useAuth } from "@sgjio/ui";
 import { Settings } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
+import { AboutYouCard, ProfileCard } from "../components/ProfileCards";
 import { TopicRadar } from "../components/TopicRadar";
 import { useProgress } from "../lib/progress";
-import { Initials } from "./SettingsPage";
 
 /**
- * The Profile tab (SCRUM-100), which took the place of the Settings tab: who you are, and
- * the level you have reached in each topic as a radar chart that grows as you complete
- * lessons, until every spoke is full. Settings opens from the gear at the top.
+ * The Profile tab (SCRUM-100), which took the place of the Settings tab. In order: who you
+ * are (SCRUM-41 AC1-AC2), the level you have reached in each topic as a radar chart that
+ * grows as you complete lessons until every spoke is full, and your interests, languages
+ * and neighbourhood (SCRUM-41 AC3, AC5). Your account, the introduction, security and
+ * sign-out are in Settings, which opens from the gear at the top.
  */
 export function ProfilePage() {
   const { user } = useAuth();
   const { state, reload } = useProgress();
+  // Set by the profile editor after a save.
+  const profileSaved = (useLocation().state as { profileSaved?: boolean } | null)?.profileSaved;
 
   return (
     <div className="flex flex-col gap-4">
@@ -33,18 +37,10 @@ export function ProfilePage() {
         </Link>
       </div>
 
-      {user && (
-        <section className="flex items-center gap-3 rounded-lg border border-line bg-white p-4 sm:p-5">
-          <Initials name={user.name} />
-          <div className="min-w-0">
-            <p className="truncate text-base font-semibold text-ink">{user.name}</p>
-            <p className="text-sm text-muted">
-              {user.user_type === "singaporean" ? "Singaporean" : "Newcomer"} · Member since{" "}
-              {formatDate(new Date(user.created_at))}
-            </p>
-          </div>
-        </section>
-      )}
+      {profileSaved && <Alert tone="success">Your profile has been updated.</Alert>}
+
+      {/* SCRUM-41 AC1-AC2, as it was on Settings */}
+      {user && <AboutYouCard user={user} />}
 
       {state.status === "loading" && (
         <div className="flex justify-center py-16 text-brand">
@@ -94,6 +90,8 @@ export function ProfilePage() {
           )}
         </section>
       )}
+
+      <ProfileCard />
     </div>
   );
 }
