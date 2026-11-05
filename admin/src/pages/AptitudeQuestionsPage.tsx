@@ -103,7 +103,7 @@ export function AptitudeQuestionsPage() {
         <div>
           <h1 className="text-2xl font-bold text-ink">Aptitude question bank</h1>
           <p className="mt-1 text-sm text-muted">
-            One random active question from each level is used in onboarding.
+            Learners move from Level 1 upward separately in each assessed topic.
           </p>
         </div>
         <Button onClick={() => open()}>
@@ -112,27 +112,41 @@ export function AptitudeQuestionsPage() {
       </div>
       <Alert tone={bank.ready ? "success" : "error"}>
         {bank.ready
-          ? "Quiz ready — every level has active questions."
-          : "Quiz not ready — add an active question to every level."}
+          ? "Quiz ready — every assessed topic has an active question at Levels 1 to 5."
+          : "Quiz not ready — one or more topics is missing an active difficulty level."}
       </Alert>
-      <div className="grid grid-cols-5 gap-2">
-        {[1, 2, 3, 4, 5].map((level) => (
-          <div key={level} className="rounded-lg border border-line bg-white p-3 text-center">
-            <p className="text-xs text-muted">Level {level}</p>
-            <p className="text-2xl font-bold text-ink">{bank.counts_by_level[level] ?? 0}</p>
-            <p className="text-xs text-muted">active</p>
-          </div>
-        ))}
-      </div>
-      <div className="rounded-lg border border-line bg-white p-4">
-        <h2 className="font-semibold text-ink">Active questions by topic</h2>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {Object.entries(bank.counts_by_topic).map(([topic, count]) => (
-            <span key={topic} className="rounded-full bg-surface px-3 py-1 text-xs text-muted">
-              {topic}: {count}
-            </span>
-          ))}
+      <div className="overflow-hidden rounded-lg border border-line bg-white">
+        <div className="border-b border-line p-4">
+          <h2 className="font-semibold text-ink">Active questions by topic and difficulty</h2>
         </div>
+        <table className="w-full text-center text-sm">
+          <thead className="bg-surface text-xs text-muted">
+            <tr>
+              <th className="p-3 text-left">Topic</th>
+              {[1, 2, 3, 4, 5].map((level) => (
+                <th key={level} className="p-3">
+                  Level {level}
+                </th>
+              ))}
+              <th className="p-3">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bank.topics.map((topic) => (
+              <tr key={topic.topic_id} className="border-t border-line">
+                <td className="p-3 text-left font-medium text-ink">{topic.topic_name}</td>
+                {[1, 2, 3, 4, 5].map((level) => (
+                  <td key={level} className="p-3">
+                    {topic.counts_by_level[level] ?? 0}
+                  </td>
+                ))}
+                <td className={`p-3 font-semibold ${topic.ready ? "text-success" : "text-danger"}`}>
+                  {topic.ready ? "Ready" : "Not ready"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
       {error && <Alert tone="error">{error}</Alert>}
       {editing && (

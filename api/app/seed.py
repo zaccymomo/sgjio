@@ -27,12 +27,14 @@ from app.auth import normalise_email
 from app.config import get_settings
 from app.lessons import latest_version
 from app.models import (
+    AptitudeAttempt,
     AptitudeQuestion,
     Lesson,
     LessonCompletion,
     LessonStatus,
     Profile,
     Topic,
+    TopicExemption,
     User,
     UserRole,
     UserType,
@@ -85,6 +87,30 @@ class SeedQuestion(BaseModel):
 
 class SeedQuestionFile(BaseModel):
     questions: list[SeedQuestion]
+
+
+TEST_USERS: dict[str, tuple[str, dict[str, int] | None]] = {
+    "starter@sgjio.example.com": (
+        "Starter Newcomer",
+        {name: 1 for name in TOPICS},
+    ),
+    "mixed@sgjio.example.com": (
+        "Mixed Placement Newcomer",
+        {
+            "Singlish": 4,
+            "Hawker & Food": 2,
+            "Workplace": 3,
+            "Public Etiquette": 1,
+            "Festivals": 5,
+            "Getting Around": 0,
+        },
+    ),
+    "advanced@sgjio.example.com": (
+        "Advanced Newcomer",
+        {name: 4 for name in TOPICS},
+    ),
+    "skipped@sgjio.example.com": ("Skipped Quiz Newcomer", None),
+}
 
 
 # How many of each topic's lessons the demo Newcomer has finished, so the landing page
@@ -217,6 +243,80 @@ def _seed_aptitude_questions(db: Session) -> list[str]:
     return log
 
 
+def _seed_test_users(db: Session) -> list[str]:
+    """Create stable demo users without changing any result that already exists."""
+    topics = {topic.name: topic for topic in db.scalars(select(Topic))}
+    questions = {
+        (question.topic.name, question.level): question
+        for question in db.scalars(
+            select(AptitudeQuestion)
+            .where(AptitudeQuestion.is_active.is_(True))
+            .order_by(AptitudeQuestion.seed_key)
+        )
+    }
+    log: list[str] = []
+    for email, (name, placements) in TEST_USERS.items():
+        user, created = _get_or_create_user(
+            db, email, "UserPass123", name, UserRole.USER, UserType.NEWCOMER
+        )
+        if created:
+            user.profile = Profile(
+                neighbourhood="Tampines", interests=["Food"], languages=["English"]
+            )
+            user.intro_finished_at = datetime.now(UTC)
+            log.append(f"test user {email}")
+            db.flush()
+        if placements is None or db.scalar(
+            select(AptitudeAttempt.id).where(AptitudeAttempt.user_id == user.id)
+        ):
+            continue
+
+        results = []
+        for topic_name, placement in placements.items():
+            last_level = 5 if placement == 5 else placement + 1
+            for level in range(1, last_level + 1):
+                question = questions[(topic_name, level)]
+                correct = level <= placement
+                option_id = (
+                    question.correct_option_id
+                    if correct
+                    else next(
+                        option["id"]
+                        for option in question.options
+                        if option["id"] != question.correct_option_id
+                    )
+                )
+                option_text = next(
+                    option["text"] for option in question.options if option["id"] == option_id
+                )
+                results.append(
+                    {
+                        "question_id": str(question.id),
+                        "topic_id": str(question.topic_id),
+                        "topic": topic_name,
+                        "level": level,
+                        "prompt": question.prompt,
+                        "option_id": option_id,
+                        "option_text": option_text,
+                        "correct": correct,
+                    }
+                )
+
+        db.add(AptitudeAttempt(user_id=user.id, results=results))
+        db.flush()
+        for topic_name, placement in placements.items():
+            db.add(
+                TopicExemption(
+                    user_id=user.id,
+                    topic_id=topics[topic_name].id,
+                    level=placement,
+                )
+            )
+        log.append(f"aptitude result for {email}")
+    db.commit()
+    return log
+
+
 def seed(db: Session) -> list[str]:
     """Insert anything missing and return a short log of what was created."""
     settings = get_settings()
@@ -270,6 +370,7 @@ def seed(db: Session) -> list[str]:
             log.append(result.describe().strip())
 
     log.extend(_seed_aptitude_questions(db))
+    log.extend(_seed_test_users(db))
 
     log.extend(_seed_completions(db, user))
 

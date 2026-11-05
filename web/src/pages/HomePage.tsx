@@ -41,6 +41,22 @@ export function HomePage() {
 
       {state.status === "ready" && (
         <>
+          {user?.user_type === "newcomer" && !state.progress.aptitude_taken && (
+            <section className="flex items-center justify-between gap-3 rounded-lg border border-brand/30 bg-brand-soft/40 p-3.5">
+              <div>
+                <p className="text-sm font-semibold text-ink">Find your starting point</p>
+                <p className="text-caption text-muted">
+                  Take the quiz to exempt lessons in topics you already understand.
+                </p>
+              </div>
+              <Link
+                to="/aptitude"
+                className="shrink-0 rounded-sm bg-ink px-3 py-2 text-xs font-semibold text-white"
+              >
+                Take quiz
+              </Link>
+            </section>
+          )}
           <ProgressSection progress={state.progress} />
           {state.progress.available > 0 && (
             <>
@@ -72,7 +88,7 @@ export function HomePage() {
 }
 
 function ProgressSection({ progress }: { progress: Progress }) {
-  const { topics, completed, available } = progress;
+  const { topics, completed, exempted, available } = progress;
   // The circle whose explanation is open (SCRUM-46), or null when it is closed.
   const [explaining, setExplaining] = useState<TopicProgress | null>(null);
 
@@ -97,9 +113,15 @@ function ProgressSection({ progress }: { progress: Progress }) {
           <span className="font-bold text-ink">
             {completed} / {available}
           </span>{" "}
-          <span className="text-muted">lessons completed</span>
+          <span className="text-muted">lessons covered</span>
         </p>
       </div>
+
+      {exempted > 0 && (
+        <p className="mt-1 text-right text-caption text-muted">
+          Includes {exempted} {exempted === 1 ? "lesson" : "lessons"} exempted by your aptitude quiz
+        </p>
+      )}
 
       <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-line">
         <div
@@ -207,7 +229,8 @@ function CircleExplanation({
       open={topic !== null}
       title="How your circles are filled"
       description={
-        topic && `${topic.name}: ${topic.completed} of ${topic.available} lessons completed.`
+        topic &&
+        `${topic.name}: ${topic.completed} of ${topic.available} lessons covered, including ${topic.exempted} exempted.`
       }
       onClose={onClose}
       footer={
@@ -219,8 +242,7 @@ function CircleExplanation({
       <ul className="flex list-disc flex-col gap-2 pl-5 text-sm text-ink">
         {/* AC1 */}
         <li>
-          Each circle counts the lessons you&apos;ve completed out of the lessons available in that
-          topic.
+          Each circle counts lessons you completed and lessons exempted by your topic placement.
         </li>
         {/* AC2 */}
         <li>Finishing a lesson completes it, even if you answered some questions incorrectly.</li>

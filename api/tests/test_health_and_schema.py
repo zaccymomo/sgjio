@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.lesson_doc import LessonDoc, correct_option
 from app.models import Lesson, LessonStatus, LessonVersion, Topic, User
-from app.seed import TOPICS, seed
+from app.seed import TEST_USERS, TOPICS, seed
 
 
 def test_health_reports_ok(client):
@@ -20,7 +20,7 @@ def test_health_reports_ok(client):
 def test_seed_creates_admin_user_topics_and_sample_lesson(db):
     created = seed(db)
     assert created, "first run should create data"
-    assert db.scalar(select(func.count()).select_from(User)) == 2
+    assert db.scalar(select(func.count()).select_from(User)) == 2 + len(TEST_USERS)
     assert sorted(t.name for t in db.scalars(select(Topic))) == sorted(TOPICS)
     lesson = db.scalar(select(Lesson).where(Lesson.status == LessonStatus.PUBLISHED))
     doc = LessonDoc.model_validate(lesson.draft)

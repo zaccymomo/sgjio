@@ -14,8 +14,12 @@ export type AptitudeQuestion = {
 };
 export type AptitudeBank = {
   ready: boolean;
-  counts_by_level: Record<string, number>;
-  counts_by_topic: Record<string, number>;
+  topics: Array<{
+    topic_id: string;
+    topic_name: string;
+    ready: boolean;
+    counts_by_level: Record<string, number>;
+  }>;
   questions: AptitudeQuestion[];
 };
 export type AptitudeFields = {

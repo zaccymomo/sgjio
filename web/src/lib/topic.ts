@@ -10,6 +10,8 @@ export type TopicLesson = {
   /** Scored questions only: a one-option tap is not counted. */
   questions: number;
   completed: boolean;
+  exempted: boolean;
+  level: number;
   /** The best result so far (SCRUM-16), null until the lesson is completed. */
   best_correct: number | null;
   best_scored: number | null;
@@ -24,6 +26,7 @@ export type Topic = {
   /** What the topic covers, shown under its name (SCRUM-86). Empty when it has none. */
   description: string;
   completed: number;
+  exempted: number;
   available: number;
   lessons: TopicLesson[];
 };

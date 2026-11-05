@@ -323,6 +323,7 @@ class TopicProgressOut(BaseModel):
     id: uuid.UUID
     name: str
     completed: int
+    exempted: int
     available: int
 
 
@@ -347,8 +348,10 @@ class ProgressOut(BaseModel):
 
     topics: list[TopicProgressOut]
     completed: int
+    exempted: int
     available: int
     suggestion: SuggestionOut | None
+    aptitude_taken: bool
 
 
 class MistakeOut(BaseModel):
@@ -383,6 +386,7 @@ class TopicLessonOut(BaseModel):
     reading_seconds: int
     questions: int
     completed: bool
+    exempted: bool
     best_correct: int | None
     best_scored: int | None
     last_attempted_at: datetime | None
@@ -399,6 +403,7 @@ class TopicLessonsOut(BaseModel):
     name: str
     description: str
     completed: int
+    exempted: int
     available: int
     lessons: list[TopicLessonOut]
 
@@ -524,21 +529,31 @@ class AptitudeQuestionOut(BaseModel):
 
 class AptitudeBankOut(BaseModel):
     ready: bool
-    counts_by_level: dict[int, int]
-    counts_by_topic: dict[str, int]
+    topics: list["AptitudeTopicReadinessOut"]
     questions: list[AptitudeQuestionOut]
+
+
+class AptitudeTopicReadinessOut(BaseModel):
+    topic_id: uuid.UUID
+    topic_name: str
+    ready: bool
+    counts_by_level: dict[int, int]
 
 
 class AptitudeQuizQuestionOut(BaseModel):
     id: uuid.UUID
+    topic_id: uuid.UUID
     topic: str
     level: int
     prompt: str
     options: list[AptitudeOptionOut]
+    topic_index: int
+    topic_count: int
 
 
-class AptitudeQuizOut(BaseModel):
-    questions: list[AptitudeQuizQuestionOut]
+class AptitudeStepOut(BaseModel):
+    done: bool
+    question: AptitudeQuizQuestionOut | None
 
 
 class AptitudeAnswerIn(BaseModel):
@@ -547,14 +562,24 @@ class AptitudeAnswerIn(BaseModel):
 
 
 class AptitudeSubmitIn(BaseModel):
-    answers: list[AptitudeAnswerIn] = Field(min_length=5, max_length=5)
+    answers: list[AptitudeAnswerIn] = Field(min_length=1, max_length=30)
+
+
+class AptitudeNextIn(AptitudeSubmitIn):
+    pass
+
+
+class AptitudePlacementOut(BaseModel):
+    topic_id: uuid.UUID
+    topic: str
+    level: int
 
 
 class AptitudeResultOut(BaseModel):
-    level: int
     correct: int
     total: int
     taken_at: datetime
+    placements: list[AptitudePlacementOut]
 
 
 class OrderRequest(BaseModel):

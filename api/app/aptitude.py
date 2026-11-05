@@ -1,12 +1,14 @@
-"""Reading users' aptitude quizzes (Epic 6).
+"""Per-topic aptitude question bank and adaptive onboarding quiz (SCRUM-96/97).
 
-The quiz is taken once (SCRUM-113): a user has at most one completed attempt, saved with
-their topic exemptions (`app/exemptions.py`). A user with no attempt has not taken it, which
-after profile setup means they skipped it (SCRUM-98).
+Only a completed quiz is stored. While a learner is taking it, the browser sends the
+answers so far and the server works out the next topic and difficulty without revealing
+whether the last answer was right. Completing it saves an immutable answer snapshot and
+one exemption level per assessed topic.
 """
 
+import random
 import uuid
-from collections import Counter
+from collections.abc import Callable, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -17,6 +19,9 @@ from app.models import (
     AptitudeAttempt,
     AptitudeQuestion,
     Topic,
+    TopicExemption,
+    User,
+    UserType,
 )
 
 
@@ -97,30 +102,246 @@ def question_out(question: AptitudeQuestion) -> dict:
     }
 
 
+def _assessed_topics(db: Session) -> list[Topic]:
+    """Active topics that have at least one question, in the administrator's order."""
+    return list(
+        db.scalars(
+            select(Topic)
+            .where(
+                Topic.archived_at.is_(None),
+                select(AptitudeQuestion.id).where(AptitudeQuestion.topic_id == Topic.id).exists(),
+            )
+            .order_by(Topic.position, Topic.name)
+        )
+    )
+
+
 def bank(db: Session) -> dict:
     questions = list(
         db.scalars(
             select(AptitudeQuestion)
             .join(Topic)
-            .order_by(AptitudeQuestion.level, Topic.name, AptitudeQuestion.created_at)
+            .order_by(
+                Topic.position, Topic.name, AptitudeQuestion.level, AptitudeQuestion.created_at
+            )
         )
     )
-    active = [question for question in questions if question.is_active]
-    by_level = Counter(question.level for question in active)
-    by_topic = Counter(question.topic.name for question in active)
-    counts = {level: by_level[level] for level in range(MIN_LEVEL, MAX_LEVEL + 1)}
+    topic_rows = []
+    for topic in _assessed_topics(db):
+        counts = {
+            level: sum(
+                question.is_active and question.topic_id == topic.id and question.level == level
+                for question in questions
+            )
+            for level in range(MIN_LEVEL, MAX_LEVEL + 1)
+        }
+        topic_rows.append(
+            {
+                "topic_id": topic.id,
+                "topic_name": topic.name,
+                "ready": all(counts.values()),
+                "counts_by_level": counts,
+            }
+        )
     return {
-        "ready": all(counts.values()),
-        "counts_by_level": counts,
-        "counts_by_topic": dict(sorted(by_topic.items())),
+        "ready": bool(topic_rows) and all(topic["ready"] for topic in topic_rows),
+        "topics": topic_rows,
         "questions": [question_out(question) for question in questions],
     }
 
 
 def quiz_attempt(db: Session, user_id: uuid.UUID) -> AptitudeAttempt | None:
-    """The user's completed quiz, or None if they have not taken it (or skipped it)."""
     return db.scalar(select(AptitudeAttempt).where(AptitudeAttempt.user_id == user_id))
 
 
 def has_taken_quiz(db: Session, user_id: uuid.UUID) -> bool:
     return quiz_attempt(db, user_id) is not None
+
+
+def _eligible(db: Session, user: User) -> None:
+    if user.user_type != UserType.NEWCOMER:
+        raise AptitudeError("quiz_for_newcomers", "The aptitude quiz is for Newcomers.", 403)
+    if user.profile is None:
+        raise AptitudeError(
+            "profile_required", "Complete your profile before starting the quiz.", 409
+        )
+    if has_taken_quiz(db, user.id):
+        raise AptitudeError(
+            "quiz_already_completed",
+            "You have already completed the onboarding quiz.",
+            409,
+        )
+
+
+def _ready_topics(db: Session) -> list[Topic]:
+    status = bank(db)
+    if not status["ready"]:
+        missing = [row["topic_name"] for row in status["topics"] if not row["ready"]]
+        detail = ", ".join(missing) if missing else "all topics"
+        raise AptitudeError(
+            "aptitude_not_ready",
+            f"The quiz is not ready. Add active questions at every level for {detail}.",
+            409,
+        )
+    topic_ids = [row["topic_id"] for row in status["topics"]]
+    topics = {topic.id: topic for topic in _assessed_topics(db)}
+    return [topics[topic_id] for topic_id in topic_ids]
+
+
+def _public_question(question: AptitudeQuestion, topic_index: int, topic_count: int) -> dict:
+    return {
+        "id": question.id,
+        "topic_id": question.topic_id,
+        "topic": question.topic.name,
+        "level": question.level,
+        "prompt": question.prompt,
+        "options": question.options,
+        "topic_index": topic_index + 1,
+        "topic_count": topic_count,
+    }
+
+
+def _pick(
+    db: Session,
+    topic: Topic,
+    level: int,
+    topic_index: int,
+    topic_count: int,
+    choose: Callable[[Sequence[AptitudeQuestion]], AptitudeQuestion],
+) -> dict:
+    choices = list(
+        db.scalars(
+            select(AptitudeQuestion).where(
+                AptitudeQuestion.topic_id == topic.id,
+                AptitudeQuestion.level == level,
+                AptitudeQuestion.is_active.is_(True),
+            )
+        )
+    )
+    if not choices:
+        raise AptitudeError(
+            "aptitude_not_ready", "The quiz question bank changed. Restart it.", 409
+        )
+    return _public_question(choose(choices), topic_index, topic_count)
+
+
+def start_quiz(
+    db: Session,
+    user: User,
+    choose: Callable[[Sequence[AptitudeQuestion]], AptitudeQuestion] = random.choice,
+) -> dict:
+    _eligible(db, user)
+    topics = _ready_topics(db)
+    return {"done": False, "question": _pick(db, topics[0], 1, 0, len(topics), choose)}
+
+
+def _trace(db: Session, topics: list[Topic], answers) -> tuple[list[dict], int, int]:
+    """Validate an adaptive answer path and return snapshots plus the next topic/level."""
+    topic_index, level = 0, MIN_LEVEL
+    results: list[dict] = []
+    seen: set[uuid.UUID] = set()
+    for answer in answers:
+        if topic_index >= len(topics):
+            raise AptitudeError(
+                "answers_after_finish", "Restart the quiz and answer each question once."
+            )
+        if answer.question_id in seen:
+            raise AptitudeError("question_repeated", "Answer each question once.")
+        question = db.get(AptitudeQuestion, answer.question_id)
+        if (
+            question is None
+            or question.topic_id != topics[topic_index].id
+            or question.level != level
+        ):
+            raise AptitudeError("invalid_quiz_path", "The answers do not follow the quiz order.")
+        option = next((item for item in question.options if item["id"] == answer.option_id), None)
+        if option is None:
+            raise AptitudeError("option_not_found", "Choose an answer offered for every question.")
+        correct = option["id"] == question.correct_option_id
+        results.append(
+            {
+                "question_id": str(question.id),
+                "topic_id": str(question.topic_id),
+                "topic": topics[topic_index].name,
+                "level": question.level,
+                "prompt": question.prompt,
+                "option_id": option["id"],
+                "option_text": option["text"],
+                "correct": correct,
+            }
+        )
+        seen.add(question.id)
+        if correct and level < MAX_LEVEL:
+            level += 1
+        else:
+            topic_index += 1
+            level = MIN_LEVEL
+    return results, topic_index, level
+
+
+def next_question(
+    db: Session,
+    user: User,
+    answers,
+    choose: Callable[[Sequence[AptitudeQuestion]], AptitudeQuestion] = random.choice,
+) -> dict:
+    _eligible(db, user)
+    topics = _ready_topics(db)
+    _, topic_index, level = _trace(db, topics, answers)
+    if topic_index == len(topics):
+        return {"done": True, "question": None}
+    return {
+        "done": False,
+        "question": _pick(db, topics[topic_index], level, topic_index, len(topics), choose),
+    }
+
+
+def submit_quiz(db: Session, user: User, answers) -> AptitudeAttempt:
+    _eligible(db, user)
+    topics = _ready_topics(db)
+    results, topic_index, _ = _trace(db, topics, answers)
+    if topic_index != len(topics):
+        raise AptitudeError("quiz_incomplete", "Finish every assessed topic before submitting.")
+
+    placements = {topic.id: 0 for topic in topics}
+    for result in results:
+        topic_id = uuid.UUID(result["topic_id"])
+        if result["correct"]:
+            placements[topic_id] = result["level"]
+
+    attempt = AptitudeAttempt(user_id=user.id, results=results)
+    db.add(attempt)
+    db.flush()
+    for topic in topics:
+        db.add(TopicExemption(user_id=user.id, topic_id=topic.id, level=placements[topic.id]))
+    db.commit()
+    db.refresh(attempt)
+    return attempt
+
+
+def result_out(db: Session, attempt: AptitudeAttempt) -> dict:
+    placements = list(
+        db.execute(
+            select(TopicExemption, Topic)
+            .join(Topic, Topic.id == TopicExemption.topic_id)
+            .where(TopicExemption.user_id == attempt.user_id)
+            .order_by(Topic.position, Topic.name)
+        )
+    )
+    return {
+        "taken_at": attempt.taken_at,
+        "correct": sum(1 for result in attempt.results if result.get("correct")),
+        "total": len(attempt.results),
+        "placements": [
+            {
+                "topic_id": exemption.topic_id,
+                "topic": topic.name,
+                "level": exemption.level,
+            }
+            for exemption, topic in placements
+        ],
+    }
+
+
+def skip_quiz(db: Session, user: User) -> None:
+    _eligible(db, user)

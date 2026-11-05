@@ -7,8 +7,16 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.content_import import find_lesson_files
-from app.models import Lesson, LessonStatus, Topic
-from app.seed import TOPICS, seed
+from app.models import (
+    AptitudeAttempt,
+    AptitudeQuestion,
+    Lesson,
+    LessonStatus,
+    Topic,
+    TopicExemption,
+    User,
+)
+from app.seed import TEST_USERS, TOPICS, seed
 
 
 def _lesson_files() -> list[dict]:
@@ -63,6 +71,40 @@ def test_seeded_topics_have_multiple_lesson_levels(db):
         assert len(levels) > 1
 
 
+def test_seeded_question_bank_covers_every_topic_and_level(db):
+    seed(db)
+    for topic in db.scalars(select(Topic)):
+        levels = set(
+            db.scalars(
+                select(AptitudeQuestion.level).where(
+                    AptitudeQuestion.topic_id == topic.id,
+                    AptitudeQuestion.is_active.is_(True),
+                )
+            )
+        )
+        assert levels == {1, 2, 3, 4, 5}
+
+
+def test_seeded_users_have_per_topic_placements_or_a_skipped_quiz(db):
+    seed(db)
+    for email, (_, expected) in TEST_USERS.items():
+        user = db.scalar(select(User).where(User.email == email))
+        attempt = db.scalar(select(AptitudeAttempt).where(AptitudeAttempt.user_id == user.id))
+        exemptions = dict(
+            db.execute(
+                select(Topic.name, TopicExemption.level)
+                .join(Topic, Topic.id == TopicExemption.topic_id)
+                .where(TopicExemption.user_id == user.id)
+            ).all()
+        )
+        if expected is None:
+            assert attempt is None
+            assert exemptions == {}
+        else:
+            assert attempt is not None
+            assert exemptions == expected
+
+
 def test_seeding_again_changes_nothing(db):
     seed(db)
     before = {
@@ -94,6 +136,14 @@ def test_a_missing_topic_is_added_at_the_end(db):
     getting_around = db.scalar(select(Topic).where(Topic.name == "Getting Around"))
     for lesson in getting_around.lessons:
         db.delete(lesson)
+    for question in db.scalars(
+        select(AptitudeQuestion).where(AptitudeQuestion.topic_id == getting_around.id)
+    ):
+        db.delete(question)
+    for exemption in db.scalars(
+        select(TopicExemption).where(TopicExemption.topic_id == getting_around.id)
+    ):
+        db.delete(exemption)
     db.delete(getting_around)
     db.commit()
     # An administrator moves the last remaining topic to the front.
