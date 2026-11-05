@@ -41,7 +41,6 @@ export function HomePage() {
 
       {state.status === "ready" && (
         <>
-          <LevelCard level={state.progress.level} aptitudeTaken={state.progress.aptitude_taken} />
           <ProgressSection progress={state.progress} />
           {state.progress.available > 0 && (
             <>
@@ -69,30 +68,6 @@ export function HomePage() {
         </>
       )}
     </div>
-  );
-}
-
-function LevelCard({ level, aptitudeTaken }: { level: number; aptitudeTaken: boolean }) {
-  return (
-    <section className="flex items-center justify-between gap-3 rounded-lg border border-brand/30 bg-brand-soft/40 p-3.5">
-      <div>
-        <p className="text-xs font-semibold tracking-wide text-brand uppercase">
-          Your lesson level
-        </p>
-        <p className="mt-0.5 text-lg font-bold text-ink">Level {level}</p>
-        {!aptitudeTaken && (
-          <p className="text-caption text-muted">
-            You are seeing Level 1 lessons until you take the quiz.
-          </p>
-        )}
-      </div>
-      <Link
-        to="/aptitude"
-        className="shrink-0 rounded-sm bg-ink px-3 py-2 text-xs font-semibold text-white"
-      >
-        {aptitudeTaken ? "Retake quiz" : "Take the quiz"}
-      </Link>
-    </section>
   );
 }
 

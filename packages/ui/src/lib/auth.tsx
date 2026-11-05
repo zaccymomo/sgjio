@@ -57,6 +57,10 @@ export function AuthProvider({ basePath, children }: { basePath: string; childre
     setState(await loadCurrentUser());
   }, [loadCurrentUser]);
 
+  // A newer copy of the signed-in user, e.g. from a route that changed it. Unlike refresh
+  // this doesn't pass through "loading", so the page on screen stays mounted.
+  const setUser = useCallback((user: User) => setState({ status: "signed-in", user }), []);
+
   const signIn = useCallback(
     async (email: string, password: string) => {
       const result = await apiFetch<{ user: User }>(`${basePath}/sign-in`, {
@@ -158,6 +162,7 @@ export function AuthProvider({ basePath, children }: { basePath: string; childre
       signOut,
       deleteAccount,
       refresh,
+      setUser,
       requestPasswordReset,
       checkResetLink,
       resetPassword,
@@ -170,6 +175,7 @@ export function AuthProvider({ basePath, children }: { basePath: string; childre
       signOut,
       deleteAccount,
       refresh,
+      setUser,
       requestPasswordReset,
       checkResetLink,
       resetPassword,

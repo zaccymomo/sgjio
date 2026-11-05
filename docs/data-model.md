@@ -17,7 +17,9 @@ erDiagram
     lessons ||--o{ lesson_reports : "reported in"
     lesson_versions ||--o{ lesson_reports : "as shown"
     topics ||--o{ aptitude_questions : "asked about"
-    users ||--o{ aptitude_attempts : "took"
+    users ||--o| aptitude_attempts : "took"
+    aptitude_attempts ||--o{ topic_exemptions : "gave"
+    topics ||--o{ topic_exemptions : "exempted in"
 
     users {
         uuid id PK
@@ -30,7 +32,6 @@ erDiagram
         timestamptz invited_at "admin waiting to choose a password"
         timestamptz removed_at "admin removed: closed, restorable"
         timestamptz intro_finished_at "introduction finished or skipped"
-        smallint level "1-5, current; null = no quiz yet or skipped, treated as 1"
         timestamptz created_at
     }
     aptitude_questions {
@@ -44,10 +45,14 @@ erDiagram
     }
     aptitude_attempts {
         uuid id PK
-        uuid user_id FK "indexed with taken_at"
-        timestamptz taken_at "newest = the latest, shown to the user"
-        smallint level "1-5, the level this quiz gave"
+        uuid user_id FK,UK "one completed quiz per user"
+        timestamptz taken_at
         jsonb results "one entry per question, each a copy of it"
+    }
+    topic_exemptions {
+        uuid user_id PK,FK "to users and to their aptitude_attempts row"
+        uuid topic_id PK,FK
+        smallint level "0-5, exempted up to; 0 = nothing"
     }
     admin_events {
         uuid id PK
@@ -193,9 +198,9 @@ erDiagram
 - **A completion row outlives withdrawal.** Withdrawing a lesson leaves the row in place, so the user's history keeps it (SCRUM-52 AC4), while the progress query filters on `status = published` so the circle's two figures both shrink and `completed` can never exceed `available` (SCRUM-16 AC8).
 - **A reported problem names the version and the card** (`lesson_reports`, SCRUM-82 AC3). Card ids stay the same across edits, so administrators can open the same card in today's draft (SCRUM-83 AC2). Dealing with a report marks it `fixed` or `dismissed` rather than deleting it (AC3). The reporter is kept but never shown (AC1).
 - **Every attempt is stored** (`lesson_attempts`, `attempt_answers`), finished or not, so attempt history (SCRUM-42) can read them. Only the first answer to each question counts: the key `(attempt_id, question_id)` makes a repeated submission record nothing (SCRUM-16 AC6).
-- **Levels are a number, not a table** (SCRUM-110). Users, lessons and aptitude questions all use Level 1 to 5 (Epic 6), so each has a `level` column checked to that range rather than a foreign key to a tiers table. A lesson or question's level is set when it is created and never changed (SCRUM-103, SCRUM-96), so completions and level-ups never shift under anyone. Lessons from before levels existed are Level 1. A user's level is empty until their first aptitude quiz and counts as Level 1 until then.
-- **One level per user for the whole app** (SCRUM-99). Users see each topic's lessons at their level, plus every lesson they have completed at any level, and the circles count the same set (`app/progress.py`), so a level change never hides finished work and `completed` can still never exceed `available`.
-- **Every aptitude quiz is kept** (`aptitude_attempts`, SCRUM-110 AC4). Each quiz taken is a row, never overwritten; users are shown the newest (`latest_attempt` in `app/aptitude.py`), and earlier ones are history for later stories. `results` holds one entry per question given, each a copy of what mattered then (question, topic, level, prompt, the option chosen and whether it was right), so editing or deactivating a question changes no one's results (SCRUM-110 AC5) without a separate answers table. Only submitted quizzes are stored. Skipping the quiz (SCRUM-98) needs no field of its own: the user has no attempts and an empty `level`, and counts as Level 1 until they take it. `users.level` is the current level: each quiz sets it to the level that quiz gave, and SCRUM-105's level-ups raise it in between, so it can differ from the latest quiz's. (Migration 0013 first kept only the latest quiz on `users`; 0014 moved it into this table.)
+- **Levels are a number, not a table** (SCRUM-110). Lessons and aptitude questions use Level 1 to 5 (Epic 6), so each has a `level` column checked to that range rather than a foreign key to a tiers table. A lesson or question's level is set when it is created and never changed (SCRUM-103, SCRUM-96). Lessons from before levels existed are Level 1.
+- **Exemptions are per topic, and exempted lessons are not stored** (`topic_exemptions`, SCRUM-113). Users have no level of their own (0016 dropped `users.level`). The quiz gives each topic it covers a level from 0 to 5, one row per user per topic; every published lesson in that topic at or below it is exempted (SCRUM-104). Because lesson levels never change, exempted lessons are worked out from the two (`app/exemptions.py`), so a lesson published later at an exempted level is exempted too, and nothing needs updating. `user_id` refers to `users` and to the user's `aptitude_attempts` row, so exemptions only exist beside a completed quiz. Lessons are not hidden by level: everyone sees every published lesson.
+- **One aptitude quiz per user** (`aptitude_attempts`, SCRUM-113 AC2). The quiz is taken once, and only a completed one is stored, together with its exemptions (SCRUM-99 AC7); `user_id` is unique. `results` holds one entry per question given, each a copy of what mattered then (question, topic, level, prompt, the option chosen and whether it was right), so editing or deactivating a question changes no one's results (SCRUM-110 AC5) without a separate answers table. Skipping the quiz (SCRUM-98) needs no field of its own: a user who has set up their profile and has no attempt has skipped it, and is exempted from nothing. (0013 first kept the latest quiz on `users`; 0014 moved quizzes into this table with retakes and a level each; 0016 made it one per user and dropped the level, keeping each user's latest.)
 - **Aptitude questions are kept apart from lesson questions** (`aptitude_questions`, SCRUM-96), so users don't meet them again in lessons. The database checks that the correct option is one of the options. Questions are deactivated, never deleted.
 - **Lesson insights read these tables and add none** (SCRUM-84, `api/app/insights.py`). Each attempt names its version, so figures are per version, and each answer its option, so the page can say how often each wrong option was chosen. Nothing is stored about who saw what; the figures are worked out on each request.
 

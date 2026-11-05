@@ -19,9 +19,9 @@ export function SignInPage() {
     accountDeleted?: boolean;
   } | null;
   const passwordReset = pageState?.passwordReset;
-  // A new Google account goes to profile setup first, as after registering (SCRUM-92).
+  // A new Google account sees the introduction first, as after registering (SCRUM-92, SCRUM-94).
   const google = useGoogleSignIn((created) =>
-    navigate(created ? "/profile-setup" : next, { replace: true }),
+    navigate(created ? "/intro" : next, { replace: true }),
   );
 
   if (google.signup) {

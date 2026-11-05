@@ -93,6 +93,22 @@ export function SettingsPage() {
       {/* SCRUM-41 AC3, AC5 */}
       <ProfileCard />
 
+      {/* SCRUM-94: the introduction is only shown once, but can be seen again from here */}
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-ink">About SGJio</p>
+            <p className="text-sm text-muted">A short walkthrough of what the app does for you.</p>
+          </div>
+          <Link
+            to="/intro?replay=1"
+            className="inline-flex h-8 items-center rounded-sm border border-line px-3 text-xs font-semibold text-ink hover:bg-surface"
+          >
+            View the introduction again
+          </Link>
+        </div>
+      </Card>
+
       {user?.role !== "admin" && (
         <Card>
           <div className="space-y-3">

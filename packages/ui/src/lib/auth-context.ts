@@ -13,8 +13,7 @@ export type User = {
   /** False for an account created with Google, which signs in with Google only (SCRUM-92). */
   has_password: boolean;
   google_linked: boolean;
-  level: number | null;
-  current_level: number;
+  /** Empty until the introduction is finished or skipped; until then it is shown (SCRUM-94). */
   intro_finished_at: string | null;
 };
 
@@ -76,6 +75,8 @@ export type AuthContextValue = {
   resetPassword: (input: ResetPasswordInput) => Promise<void>;
   /** Re-check with the server, e.g. after "Try again". */
   refresh: () => Promise<void>;
+  /** Replace the signed-in user with a newer copy the server returned (e.g. SCRUM-94). */
+  setUser: (user: User) => void;
 };
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

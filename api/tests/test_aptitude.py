@@ -1,4 +1,4 @@
-"""SCRUM-96/97: question-bank authoring and the onboarding aptitude quiz."""
+"""SCRUM-96: aptitude question-bank authoring."""
 
 from sqlalchemy import select
 
@@ -71,38 +71,3 @@ def test_question_requires_exactly_one_correct_option(client, db, make_user):
     )
     assert response.status_code == 422
     assert response.json()["detail"]["code"] == "one_correct_required"
-
-
-def test_newcomer_gets_one_question_per_level_without_answers_and_submits(client, db):
-    seed(db)
-    assert (
-        client.post(
-            "/api/auth/sign-in",
-            json={"email": "level3@sgjio.example.com", "password": "UserPass123"},
-        ).status_code
-        == 200
-    )
-    started = client.post("/api/aptitude/start")
-    assert started.status_code == 200
-    questions = started.json()["questions"]
-    assert [question["level"] for question in questions] == [1, 2, 3, 4, 5]
-    assert all("correct_option_id" not in question for question in questions)
-    answers = [
-        {"question_id": question["id"], "option_id": question["options"][0]["id"]}
-        for question in questions
-    ]
-    result = client.post("/api/aptitude/submit", json={"answers": answers})
-    assert result.status_code == 200
-    assert 1 <= result.json()["level"] <= 5
-    assert result.json()["total"] == 5
-
-
-def test_skipping_creates_no_attempt_and_keeps_level_one(client, db):
-    seed(db)
-    client.post(
-        "/api/auth/sign-in", json={"email": "skipped@sgjio.example.com", "password": "UserPass123"}
-    )
-    assert client.post("/api/aptitude/skip").status_code == 204
-    progress = client.get("/api/progress").json()
-    assert progress["level"] == 1
-    assert progress["aptitude_taken"] is False

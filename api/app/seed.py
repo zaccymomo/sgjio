@@ -23,12 +23,10 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import content_import, lesson_doc
-from app.aptitude import latest_attempt
 from app.auth import normalise_email
 from app.config import get_settings
 from app.lessons import latest_version
 from app.models import (
-    AptitudeAttempt,
     AptitudeQuestion,
     Lesson,
     LessonCompletion,
@@ -89,14 +87,6 @@ class SeedQuestionFile(BaseModel):
     questions: list[SeedQuestion]
 
 
-TEST_USERS = {
-    "level1@sgjio.example.com": ("Level One Newcomer", 1),
-    "level3@sgjio.example.com": ("Level Three Newcomer", 3),
-    "level5@sgjio.example.com": ("Level Five Newcomer", 5),
-    "skipped@sgjio.example.com": ("Skipped Quiz Newcomer", None),
-}
-
-
 # How many of each topic's lessons the demo Newcomer has finished, so the landing page
 # shows every state a circle can be in: not started, in progress and complete
 # (SCRUM-43 AC3, AC4, AC5). Only applied when the account has no progress at all.
@@ -128,6 +118,8 @@ def _get_or_create_user(
         password_hash=hash_password(password),
         role=role,
         user_type=user_type,
+        # The seed login goes straight to Home; register to see the introduction (SCRUM-94).
+        intro_finished_at=datetime.now(UTC) if role == UserRole.USER else None,
     )
     db.add(user)
     return user, True
@@ -225,67 +217,6 @@ def _seed_aptitude_questions(db: Session) -> list[str]:
     return log
 
 
-def _seed_test_users(db: Session) -> list[str]:
-    questions = list(
-        db.scalars(
-            select(AptitudeQuestion)
-            .where(AptitudeQuestion.is_active.is_(True))
-            .order_by(AptitudeQuestion.level, AptitudeQuestion.seed_key)
-        )
-    )
-    by_level = {
-        level: next(question for question in questions if question.level == level)
-        for level in range(1, 6)
-    }
-    log: list[str] = []
-    for email, (name, level) in TEST_USERS.items():
-        user, created = _get_or_create_user(
-            db, email, "UserPass123", name, UserRole.USER, UserType.NEWCOMER
-        )
-        if created:
-            user.profile = Profile(
-                neighbourhood="Tampines", interests=["Food"], languages=["English"]
-            )
-            user.intro_finished_at = datetime.now(UTC)
-            user.level = level
-            log.append(f"test user {email}")
-        if level is not None and latest_attempt(db, user.id) is None:
-            results = []
-            for question_level, question in by_level.items():
-                # Correct through the level below the awarded level; a Level 5 user
-                # masters all five questions.
-                correct = question_level < level or level == 5
-                option_id = (
-                    question.correct_option_id
-                    if correct
-                    else next(
-                        option["id"]
-                        for option in question.options
-                        if option["id"] != question.correct_option_id
-                    )
-                )
-                results.append(
-                    {
-                        "question_id": str(question.id),
-                        "topic_id": str(question.topic_id),
-                        "topic": question.topic.name,
-                        "level": question.level,
-                        "prompt": question.prompt,
-                        "option_id": option_id,
-                        "option_text": next(
-                            option["text"]
-                            for option in question.options
-                            if option["id"] == option_id
-                        ),
-                        "correct": correct,
-                    }
-                )
-            db.add(AptitudeAttempt(user_id=user.id, level=level, results=results))
-            log.append(f"aptitude result for {email}")
-    db.commit()
-    return log
-
-
 def seed(db: Session) -> list[str]:
     """Insert anything missing and return a short log of what was created."""
     settings = get_settings()
@@ -339,7 +270,6 @@ def seed(db: Session) -> list[str]:
             log.append(result.describe().strip())
 
     log.extend(_seed_aptitude_questions(db))
-    log.extend(_seed_test_users(db))
 
     log.extend(_seed_completions(db, user))
 

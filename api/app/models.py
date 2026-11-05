@@ -15,6 +15,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     LargeBinary,
@@ -100,13 +101,16 @@ class AuthScope(str, enum.Enum):
 
 # --- Levels (SCRUM-110) ----------------------------------------------------------------------
 
-# Users, lessons and aptitude questions share one scale of Level 1 to 5 (Epic 6, SCRUM-93).
+# Lessons and aptitude questions share one scale of Level 1 to 5 (Epic 6, SCRUM-93). Users
+# have no level of their own: each topic has an exemption level instead (SCRUM-113).
 MIN_LEVEL = 1
 MAX_LEVEL = 5
+# 0 means nothing in the topic is exempted: the user missed its Level 1 question (SCRUM-99).
+NO_EXEMPTION = 0
 
 
-def _level_check(column: str = "level") -> CheckConstraint:
-    return CheckConstraint(f"{column} BETWEEN {MIN_LEVEL} AND {MAX_LEVEL}", name=f"{column}_range")
+def _level_check(column: str = "level", lowest: int = MIN_LEVEL) -> CheckConstraint:
+    return CheckConstraint(f"{column} BETWEEN {lowest} AND {MAX_LEVEL}", name=f"{column}_range")
 
 
 def _enum(enum_cls: type[enum.Enum], name: str) -> Enum:
@@ -144,7 +148,6 @@ class User(Base):
     """Main-app users and administrators share one table, separated by `role`."""
 
     __tablename__ = "users"
-    __table_args__ = (_level_check(),)
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -170,11 +173,6 @@ class User(Base):
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # When the introduction was finished or skipped (SCRUM-94); empty until then.
     intro_finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # One level for the whole app (SCRUM-99): set by each aptitude quiz and raised by
-    # level-ups (SCRUM-105), so it can differ from the latest quiz's. Empty until the
-    # first quiz, and for someone who skipped it (SCRUM-98): see `current_level`. Every
-    # quiz taken is kept in `aptitude_attempts`.
-    level: Mapped[int | None] = mapped_column(SmallInteger)
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = _updated_at()
 
@@ -198,11 +196,6 @@ class User(Base):
     @property
     def google_linked(self) -> bool:
         return self.google_sub is not None
-
-    @property
-    def current_level(self) -> int:
-        """The level lessons are chosen by: Level 1 until the aptitude quiz sets one."""
-        return self.level if self.level is not None else MIN_LEVEL
 
 
 class Profile(Base):
@@ -608,37 +601,58 @@ class AptitudeQuestion(Base):
 
 
 class AptitudeAttempt(Base):
-    """One aptitude quiz a user took (SCRUM-97). Every quiz is kept, never overwritten
-    (SCRUM-110 AC4); users are shown their latest, the one with the newest `taken_at`
-    (`app/aptitude.py`), and earlier ones are history (SCRUM-102 AC3).
+    """A user's aptitude quiz (SCRUM-97). The quiz is taken once, so a user has at most one,
+    and only a completed quiz is stored (SCRUM-113 AC2, SCRUM-99 AC7): a user who has set up
+    their profile and has none has skipped it (SCRUM-98).
 
     `results` is a list with one entry per question given, in order, each a copy of what
     mattered at the time (question id, topic id, level, prompt, the option chosen and
     whether it was correct), so editing or deactivating a question never changes a past
-    result (SCRUM-110 AC5). `level` is the level this quiz gave (SCRUM-99); the user's
-    current level is `User.level`, which level-ups can raise afterwards (SCRUM-105).
-
-    Only submitted quizzes are stored: one left part way is not (SCRUM-97 AC6). A user who
-    skipped the quiz (SCRUM-98) simply has none.
+    result (SCRUM-110 AC5). What the quiz gave is in `topic_exemptions`, saved with it.
     """
 
     __tablename__ = "aptitude_attempts"
-    __table_args__ = (
-        _level_check(),
-        CheckConstraint("jsonb_typeof(results) = 'array'", name="results_list"),
-        # A user's quizzes, newest first: their latest, and their history.
-        Index("ix_aptitude_attempts_user_id_taken_at", "user_id", "taken_at"),
-    )
+    __table_args__ = (CheckConstraint("jsonb_typeof(results) = 'array'", name="results_list"),)
 
     id: Mapped[uuid.UUID] = _uuid_pk()
+    # Unique: one completed quiz per user (SCRUM-113 AC2).
     user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True
     )
     taken_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     results: Mapped[list] = mapped_column(JSONB, nullable=False)
+
+
+class TopicExemption(Base):
+    """How far a user is exempted in one topic (SCRUM-113): every published lesson in the
+    topic at or below `level` counts as exempted for them (SCRUM-104). 0 exempts nothing.
+
+    Set once, when the aptitude quiz is completed (SCRUM-99 AC6), one row per topic the quiz
+    covered. Exempted lessons are worked out from this and each lesson's fixed level
+    (`app/exemptions.py`) rather than stored, so a lesson published later at an exempted
+    level is exempted too (SCRUM-104 AC3).
+
+    The key makes one exemption per user per topic (AC2). `user_id` also refers to the
+    user's quiz, so an exemption can only exist alongside a completed quiz.
+    """
+
+    __tablename__ = "topic_exemptions"
+    __table_args__ = (
+        _level_check(lowest=NO_EXEMPTION),
+        ForeignKeyConstraint(["user_id"], ["aptitude_attempts.user_id"], ondelete="CASCADE"),
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    topic_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("topics.id", ondelete="RESTRICT"), primary_key=True, index=True
+    )
+    level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+
+    topic: Mapped[Topic] = relationship()
 
 
 # --- Authentication support ---------------------------------------------------------------

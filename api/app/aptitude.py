@@ -1,10 +1,12 @@
-"""Aptitude question bank and the five-question onboarding quiz (SCRUM-96/97)."""
+"""Reading users' aptitude quizzes (Epic 6).
 
-import random
+The quiz is taken once (SCRUM-113): a user has at most one completed attempt, saved with
+their topic exemptions (`app/exemptions.py`). A user with no attempt has not taken it, which
+after profile setup means they skipped it (SCRUM-98).
+"""
+
 import uuid
-from collections import Counter, defaultdict
-from collections.abc import Callable
-from datetime import UTC, datetime
+from collections import Counter
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -15,8 +17,6 @@ from app.models import (
     AptitudeAttempt,
     AptitudeQuestion,
     Topic,
-    User,
-    UserType,
 )
 
 
@@ -24,25 +24,6 @@ class AptitudeError(ValueError):
     def __init__(self, code: str, message: str, status_code: int = 422):
         super().__init__(message)
         self.code, self.message, self.status_code = code, message, status_code
-
-
-def latest_attempt(db: Session, user_id: uuid.UUID) -> AptitudeAttempt | None:
-    return db.scalar(
-        select(AptitudeAttempt)
-        .where(AptitudeAttempt.user_id == user_id)
-        .order_by(AptitudeAttempt.taken_at.desc(), AptitudeAttempt.id.desc())
-        .limit(1)
-    )
-
-
-def attempts(db: Session, user_id: uuid.UUID) -> list[AptitudeAttempt]:
-    return list(
-        db.scalars(
-            select(AptitudeAttempt)
-            .where(AptitudeAttempt.user_id == user_id)
-            .order_by(AptitudeAttempt.taken_at.desc(), AptitudeAttempt.id.desc())
-        )
-    )
 
 
 def _validate_options(options) -> tuple[list[dict], str]:
@@ -136,101 +117,10 @@ def bank(db: Session) -> dict:
     }
 
 
-def start_quiz(
-    db: Session,
-    user: User,
-    choose: Callable[[list[AptitudeQuestion]], AptitudeQuestion] = random.choice,
-) -> list[dict]:
-    if user.user_type != UserType.NEWCOMER:
-        raise AptitudeError("quiz_for_newcomers", "The aptitude quiz is for Newcomers.", 403)
-    grouped: dict[int, list[AptitudeQuestion]] = defaultdict(list)
-    for question in db.scalars(
-        select(AptitudeQuestion)
-        .where(AptitudeQuestion.is_active.is_(True))
-        .order_by(AptitudeQuestion.created_at, AptitudeQuestion.id)
-    ):
-        grouped[question.level].append(question)
-    missing = [level for level in range(MIN_LEVEL, MAX_LEVEL + 1) if not grouped[level]]
-    if missing:
-        raise AptitudeError(
-            "aptitude_not_ready",
-            "The quiz is not ready. "
-            f"Level(s) {', '.join(map(str, missing))} have no active questions.",
-            409,
-        )
-    selected = [choose(grouped[level]) for level in range(MIN_LEVEL, MAX_LEVEL + 1)]
-    return [
-        {
-            "id": q.id,
-            "topic": q.topic.name,
-            "level": q.level,
-            "prompt": q.prompt,
-            "options": q.options,
-        }
-        for q in selected
-    ]
+def quiz_attempt(db: Session, user_id: uuid.UUID) -> AptitudeAttempt | None:
+    """The user's completed quiz, or None if they have not taken it (or skipped it)."""
+    return db.scalar(select(AptitudeAttempt).where(AptitudeAttempt.user_id == user_id))
 
 
-def _awarded_level(results: list[dict]) -> int:
-    """Start at Level 1 and advance for lower levels mastered in sequence."""
-    level = MIN_LEVEL
-    for result in sorted(results, key=lambda item: item["level"]):
-        if result["level"] < MAX_LEVEL and result["correct"]:
-            level += 1
-        else:
-            break
-    return min(level, MAX_LEVEL)
-
-
-def submit_quiz(db: Session, user: User, answers) -> AptitudeAttempt:
-    if user.user_type != UserType.NEWCOMER:
-        raise AptitudeError("quiz_for_newcomers", "The aptitude quiz is for Newcomers.", 403)
-    ids = [answer.question_id for answer in answers]
-    if len(ids) != 5 or len(set(ids)) != 5:
-        raise AptitudeError("five_answers_required", "Answer each of the five questions once.")
-    questions = {
-        q.id: q for q in db.scalars(select(AptitudeQuestion).where(AptitudeQuestion.id.in_(ids)))
-    }
-    if len(questions) != 5 or {q.level for q in questions.values()} != set(range(1, 6)):
-        raise AptitudeError("one_per_level_required", "Submit one question from every level.")
-    results = []
-    for answer in answers:
-        question = questions[answer.question_id]
-        option = next((item for item in question.options if item["id"] == answer.option_id), None)
-        if option is None:
-            raise AptitudeError("option_not_found", "Choose an answer offered for every question.")
-        results.append(
-            {
-                "question_id": str(question.id),
-                "topic_id": str(question.topic_id),
-                "topic": question.topic.name,
-                "level": question.level,
-                "prompt": question.prompt,
-                "option_id": option["id"],
-                "option_text": option["text"],
-                "correct": option["id"] == question.correct_option_id,
-            }
-        )
-    attempt = AptitudeAttempt(user_id=user.id, level=_awarded_level(results), results=results)
-    db.add(attempt)
-    user.level = attempt.level
-    user.intro_finished_at = datetime.now(UTC)
-    db.commit()
-    db.refresh(attempt)
-    return attempt
-
-
-def skip_quiz(db: Session, user: User) -> None:
-    if user.user_type != UserType.NEWCOMER:
-        raise AptitudeError("quiz_for_newcomers", "The aptitude quiz is for Newcomers.", 403)
-    user.intro_finished_at = datetime.now(UTC)
-    db.commit()
-
-
-def result_out(attempt: AptitudeAttempt) -> dict:
-    return {
-        "level": attempt.level,
-        "correct": sum(1 for item in attempt.results if item.get("correct")),
-        "total": len(attempt.results),
-        "taken_at": attempt.taken_at,
-    }
+def has_taken_quiz(db: Session, user_id: uuid.UUID) -> bool:
+    return quiz_attempt(db, user_id) is not None

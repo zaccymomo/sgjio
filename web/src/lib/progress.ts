@@ -25,8 +25,6 @@ export type Progress = {
   available: number;
   /** Null once every lesson available has been completed (SCRUM-6 AC6). */
   suggestion: Suggestion | null;
-  level: number;
-  aptitude_taken: boolean;
 };
 
 type State =

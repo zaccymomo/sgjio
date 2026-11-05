@@ -38,8 +38,8 @@ class UserOut(BaseModel):
     # (SCRUM-92). Settings uses these to show what applies.
     has_password: bool
     google_linked: bool
-    level: int | None
-    current_level: int
+    # Empty until the introduction is finished or skipped; the main app shows it until
+    # then (SCRUM-94).
     intro_finished_at: datetime | None
 
 
@@ -349,8 +349,6 @@ class ProgressOut(BaseModel):
     completed: int
     available: int
     suggestion: SuggestionOut | None
-    level: int
-    aptitude_taken: bool
 
 
 class MistakeOut(BaseModel):
