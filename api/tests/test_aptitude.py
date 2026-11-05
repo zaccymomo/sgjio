@@ -2,6 +2,7 @@
 
 from sqlalchemy import select
 
+from app.aptitude import NOT_SURE_OPTION, _quiz_options
 from app.models import (
     AptitudeAttempt,
     AptitudeQuestion,
@@ -214,3 +215,60 @@ def test_singaporean_cannot_take_the_newcomer_quiz(client, db, make_user):
     response = client.post("/api/aptitude/start")
     assert response.status_code == 403
     assert response.json()["detail"]["code"] == "quiz_for_newcomers"
+
+
+def test_quiz_options_are_shuffled_and_end_with_not_sure(client, db):
+    seed(db)
+    client.post("/api/auth/sign-in", json=NEWCOMER)
+    question = client.post("/api/aptitude/start").json()["question"]
+    model = db.get(AptitudeQuestion, question["id"])
+
+    assert question["options"][-1] == NOT_SURE_OPTION
+    assert sorted(option["id"] for option in question["options"][:-1]) == sorted(
+        option["id"] for option in model.options
+    )
+
+    orders = {tuple(option["id"] for option in _quiz_options(model)[:-1]) for _ in range(50)}
+    assert len(orders) > 1
+
+
+def test_not_sure_counts_as_wrong(client, db):
+    seed(db)
+    client.post("/api/auth/sign-in", json=NEWCOMER)
+    current = client.post("/api/aptitude/start").json()["question"]
+    first_topic = current["topic_id"]
+    answers = [{"question_id": current["id"], "option_id": NOT_SURE_OPTION["id"]}]
+
+    step = client.post("/api/aptitude/next", json={"answers": answers}).json()
+    assert step["question"]["topic_id"] != first_topic
+    assert step["question"]["level"] == 1
+
+    current = step["question"]
+    while current is not None:
+        answers.append({"question_id": current["id"], "option_id": NOT_SURE_OPTION["id"]})
+        current = client.post("/api/aptitude/next", json={"answers": answers}).json()["question"]
+    result = client.post("/api/aptitude/submit", json={"answers": answers}).json()
+    assert result["correct"] == 0
+    assert all(placement["level"] == 0 for placement in result["placements"])
+    user_id = client.get("/api/auth/me").json()["id"]
+    attempt = db.scalar(select(AptitudeAttempt).where(AptitudeAttempt.user_id == user_id))
+    assert attempt.results[0]["option_text"] == NOT_SURE_OPTION["text"]
+    assert attempt.results[0]["correct"] is False
+
+
+def test_not_sure_option_id_is_reserved_for_authors(client, db, make_user):
+    topic = _admin(client, db, make_user)
+    response = client.post(
+        "/api/admin/aptitude-questions",
+        json={
+            "topic_id": str(topic.id),
+            "level": 1,
+            "prompt": "Pick one",
+            "options": [
+                {"id": NOT_SURE_OPTION["id"], "text": "Clash", "correct": True},
+                {"id": "b", "text": "Other"},
+            ],
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["code"] == "option_id_reserved"

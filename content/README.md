@@ -73,6 +73,10 @@ Each question has a stable `key`, a topic, a level from 1 to 5, answer options a
 one `correct: true` option. The stable key means editing the file and running the seed again
 updates the same row instead of creating a duplicate.
 
+Write the options in any order: learners see them shuffled each time, followed by an
+"I’m not sure" option the app adds itself and scores as wrong. Don't write your own "not sure"
+option, and don't use the id `not-sure`, which is reserved for it.
+
 ## The images and audio here
 
 The illustrations are placeholders drawn to one flat style, and the audio was made with Singapore-English text-to-speech voices. Replace them freely; [STYLE.md](STYLE.md) says how to keep new ones looking like they belong together.
