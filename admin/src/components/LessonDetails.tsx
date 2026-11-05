@@ -1,7 +1,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { cn } from "@sgjio/ui";
 import { Check, ChevronDown, Lock } from "lucide-react";
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import type { Topic } from "../lib/content";
 import { MAX_SUMMARY, MAX_TITLE } from "../lib/lessons";
@@ -179,6 +179,15 @@ function LevelSelect({
   error?: string;
 }) {
   const description = value ? LEVEL_DESCRIPTIONS[value as Level] : undefined;
+  const [open, setOpen] = useState(false);
+  const current = useRef<HTMLDivElement>(null);
+  // Radix focuses the first level on opening; start from the lesson's own instead, so
+  // pressing Enter twice from the keyboard never changes the level by accident.
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => current.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
   if (locked && value !== null) {
     return (
       <span
@@ -192,7 +201,7 @@ function LevelSelect({
     );
   }
   return (
-    <DropdownMenu.Root modal={false}>
+    <DropdownMenu.Root modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
@@ -233,6 +242,7 @@ function LevelSelect({
             {LEVELS.map((level) => (
               <DropdownMenu.RadioItem
                 key={level}
+                ref={level === value ? current : undefined}
                 value={String(level)}
                 className="flex cursor-pointer items-start gap-2 rounded-sm px-2.5 py-2 outline-none data-[highlighted]:bg-surface"
               >
