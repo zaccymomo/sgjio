@@ -141,7 +141,11 @@ questions:
     level: 2
     prompt: You disagree with a teammate’s suggestion. What is a constructive response?
     options:
-      - { id: explain, text: Explain your concern politely and suggest an alternative, correct: true }
+      - {
+          id: explain,
+          text: Explain your concern politely and suggest an alternative,
+          correct: true,
+        }
       - { id: silent, text: Ignore every follow-up message }
       - { id: mock, text: Mock the suggestion in the group chat }
   - key: workplace-follow-up
@@ -157,7 +161,11 @@ questions:
     level: 5
     prompt: When correcting a colleague in a group, which approach best avoids unnecessary embarrassment?
     options:
-      - { id: private, text: Raise the sensitive point privately and respectfully where possible, correct: true }
+      - {
+          id: private,
+          text: Raise the sensitive point privately and respectfully where possible,
+          correct: true,
+        }
       - { id: public, text: Call them out loudly before discussing the facts }
       - { id: joke, text: Turn the mistake into a public joke }
   - key: public-priority-seat
@@ -229,7 +237,11 @@ questions:
     level: 4
     prompt: When booking a ride-hailing car at a mall, what helps the driver find you?
     options:
-      - { id: point, text: Choose the correct designated pickup point and check its label, correct: true }
+      - {
+          id: point,
+          text: Choose the correct designated pickup point and check its label,
+          correct: true,
+        }
       - { id: vague, text: Select any location and give no details }
       - { id: lane, text: Stand in an active traffic lane }
   - key: last-train
