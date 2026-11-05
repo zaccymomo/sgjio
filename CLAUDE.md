@@ -26,7 +26,7 @@ The developer uses Anaconda. **Always run Python tools with `python -m`** from `
 ```bash
 docker compose up -d                                   # Postgres + Mailpit (http://localhost:8025)
 cd api && python -m uvicorn app.main:app --reload      # API
-python -m pytest                                       # 644 tests, uses the sgjio_test database
+python -m pytest                                       # 647 tests, uses the sgjio_test database
 python -m ruff check . && python -m ruff format .
 python -m alembic revision --autogenerate -m "..."     # then READ the generated file
 python -m alembic upgrade head

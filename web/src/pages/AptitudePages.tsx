@@ -209,7 +209,7 @@ export function AptitudeQuizPage() {
 }
 
 /** Where a link to the results came from, so the page can offer a way back (SCRUM-100). */
-export type ResultsBack = { label: string };
+type ResultsBack = { label: string };
 
 export function AptitudeResultsPage() {
   const location = useLocation();
