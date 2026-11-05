@@ -41,7 +41,9 @@ export function TopicRadar({ topics, className }: { topics: RadarTopic[]; classN
     <figure className={cn("m-0 flex justify-center", className)}>
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-        className="h-auto w-full max-w-md"
+        // Nothing in the chart can be selected, so it shows the plain arrow, never the text
+        // cursor over its labels.
+        className="h-auto w-full max-w-md cursor-default select-none"
         role="img"
         aria-label={`Level in each topic: ${topics
           .map((topic) => `${topic.name}, Level ${topic.level}`)

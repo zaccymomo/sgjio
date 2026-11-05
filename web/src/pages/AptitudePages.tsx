@@ -320,7 +320,8 @@ function PlacementRow({ placement }: { placement: Placement }) {
           aria-controls={panelId}
           onClick={() => setOpen((value) => !value)}
           className={cn(
-            "flex w-full items-center justify-between gap-3 p-3 text-left",
+            // Buttons get the arrow by default; this one opens the row, so it shows the hand.
+            "flex w-full cursor-pointer items-center justify-between gap-3 p-3 text-left",
             "transition-colors hover:bg-surface",
             "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand",
           )}
@@ -354,7 +355,11 @@ function PlacementLessons({ topicId }: { topicId: string }) {
     return (
       <p className="text-caption text-muted">
         {state.message}{" "}
-        <button type="button" onClick={reload} className="font-semibold text-brand underline">
+        <button
+          type="button"
+          onClick={reload}
+          className="cursor-pointer font-semibold text-brand underline"
+        >
           Try again
         </button>
       </p>
