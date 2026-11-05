@@ -334,6 +334,8 @@ class TopicProgressOut(BaseModel):
     completed: int
     exempted: int
     available: int
+    # SCRUM-100: the level reached in the topic, 0 to 5, drawn on the Profile tab's chart.
+    level: int
 
 
 class SuggestionOut(BaseModel):
@@ -584,6 +586,9 @@ class AptitudePlacementOut(BaseModel):
     topic_id: uuid.UUID
     topic: str
     level: int
+    # SCRUM-100 AC1: "4 of 12 exempted", counting currently published lessons only.
+    exempted: int
+    available: int
 
 
 class AptitudeResultOut(BaseModel):

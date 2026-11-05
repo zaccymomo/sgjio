@@ -1,7 +1,9 @@
 import { Alert, ApiError, Button, Spinner, useAuth } from "@sgjio/ui";
+import { ChevronLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+import { TopicRadar } from "../components/TopicRadar";
 import { aptitudeApi, type QuizAnswer, type QuizQuestion, type QuizResult } from "../lib/aptitude";
 
 export function AptitudeIntroPage() {
@@ -26,8 +28,8 @@ export function AptitudeIntroPage() {
   if (user?.user_type !== "newcomer") {
     return (
       <div className="mx-auto flex max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-6">
-        <h1 className="text-2xl font-bold text-ink">No placement quiz needed</h1>
-        <p className="text-sm text-muted">The onboarding aptitude quiz is for Newcomers.</p>
+        <h1 className="text-2xl font-bold text-ink">No aptitude test needed</h1>
+        <p className="text-sm text-muted">The aptitude test is for Newcomers.</p>
         <Button onClick={() => navigate("/", { replace: true })}>Go to my lessons</Button>
       </div>
     );
@@ -36,12 +38,16 @@ export function AptitudeIntroPage() {
   if (completed) {
     return (
       <div className="mx-auto flex max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-6">
-        <h1 className="text-2xl font-bold text-ink">Quiz already completed</h1>
+        <h1 className="text-2xl font-bold text-ink">Aptitude test already completed</h1>
         <p className="text-sm text-muted">
-          Your starting point for each topic has been saved. The onboarding quiz can only be taken
+          Your starting point for each topic has been saved. The aptitude test can only be taken
           once during this version of SGJio.
         </p>
-        <Link className="text-sm font-semibold text-brand" to="/aptitude/results">
+        <Link
+          className="text-sm font-semibold text-brand"
+          to="/aptitude/results"
+          state={{ back: { label: "Back" } }}
+        >
           View my topic placements
         </Link>
         <Button onClick={() => navigate("/", { replace: true })}>Go to my lessons</Button>
@@ -78,7 +84,7 @@ export function AptitudeIntroPage() {
       </div>
       {error && <Alert tone="error">{error}</Alert>}
       <Button loading={busy === "start"} onClick={() => void run("start")}>
-        Take the quiz now
+        Take the aptitude test now
       </Button>
       <Button variant="secondary" loading={busy === "skip"} onClick={() => void run("skip")}>
         Skip for now
@@ -103,7 +109,9 @@ export function AptitudeQuizPage() {
       .start()
       .then((step) => setQuestion(step.question))
       .catch((cause: unknown) =>
-        setError(cause instanceof ApiError ? cause.message : "The quiz could not be started."),
+        setError(
+          cause instanceof ApiError ? cause.message : "The aptitude test could not be started.",
+        ),
       );
   }, []);
 
@@ -200,9 +208,14 @@ export function AptitudeQuizPage() {
   );
 }
 
+/** Where a link to the results came from, so the page can offer a way back (SCRUM-100). */
+type ResultsBack = { label: string };
+
 export function AptitudeResultsPage() {
   const location = useLocation();
-  const stateResult = (location.state as { result?: QuizResult } | null)?.result;
+  const navigate = useNavigate();
+  const state = location.state as { result?: QuizResult; back?: ResultsBack } | null;
+  const stateResult = state?.result;
   const [result, setResult] = useState<QuizResult | null>(stateResult ?? null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -212,6 +225,20 @@ export function AptitudeResultsPage() {
         .then(setResult)
         .catch(() => setError("No result is available yet."));
   }, [stateResult]);
+
+  // Opened from "See why" on Home or a topic page: step back there. Straight after the
+  // aptitude test there is nowhere to go back to, so "Go to my lessons" is the way on.
+  const back = state?.back && (
+    <button
+      type="button"
+      onClick={() => navigate(-1)}
+      className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-sm text-sm font-medium text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+    >
+      <ChevronLeft className="size-4" aria-hidden />
+      {state.back.label}
+    </button>
+  );
+
   if (error) return <Alert tone="error">{error}</Alert>;
   if (!result) {
     return (
@@ -220,32 +247,91 @@ export function AptitudeResultsPage() {
       </div>
     );
   }
+  const exempted = result.placements.reduce((total, placement) => total + placement.exempted, 0);
+  const available = result.placements.reduce((total, placement) => total + placement.available, 0);
   return (
-    <div className="mx-auto flex max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-6">
-      <div className="text-center">
-        <p className="text-sm font-semibold text-brand">Your topic placements</p>
-        <h1 className="mt-1 text-2xl font-bold text-ink">Your starting points are ready</h1>
-        <p className="mt-2 text-sm text-muted">
-          Introductory lessons at or below each placement are marked exempted.
+    <div className="flex flex-col gap-4">
+      {back}
+      <div className="mx-auto flex w-full max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-6">
+        <div className="text-center">
+          <p className="text-sm font-semibold text-brand">Your topic placements</p>
+          <h1 className="mt-1 text-2xl font-bold text-ink">Your starting points are ready</h1>
+          <p className="mt-2 text-sm text-muted">
+            Introductory lessons at or below each placement are marked exempted.
+          </p>
+          {available > 0 && (
+            <p className="mt-1 text-sm text-muted">
+              The aptitude test exempted you from{" "}
+              <span className="font-semibold text-ink">
+                {exempted} of {available} {available === 1 ? "lesson" : "lessons"}
+              </span>
+              . They already count in your topic circles.
+            </p>
+          )}
+        </div>
+        {/* SCRUM-100: the level in each topic as a shape; the list below says the same in
+            words, with the counts. */}
+        <TopicRadar
+          topics={result.placements.map((placement) => ({
+            id: placement.topic_id,
+            name: placement.topic,
+            level: placement.level,
+          }))}
+        />
+        <ul className="divide-y divide-line rounded-lg border border-line">
+          {result.placements.map((placement) => (
+            <PlacementRow key={placement.topic_id} placement={placement} />
+          ))}
+        </ul>
+        <p className="text-center text-xs text-muted">
+          You can still open exempted lessons any time.
         </p>
+        <Link
+          to="/"
+          className="flex h-11 items-center justify-center rounded-sm bg-ink px-4 text-sm font-semibold text-white"
+        >
+          Go to my lessons
+        </Link>
+        <p className="text-center text-xs text-muted">The aptitude test cannot be retaken.</p>
       </div>
-      <ul className="divide-y divide-line rounded-lg border border-line">
-        {result.placements.map((placement) => (
-          <li key={placement.topic_id} className="flex items-center justify-between p-3 text-sm">
-            <span className="font-medium text-ink">{placement.topic}</span>
-            <span className="font-semibold text-brand">
-              {placement.level === 0 ? "No exemptions" : `Level ${placement.level}`}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <Link
-        to="/"
-        className="flex h-11 items-center justify-center rounded-sm bg-ink px-4 text-sm font-semibold text-white"
-      >
-        Go to my lessons
-      </Link>
-      <p className="text-center text-xs text-muted">This onboarding quiz cannot be retaken.</p>
     </div>
+  );
+}
+
+type Placement = QuizResult["placements"][number];
+
+/**
+ * One topic in the results (SCRUM-100): how many of its lessons the aptitude test exempted
+ * (AC1), or that the learner starts from its first lesson (AC2). The topic's name opens it.
+ */
+function PlacementRow({ placement }: { placement: Placement }) {
+  const { topic_id, topic, level, exempted, available } = placement;
+
+  const [count, detail] =
+    available === 0
+      ? ["No lessons yet", "Its lessons will appear when they're published"]
+      : exempted === 0
+        ? ["None exempted", "Start from the first lesson"]
+        : exempted === available
+          ? ["All lessons exempted", `Up to Level ${level}`]
+          : [
+              `${exempted} ${exempted === 1 ? "lesson" : "lessons"} exempted`,
+              `Up to Level ${level}`,
+            ];
+
+  // The name and its detail on the left, the count centred against both on the right.
+  return (
+    <li className="flex items-center justify-between gap-3 p-3 text-sm">
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <Link
+          to={`/topics/${topic_id}`}
+          className="w-fit rounded-sm font-medium text-ink underline-offset-2 hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        >
+          {topic}
+        </Link>
+        <span className="text-caption text-muted">{detail}</span>
+      </span>
+      <span className="shrink-0 text-right font-semibold text-brand">{count}</span>
+    </li>
   );
 }

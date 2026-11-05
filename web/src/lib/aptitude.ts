@@ -16,7 +16,14 @@ export type QuizResult = {
   correct: number;
   total: number;
   taken_at: string;
-  placements: Array<{ topic_id: string; topic: string; level: number }>;
+  /** One per topic the quiz covered. `exempted` of `available` published lessons (SCRUM-100). */
+  placements: Array<{
+    topic_id: string;
+    topic: string;
+    level: number;
+    exempted: number;
+    available: number;
+  }>;
 };
 
 export const aptitudeApi = {

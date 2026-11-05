@@ -41,7 +41,7 @@ export function ProfileSetupPage() {
   );
 }
 
-/** Editing from Settings (SCRUM-14 AC4, SCRUM-41 AC5). */
+/** Editing from the Profile tab (SCRUM-14 AC4, SCRUM-41 AC5; moved there in SCRUM-100). */
 export function EditProfilePage() {
   const navigate = useNavigate();
 
@@ -49,11 +49,11 @@ export function EditProfilePage() {
     <div className="flex flex-col gap-4">
       <div>
         <Link
-          to="/settings"
+          to="/profile"
           className="mb-2 inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-ink"
         >
           <ChevronLeft className="size-4" aria-hidden />
-          Settings
+          Profile
         </Link>
         <h1 className="text-[22px] font-bold text-ink">Edit your profile</h1>
         <p className="mt-1 text-sm text-muted">
@@ -63,10 +63,10 @@ export function EditProfilePage() {
 
       <LoadedProfileForm
         submitLabel="Save changes"
-        onSaved={() => navigate("/settings", { state: { profileSaved: true } })}
+        onSaved={() => navigate("/profile", { state: { profileSaved: true } })}
         secondaryAction={
           <Link
-            to="/settings"
+            to="/profile"
             className="flex h-11 items-center justify-center rounded-sm px-4 text-sm font-semibold text-muted hover:bg-surface hover:text-ink"
           >
             Cancel

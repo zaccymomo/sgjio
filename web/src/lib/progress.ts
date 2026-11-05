@@ -8,6 +8,8 @@ export type TopicProgress = {
   completed: number;
   exempted: number;
   available: number;
+  /** The level reached in the topic, 0 to 5 (SCRUM-100): drawn on the Profile chart. */
+  level: number;
 };
 
 /** The suggested next lesson (SCRUM-6), from the topic where progress is weakest. */

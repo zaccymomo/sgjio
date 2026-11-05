@@ -9,6 +9,10 @@ import { cn } from "../lib/cn";
  * - everything done: a solid red disc, so a finished topic reads differently at a glance
  *   rather than only as a ring that happens to be closed (AC5)
  *
+ * With `exempted` (SCRUM-100), the part of the arc the aptitude quiz exempted is drawn in a
+ * lighter red, after the full-red part the user completed, so their own work stands out.
+ * `completed` still counts both, as the circles do.
+ *
  * The count sits inside the ring (AC3). The whole thing is aria-hidden: the caller wraps
  * it in something that carries the topic name and the figure as one label, which reads
  * far better than a screen reader spelling out the SVG.
@@ -16,12 +20,15 @@ import { cn } from "../lib/cn";
 export function ProgressRing({
   completed,
   available,
+  exempted = 0,
   size = 56,
   strokeWidth = 5,
   className,
 }: {
   completed: number;
   available: number;
+  /** How many of `completed` are exempted rather than completed by the user. */
+  exempted?: number;
   size?: number;
   strokeWidth?: number;
   className?: string;
@@ -30,6 +37,8 @@ export function ProgressRing({
   // Guard against a divide by zero, and against a stale count exceeding the published
   // lessons: the API prevents that (SCRUM-16 AC8), but the arc should never overshoot.
   const fraction = available > 0 ? Math.min(completed / available, 1) : 0;
+  const ownFraction =
+    available > 0 ? Math.min(Math.max(completed - exempted, 0) / available, fraction) : 0;
 
   const centre = size / 2;
   const radius = (size - strokeWidth) / 2;
@@ -54,19 +63,28 @@ export function ProgressRing({
             strokeWidth={strokeWidth}
             className="fill-none stroke-line"
           />
-          {fraction > 0 && (
-            <circle
-              cx={centre}
-              cy={centre}
-              r={radius}
-              strokeWidth={strokeWidth}
-              strokeLinecap="round"
-              strokeDasharray={circumference}
-              strokeDashoffset={circumference * (1 - fraction)}
-              // Start the arc at the top rather than at 3 o'clock.
-              transform={`rotate(-90 ${centre} ${centre})`}
-              className="fill-none stroke-brand transition-[stroke-dashoffset] duration-500"
-            />
+          {[
+            // The whole covered arc first, then the user's own part over it, so with
+            // nothing exempted the two coincide and the ring looks as it always has.
+            { share: fraction, colour: exempted > 0 ? "stroke-brand-light" : "stroke-brand" },
+            { share: exempted > 0 ? ownFraction : 0, colour: "stroke-brand" },
+          ].map(
+            ({ share, colour }, index) =>
+              share > 0 && (
+                <circle
+                  key={index}
+                  cx={centre}
+                  cy={centre}
+                  r={radius}
+                  strokeWidth={strokeWidth}
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={circumference * (1 - share)}
+                  // Start the arc at the top rather than at 3 o'clock.
+                  transform={`rotate(-90 ${centre} ${centre})`}
+                  className={cn("fill-none transition-[stroke-dashoffset] duration-500", colour)}
+                />
+              ),
           )}
         </>
       )}
