@@ -1,5 +1,19 @@
 import { AppShell, AuthProvider, RequireAuth, type NavItem } from "@sgjio/ui";
-import { BookOpen, Home, MessageSquare, Settings, Users } from "lucide-react";
+import {
+  Award,
+  BookOpen,
+  CalendarDays,
+  CircleCheck,
+  Download,
+  Heart,
+  History,
+  Home,
+  Lightbulb,
+  MessageSquare,
+  Settings,
+  Store,
+  Users,
+} from "lucide-react";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 
 import { ComingSoonPage } from "./pages/ComingSoonPage";
@@ -69,15 +83,60 @@ export function App() {
                 <Route path="review" element={<ReviewPage />} />
                 <Route
                   path="practice"
-                  element={<ComingSoonPage title="AI scenario practice" module="Module 4" />}
+                  element={
+                    <ComingSoonPage
+                      title="AI Scenario Practice"
+                      icon={MessageSquare}
+                      summary="Practise real conversations with an AI partner, then see how it went."
+                      features={[
+                        {
+                          icon: Store,
+                          text: "Order at a hawker stall, chat with a neighbour or reply to your manager",
+                        },
+                        {
+                          icon: Lightbulb,
+                          text: "Get feedback on what went well and what a local might say instead",
+                        },
+                        { icon: BookOpen, text: "Practise the topics from your lessons" },
+                      ]}
+                    />
+                  }
                 />
                 <Route
                   path="buddies"
-                  element={<ComingSoonPage title="Buddy matching" module="Module 2" />}
+                  element={
+                    <ComingSoonPage
+                      title="Buddy Matching"
+                      icon={Users}
+                      summary="Get matched with someone who can show you everyday Singapore."
+                      features={[
+                        {
+                          icon: Heart,
+                          text: "Be matched on shared interests, languages and neighbourhood",
+                        },
+                        {
+                          icon: CalendarDays,
+                          text: "Arrange sessions to try everyday situations together",
+                        },
+                        { icon: CircleCheck, text: "Keep a record of the sessions you've done" },
+                      ]}
+                    />
+                  }
                 />
                 <Route
                   path="portfolio"
-                  element={<ComingSoonPage title="Integration portfolio" module="Module 3" />}
+                  element={
+                    <ComingSoonPage
+                      title="Integration Portfolio"
+                      icon={BookOpen}
+                      summary="Keep a record of your lessons, practice and buddy sessions in one place."
+                      features={[
+                        { icon: History, text: "See everything you've done, newest first" },
+                        { icon: Award, text: "Reach new tiers as your record grows" },
+                        { icon: Download, text: "Download a copy to keep" },
+                      ]}
+                    />
+                  }
                 />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="settings/change-password" element={<ChangePasswordPage />} />

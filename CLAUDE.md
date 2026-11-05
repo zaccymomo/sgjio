@@ -45,7 +45,7 @@ Seed logins: main app `newcomer@sgjio.example.com` / `UserPass123`; admin `admin
 - Never edit a migration already on `main`; add a new one. Enums are stored as VARCHAR + CHECK (`_enum()` in `models.py`), not native Postgres enums.
 - New settings go in `api/app/config.py` **and** `api/.env.example`. Never commit `.env`.
 - UI: use the Tailwind tokens (`bg-brand`, `text-ink`, `text-muted`, `text-subtle`, `border-line`, `bg-surface`, `text-danger`, `rounded-sm/md/lg`, `text-2xs`, `text-caption`) and reuse `@sgjio/ui` components (`Button`, `TextField`, `PasswordField`, `Alert`, `AuthCard`, `AppShell`, `AdminLayout`, `SignInForm`, `ErrorState`, `Placeholder`). Brand red `#F43F5E` is for highlights; errors use `danger` `#DC2626`.
-- Pages not built yet show `<Placeholder story="SCRUM-xx">`. Replace it when building that story.
+- Tabs whose module isn't built yet (Practice, Buddies, Portfolio) use `ComingSoonPage` in `web/`: a learner-facing summary and what the tab will do. Unfinished parts of built pages show `<Placeholder story="SCRUM-xx">`. Replace either when building that story.
 - Write user-facing copy in plain language; say "select", not "tap" (web app).
 
 ## Auth (already built, `api/app/auth/`)
