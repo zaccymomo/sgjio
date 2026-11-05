@@ -8,7 +8,14 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select
 
-from app.models import Lesson, LessonCompletion, LessonStatus, Topic
+from app.models import (
+    AptitudeAttempt,
+    Lesson,
+    LessonCompletion,
+    LessonStatus,
+    Topic,
+    TopicExemption,
+)
 
 USER = {"email": "user@example.com", "password": "Password123"}
 
@@ -20,11 +27,18 @@ def _topic(db, name: str, position: int = 0) -> Topic:
     return topic
 
 
-def _lesson(db, topic: Topic, title: str, status: LessonStatus = LessonStatus.PUBLISHED) -> Lesson:
+def _lesson(
+    db,
+    topic: Topic,
+    title: str,
+    status: LessonStatus = LessonStatus.PUBLISHED,
+    level: int = 1,
+) -> Lesson:
     lesson = Lesson(
         title=title,
         topic=topic,
         status=status,
+        level=level,
         published_at=datetime.now(UTC) if status == LessonStatus.PUBLISHED else None,
     )
     db.add(lesson)
@@ -38,6 +52,13 @@ def _complete(db, user, lesson: Lesson, correct: bool = True) -> None:
             user_id=user.id, lesson_id=lesson.id, best_correct=int(correct), best_scored=1
         )
     )
+    db.commit()
+
+
+def _exempt(db, user, topic: Topic, level: int) -> None:
+    db.add(AptitudeAttempt(user_id=user.id, results=[]))
+    db.flush()
+    db.add(TopicExemption(user_id=user.id, topic_id=topic.id, level=level))
     db.commit()
 
 
@@ -155,6 +176,7 @@ def test_a_topic_with_no_completions_reads_zero_out_of_available(client, db, mak
         "id": str(topic.id),
         "name": "Singlish",
         "completed": 0,
+        "exempted": 0,
         "available": 2,
     }
 
@@ -169,6 +191,27 @@ def test_completed_counts_the_users_finished_lessons(client, db, make_user):
 
     topic_progress = client.get("/api/progress").json()["topics"][0]
     assert (topic_progress["completed"], topic_progress["available"]) == (1, 3)
+
+
+def test_circle_counts_completed_and_exempted_lessons_once(client, db, make_user):
+    user = _sign_in(client, make_user)
+    topic = _topic(db, "Singlish")
+    first = _lesson(db, topic, "One", level=1)
+    _lesson(db, topic, "Two", level=2)
+    _lesson(db, topic, "Three", level=3)
+    _complete(db, user, first)
+    _exempt(db, user, topic, level=2)
+
+    body = client.get("/api/progress").json()
+    assert body["topics"][0] | {"id": None, "name": None} == {
+        "id": None,
+        "name": None,
+        "completed": 2,
+        "exempted": 1,
+        "available": 3,
+    }
+    assert (body["completed"], body["exempted"], body["available"]) == (2, 1, 3)
+    assert body["aptitude_taken"] is True
 
 
 def test_a_wrong_answer_still_counts_as_completed(client, db, make_user):

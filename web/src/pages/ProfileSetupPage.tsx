@@ -13,6 +13,7 @@ export function ProfileSetupPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const firstName = user?.name.trim().split(/\s+/)[0];
+  const next = user?.user_type === "newcomer" ? "/aptitude" : "/";
 
   return (
     <div className="flex flex-col gap-4">
@@ -29,9 +30,9 @@ export function ProfileSetupPage() {
       <LoadedProfileForm
         showProgress
         submitLabel="Continue"
-        onSaved={() => navigate("/", { replace: true })}
+        onSaved={() => navigate(next, { replace: true })}
         secondaryAction={
-          <Button type="button" variant="ghost" onClick={() => navigate("/", { replace: true })}>
+          <Button type="button" variant="ghost" onClick={() => navigate(next, { replace: true })}>
             Skip for now
           </Button>
         }

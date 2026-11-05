@@ -1,0 +1,254 @@
+# Version-controlled aptitude bank. Stable keys make re-seeding idempotent.
+questions:
+  - key: queue-at-mrt
+    topic: Public Etiquette
+    level: 1
+    prompt: A queue has formed beside an MRT train door. What should you do?
+    options:
+      - { id: back, text: Join the back of the queue, correct: true }
+      - { id: front, text: Stand at the front near the door }
+      - { id: middle, text: Step into the middle of the queue }
+  - key: chope-seat
+    topic: Hawker & Food
+    level: 1
+    prompt: At a busy hawker centre, a tissue packet has been left on an empty table. What does it usually mean?
+    options:
+      - { id: reserved, text: Someone has reserved or “choped” the seat, correct: true }
+      - { id: rubbish, text: The table definitely needs cleaning }
+      - { id: free, text: Anyone should throw it away and sit down }
+  - key: tap-same-card
+    topic: Getting Around
+    level: 2
+    prompt: When paying for an MRT trip with a contactless card, what should you do?
+    options:
+      - { id: same, text: Tap the same card or device when entering and leaving, correct: true }
+      - { id: different, text: Use a different card when leaving }
+      - { id: once, text: Tap only when entering }
+  - key: return-tray
+    topic: Hawker & Food
+    level: 2
+    prompt: After eating at a hawker centre, where should your tray and used crockery go?
+    options:
+      - { id: station, text: The appropriate tray-return station, correct: true }
+      - { id: table, text: Leave everything on the table }
+      - { id: floor, text: Place it beside a bin }
+  - key: singlish-can
+    topic: Singlish
+    level: 3
+    prompt: In everyday Singlish, what can “Can!” mean when it is used as a complete reply?
+    options:
+      - { id: "yes", text: "Yes, that is possible or acceptable", correct: true }
+      - { id: maybe, text: I am definitely unsure }
+      - { id: "no", text: "No, that cannot happen" }
+  - key: names-at-work
+    topic: Workplace
+    level: 3
+    prompt: You are unsure how a new colleague prefers to be addressed. What is the safest approach?
+    options:
+      - { id: ask, text: Ask politely what they prefer to be called, correct: true }
+      - { id: title, text: Invent a formal title for them }
+      - { id: surname, text: Always use only their surname }
+  - key: escalator-side
+    topic: Public Etiquette
+    level: 4
+    prompt: On an escalator where other people are standing to one side, what is the common local convention?
+    options:
+      - { id: left, text: Stand on the left and leave the right for people passing, correct: true }
+      - { id: right, text: Stand on the right and leave the left for passing }
+      - { id: both, text: Block both sides with bags }
+  - key: visiting-home-shoes
+    topic: Festivals
+    level: 4
+    prompt: When entering someone’s home in Singapore, what should you do if you are unsure about shoes?
+    options:
+      - { id: cues, text: Look for cues and ask the host, correct: true }
+      - { id: keep, text: Always keep them on without asking }
+      - { id: outside, text: Leave them at the lift lobby }
+  - key: kopi-o-kosong
+    topic: Hawker & Food
+    level: 5
+    prompt: What does “kopi-o kosong” order?
+    options:
+      - { id: black, text: Black coffee without sugar, correct: true }
+      - { id: milk, text: Coffee with condensed milk and sugar }
+      - { id: tea, text: Tea without milk }
+  - key: hari-raya-greeting
+    topic: Festivals
+    level: 5
+    prompt: Which is an appropriate greeting during Hari Raya Puasa?
+    options:
+      - { id: selamat, text: Selamat Hari Raya, correct: true }
+      - { id: gongxi, text: Gong Xi Fa Cai }
+      - { id: deepavali, text: Happy Deepavali }
+  - key: singlish-lah-tone
+    topic: Singlish
+    level: 1
+    prompt: In casual Singaporean speech, what does “lah” usually do at the end of a sentence?
+    options:
+      - { id: tone, text: Adds emphasis or a familiar conversational tone, correct: true }
+      - { id: question, text: Always turns it into a question }
+      - { id: past, text: Changes it to the past tense }
+  - key: singlish-can-or-not
+    topic: Singlish
+    level: 2
+    prompt: What is someone asking when they say “Can or not?”
+    options:
+      - { id: possible, text: Whether something is possible or acceptable, correct: true }
+      - { id: container, text: Whether a can is empty }
+      - { id: identity, text: What your name is }
+  - key: singlish-meh
+    topic: Singlish
+    level: 4
+    prompt: What does “meh” commonly express at the end of a Singlish question?
+    options:
+      - { id: doubt, text: Surprise or doubt about what was said, correct: true }
+      - { id: certainty, text: Complete certainty }
+      - { id: greeting, text: A formal greeting }
+  - key: singlish-bojio
+    topic: Singlish
+    level: 5
+    prompt: A friend says “bo jio” after seeing photos of your outing. What do they mean?
+    options:
+      - { id: invite, text: You did not invite me, correct: true }
+      - { id: early, text: You arrived too early }
+      - { id: bill, text: You forgot to pay the bill }
+  - key: share-hawker-table
+    topic: Hawker & Food
+    level: 3
+    prompt: A hawker-centre table has free seats but other diners are already there. What is a considerate approach?
+    options:
+      - { id: ask, text: Ask whether the free seats are available before sitting, correct: true }
+      - { id: move, text: Move their belongings without asking }
+      - { id: reserve, text: Insist the whole table is yours }
+  - key: kopi-c
+    topic: Hawker & Food
+    level: 4
+    prompt: In a traditional kopi order, what does the “C” in “kopi C” indicate?
+    options:
+      - { id: evaporated, text: Coffee made with evaporated milk, correct: true }
+      - { id: cold, text: Coffee that must be served cold }
+      - { id: cocoa, text: Coffee mixed with cocoa }
+  - key: workplace-address
+    topic: Workplace
+    level: 1
+    prompt: A colleague introduces herself using her first name. How should you address her initially?
+    options:
+      - { id: given, text: Use the name she introduced herself with, correct: true }
+      - { id: invent, text: Give her a new nickname immediately }
+      - { id: title, text: Always call her “Madam” }
+  - key: workplace-disagree
+    topic: Workplace
+    level: 2
+    prompt: You disagree with a teammate’s suggestion. What is a constructive response?
+    options:
+      - {
+          id: explain,
+          text: Explain your concern politely and suggest an alternative,
+          correct: true,
+        }
+      - { id: silent, text: Ignore every follow-up message }
+      - { id: mock, text: Mock the suggestion in the group chat }
+  - key: workplace-follow-up
+    topic: Workplace
+    level: 4
+    prompt: After a verbal discussion assigns you a task, what is a useful follow-up?
+    options:
+      - { id: recap, text: Send a short written recap of the action and deadline, correct: true }
+      - { id: assume, text: Assume everyone remembers different details }
+      - { id: broadcast, text: Forward private details to unrelated people }
+  - key: workplace-face
+    topic: Workplace
+    level: 5
+    prompt: When correcting a colleague in a group, which approach best avoids unnecessary embarrassment?
+    options:
+      - {
+          id: private,
+          text: Raise the sensitive point privately and respectfully where possible,
+          correct: true,
+        }
+      - { id: public, text: Call them out loudly before discussing the facts }
+      - { id: joke, text: Turn the mistake into a public joke }
+  - key: public-priority-seat
+    topic: Public Etiquette
+    level: 2
+    prompt: You are sitting in a priority seat and someone who needs it boards. What should you do?
+    options:
+      - { id: offer, text: Offer the seat to them, correct: true }
+      - { id: pretend, text: Pretend not to notice }
+      - { id: bag, text: Put your bag on the seat }
+  - key: public-train-boarding
+    topic: Public Etiquette
+    level: 3
+    prompt: At an MRT door, what should happen before waiting passengers board?
+    options:
+      - { id: alight, text: Let passengers alight first, correct: true }
+      - { id: rush, text: Rush in as soon as the doors open }
+      - { id: block, text: Stand directly in the middle of the doorway }
+  - key: public-quiet-hours
+    topic: Public Etiquette
+    level: 5
+    prompt: You reach home late in a high-rise block. Which action is most considerate to neighbours?
+    options:
+      - { id: quiet, text: Keep voices and avoid noisy work during late hours, correct: true }
+      - { id: drill, text: Start drilling into a wall }
+      - { id: music, text: Play music loudly in the corridor }
+  - key: cny-oranges
+    topic: Festivals
+    level: 1
+    prompt: When visiting during Chinese New Year, which item is commonly brought as a courteous gift?
+    options:
+      - { id: oranges, text: A pair of mandarin oranges, correct: true }
+      - { id: shoes, text: Muddy shoes }
+      - { id: clock, text: An alarm clock for the host }
+  - key: hari-raya-host
+    topic: Festivals
+    level: 2
+    prompt: When visiting a Muslim home for Hari Raya, what should you do before bringing food?
+    options:
+      - { id: halal, text: Check that it is halal or ask the host, correct: true }
+      - { id: alcohol, text: Bring alcohol without asking }
+      - { id: pork, text: Bring a pork dish }
+  - key: deepavali-home
+    topic: Festivals
+    level: 3
+    prompt: You are invited to a Deepavali home visit. What is a respectful approach?
+    options:
+      - { id: host, text: Follow the host’s cues and ask when unsure, correct: true }
+      - { id: rules, text: Assume every family follows exactly the same customs }
+      - { id: refuse, text: Refuse all greetings and hospitality }
+  - key: transport-queue
+    topic: Getting Around
+    level: 1
+    prompt: A queue has formed at a bus stop for your bus. What should you do?
+    options:
+      - { id: back, text: Join the back of the queue, correct: true }
+      - { id: front, text: Move directly to the front }
+      - { id: road, text: Wait in the road }
+  - key: bus-stop-button
+    topic: Getting Around
+    level: 3
+    prompt: You are on a bus and want to get off at the next stop. What should you do in good time?
+    options:
+      - { id: bell, text: Press the stop bell and prepare to alight, correct: true }
+      - { id: driver, text: Shout continuously at the driver }
+      - { id: door, text: Force the door open }
+  - key: ride-hailing-pickup
+    topic: Getting Around
+    level: 4
+    prompt: When booking a ride-hailing car at a mall, what helps the driver find you?
+    options:
+      - {
+          id: point,
+          text: Choose the correct designated pickup point and check its label,
+          correct: true,
+        }
+      - { id: vague, text: Select any location and give no details }
+      - { id: lane, text: Stand in an active traffic lane }
+  - key: last-train
+    topic: Getting Around
+    level: 5
+    prompt: You plan a late MRT journey. What should you check before leaving?
+    options:
+      - { id: times, text: The last-train time for the stations and any transfers, correct: true }
+      - { id: colour, text: Only the colour of the train }
+      - { id: weather, text: Whether the train has air-conditioning }

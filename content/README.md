@@ -66,6 +66,13 @@ Each card has **text**, and may have an **image**, **audio** or both, and a **qu
 
 Every lesson needs a title, a topic and at least one question to be published. The import tells you what is missing, and `api/tests/test_content_import.py` checks every lesson here loads and is ready.
 
+## Aptitude question bank
+
+`aptitude_questions.yaml` is the separate, version-controlled onboarding question bank.
+Each question has a stable `key`, a topic, a level from 1 to 5, answer options and exactly
+one `correct: true` option. The stable key means editing the file and running the seed again
+updates the same row instead of creating a duplicate.
+
 ## The images and audio here
 
 The illustrations are placeholders drawn to one flat style, and the audio was made with Singapore-English text-to-speech voices. Replace them freely; [STYLE.md](STYLE.md) says how to keep new ones looking like they belong together.

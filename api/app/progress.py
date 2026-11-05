@@ -34,10 +34,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from fractions import Fraction
 
-from sqlalchemy import Select, and_, func, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app import lesson_doc, media
+from app.aptitude import has_taken_quiz
+from app.exemptions import is_exempted
 from app.lesson_doc import LessonDoc
 from app.lessons import latest_version
 from app.models import (
@@ -55,7 +57,10 @@ from app.topics import visible_to_users
 class TopicProgress:
     id: uuid.UUID
     name: str
+    # Covered lessons: completed by the learner or exempted by their aptitude result.
     completed: int
+    # Exempted and not also completed, so the two parts never double count.
+    exempted: int
     available: int
 
 
@@ -75,9 +80,11 @@ class Suggestion:
 class Progress:
     topics: list[TopicProgress]
     completed: int
+    exempted: int
     available: int
     # None once every lesson available has been completed (SCRUM-6 AC6).
     suggestion: Suggestion | None
+    aptitude_taken: bool
 
 
 def _topic_rows(user_id: uuid.UUID) -> Select:
@@ -92,7 +99,12 @@ def _topic_rows(user_id: uuid.UUID) -> Select:
         select(
             Topic.id,
             Topic.name,
-            func.count(LessonCompletion.id).label("completed"),
+            func.count(Lesson.id)
+            .filter(or_(LessonCompletion.id.is_not(None), is_exempted(user_id)))
+            .label("completed"),
+            func.count(Lesson.id)
+            .filter(and_(LessonCompletion.id.is_(None), is_exempted(user_id)))
+            .label("exempted"),
             func.count(Lesson.id).label("available"),
         )
         .join(Lesson, published_lessons)
@@ -108,7 +120,13 @@ def _topic_rows(user_id: uuid.UUID) -> Select:
 def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
     """Per-topic and overall figures for one user."""
     topics = [
-        TopicProgress(id=row.id, name=row.name, completed=row.completed, available=row.available)
+        TopicProgress(
+            id=row.id,
+            name=row.name,
+            completed=row.completed,
+            exempted=row.exempted,
+            available=row.available,
+        )
         for row in db.execute(_topic_rows(user_id)).all()
     ]
     # The overall figure is the sum of the circles, so the two always agree on screen
@@ -116,8 +134,10 @@ def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
     return Progress(
         topics=topics,
         completed=sum(topic.completed for topic in topics),
+        exempted=sum(topic.exempted for topic in topics),
         available=sum(topic.available for topic in topics),
         suggestion=_suggestion(db, user_id, topics),
+        aptitude_taken=has_taken_quiz(db, user_id),
     )
 
 
@@ -138,6 +158,7 @@ def _suggestion(db: Session, user_id: uuid.UUID, topics: list[TopicProgress]) ->
                 Lesson.topic_id == topic.id,
                 Lesson.status == LessonStatus.PUBLISHED,
                 ~completed.exists(),
+                ~is_exempted(user_id),
             )
             .order_by(Lesson.position, Lesson.created_at)
         )
@@ -168,11 +189,13 @@ class TopicLesson:
     # Scored questions only: a one-option tap is not a quiz question.
     questions: int
     completed: bool
+    exempted: bool
     # The best result so far (SCRUM-16), empty until the lesson is completed.
     best_correct: int | None
     best_scored: int | None
     # When this user last finished it (SCRUM-54), empty until the lesson is completed.
     last_attempted_at: datetime | None
+    level: int
 
 
 @dataclass(frozen=True)
@@ -181,6 +204,7 @@ class TopicLessons:
     name: str
     description: str
     completed: int
+    exempted: int
     available: int
     lessons: list[TopicLesson]
 
@@ -203,7 +227,7 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
         .subquery()
     )
     rows = db.execute(
-        select(Lesson, LessonCompletion, last_finished.c.at)
+        select(Lesson, LessonCompletion, last_finished.c.at, is_exempted(user_id))
         .outerjoin(
             LessonCompletion,
             and_(LessonCompletion.lesson_id == Lesson.id, LessonCompletion.user_id == user_id),
@@ -217,7 +241,7 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
     ).all()
 
     lessons = []
-    for lesson, completion, last_finished_at in rows:
+    for lesson, completion, last_finished_at, exempted in rows:
         version = latest_version(db, lesson.id)
         # A published lesson always has a version; skip one that somehow does not, as
         # opening it would be refused (app/learning.py).
@@ -234,6 +258,7 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
                 reading_seconds=stats.reading_seconds,
                 questions=stats.scored_questions,
                 completed=completion is not None,
+                exempted=exempted,
                 best_correct=completion.best_correct if completion else None,
                 best_scored=completion.best_scored if completion else None,
                 # A completion recorded before attempts were (or seeded) has no attempt;
@@ -241,6 +266,7 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
                 last_attempted_at=(
                     (last_finished_at or completion.completed_at) if completion else None
                 ),
+                level=lesson.level,
             )
         )
 
@@ -248,7 +274,8 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
         id=topic.id,
         name=topic.name,
         description=topic.description,
-        completed=sum(1 for lesson in lessons if lesson.completed),
+        completed=sum(1 for lesson in lessons if lesson.completed or lesson.exempted),
+        exempted=sum(1 for lesson in lessons if lesson.exempted and not lesson.completed),
         available=len(lessons),
         lessons=lessons,
     )

@@ -11,12 +11,14 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from app.models import (
+    AptitudeAttempt,
     Lesson,
     LessonAttempt,
     LessonCompletion,
     LessonStatus,
     LessonVersion,
     Topic,
+    TopicExemption,
 )
 
 USER = {"email": "user@example.com", "password": "Password123"}
@@ -59,8 +61,9 @@ def _lesson(
     position: int = 0,
     status: LessonStatus = LessonStatus.PUBLISHED,
     doc: dict | None = None,
+    level: int = 1,
 ) -> Lesson:
-    lesson = Lesson(title=title, topic=topic, position=position, status=status)
+    lesson = Lesson(title=title, topic=topic, position=position, status=status, level=level)
     db.add(lesson)
     db.flush()
     if status != LessonStatus.DRAFT:
@@ -86,6 +89,13 @@ def _complete(db, user, lesson: Lesson, correct: int = 1, scored: int = 1) -> No
             user_id=user.id, lesson_id=lesson.id, best_correct=correct, best_scored=scored
         )
     )
+    db.commit()
+
+
+def _exempt(db, user, topic: Topic, level: int) -> None:
+    db.add(AptitudeAttempt(user_id=user.id, results=[]))
+    db.flush()
+    db.add(TopicExemption(user_id=user.id, topic_id=topic.id, level=level))
     db.commit()
 
 
@@ -146,6 +156,7 @@ def test_a_topic_with_no_published_lessons_is_empty_not_missing(client, db, make
         "name": "Singlish",
         "description": "",
         "completed": 0,
+        "exempted": 0,
         "available": 0,
         "lessons": [],
     }
@@ -183,6 +194,23 @@ def test_marks_completed_lessons_and_counts_them(client, db, make_user):
         None,
         None,
     )
+
+
+def test_marks_lower_level_lessons_exempted_and_counts_them(client, db, make_user):
+    user = _sign_in(client, make_user)
+    topic = _topic(db)
+    _lesson(db, topic, "Intro", position=0, level=1)
+    _lesson(db, topic, "Intermediate", position=1, level=2)
+    _lesson(db, topic, "Advanced", position=2, level=3)
+    _exempt(db, user, topic, level=2)
+
+    body = client.get(f"/api/topics/{topic.id}").json()
+    assert (body["completed"], body["exempted"], body["available"]) == (2, 2, 3)
+    assert [(lesson["level"], lesson["exempted"]) for lesson in body["lessons"]] == [
+        (1, True),
+        (2, True),
+        (3, False),
+    ]
 
 
 def test_figures_match_the_topics_circle(client, db, make_user):

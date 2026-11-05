@@ -208,9 +208,12 @@ erDiagram
 
 `python -m app.cli seed` is safe to run repeatedly. It adds:
 
-- one administrator and one Newcomer user (see README for the sign-in details)
+- one administrator, the original Newcomer, and Level 1, Level 3, Level 5 and skipped-quiz
+  Newcomers (see README for the sign-in details)
 - the six topics from the Figma home screen: Singlish, Hawker & Food, Workplace, Public Etiquette, Festivals, Getting Around, each with a description. Running it again fills in a description only where a topic has none, so an administrator's edit is kept.
 - the lessons in `content/lessons` (three per topic, eighteen in all, each a deck of cards with illustrations, some audio and two or three questions), published, plus a draft "Card gallery" showing every kind of card. Running it again only updates lessons whose files changed; see `content/README.md`.
+- the aptitude bank in `content/aptitude_questions.yaml`, with two active questions at
+  every level and stable keys, so a second seed updates rather than duplicates them
 - some completed lessons for the Newcomer account, chosen so the landing page shows every
   state a progress circle can be in: not started, in progress and complete. These are only
   added when that account has no progress at all, so re-seeding never overwrites real

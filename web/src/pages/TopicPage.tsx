@@ -57,7 +57,7 @@ function TopicView({ topicId }: { topicId: string }) {
 }
 
 function TopicDetail({ topic }: { topic: Topic }) {
-  const { name, description, completed, available, lessons } = topic;
+  const { name, description, completed, exempted, available, lessons } = topic;
   const questions = lessons.reduce((total, lesson) => total + lesson.questions, 0);
 
   return (
@@ -80,10 +80,12 @@ function TopicDetail({ topic }: { topic: Topic }) {
             <ProgressRing completed={completed} available={available} size={48} />
             <div>
               <p className="text-sm font-bold text-ink">
-                {completed} of {available} {plural(available, "lesson")} completed
+                {completed} of {available} {plural(available, "lesson")} covered
               </p>
               <p className="text-caption text-muted">
-                {questions} quiz {plural(questions, "question")} in this topic
+                {exempted > 0
+                  ? `${exempted} exempted by your topic placement`
+                  : `${questions} quiz ${plural(questions, "question")} in this topic`}
               </p>
             </div>
           </section>
@@ -107,7 +109,7 @@ function TopicDetail({ topic }: { topic: Topic }) {
 }
 
 function LessonRow({ lesson }: { lesson: TopicLesson }) {
-  const { id, title, completed } = lesson;
+  const { id, title, completed, exempted } = lesson;
   const meta = rowMeta(lesson);
 
   return (
@@ -122,7 +124,7 @@ function LessonRow({ lesson }: { lesson: TopicLesson }) {
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
       )}
     >
-      {completed ? (
+      {completed || exempted ? (
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand text-white">
           <Check className="size-4" strokeWidth={3} aria-hidden />
         </span>
@@ -148,6 +150,9 @@ const DATE = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", 
  */
 function rowMeta(lesson: TopicLesson): string {
   const { last_attempted_at, best_correct, best_scored, reading_seconds, questions } = lesson;
+  if (lesson.exempted && !lesson.completed) {
+    return `Exempted by aptitude quiz · Level ${lesson.level}`;
+  }
   if (!last_attempted_at) {
     return [
       "Not attempted yet",

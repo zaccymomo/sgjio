@@ -6,6 +6,7 @@ export type TopicProgress = {
   id: string;
   name: string;
   completed: number;
+  exempted: number;
   available: number;
 };
 
@@ -22,9 +23,11 @@ export type Suggestion = {
 export type Progress = {
   topics: TopicProgress[];
   completed: number;
+  exempted: number;
   available: number;
   /** Null once every lesson available has been completed (SCRUM-6 AC6). */
   suggestion: Suggestion | null;
+  aptitude_taken: boolean;
 };
 
 type State =

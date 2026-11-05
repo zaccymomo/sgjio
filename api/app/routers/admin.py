@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from pydantic import AwareDatetime
 from sqlalchemy.orm import Session
 
-from app import admins, insights, lessons, media, reports, topics
+from app import admins, aptitude, insights, lessons, media, reports, topics
 from app.auth.deps import require_admin
 from app.db import get_db
 from app.models import User
@@ -20,6 +20,10 @@ from app.schemas import (
     AdminInviteRequest,
     AdminOut,
     AdminsOut,
+    AptitudeBankOut,
+    AptitudeQuestionCreate,
+    AptitudeQuestionOut,
+    AptitudeQuestionUpdate,
     AssetOut,
     LessonChangeRequest,
     LessonCreateRequest,
@@ -36,6 +40,36 @@ from app.schemas import (
 )
 
 router = APIRouter(dependencies=[Depends(require_admin)])
+
+
+def _aptitude_call(action):
+    try:
+        return action()
+    except aptitude.AptitudeError as error:
+        raise HTTPException(
+            error.status_code, detail={"code": error.code, "message": error.message}
+        ) from None
+
+
+@router.get("/aptitude-questions", response_model=AptitudeBankOut)
+def aptitude_bank(db: Session = Depends(get_db)):
+    return aptitude.bank(db)
+
+
+@router.post(
+    "/aptitude-questions", response_model=AptitudeQuestionOut, status_code=status.HTTP_201_CREATED
+)
+def add_aptitude_question(body: AptitudeQuestionCreate, db: Session = Depends(get_db)):
+    return aptitude.question_out(_aptitude_call(lambda: aptitude.create_question(db, body)))
+
+
+@router.patch("/aptitude-questions/{question_id}", response_model=AptitudeQuestionOut)
+def edit_aptitude_question(
+    question_id: uuid.UUID, body: AptitudeQuestionUpdate, db: Session = Depends(get_db)
+):
+    return aptitude.question_out(
+        _aptitude_call(lambda: aptitude.update_question(db, question_id, body))
+    )
 
 
 @router.get("/ping")

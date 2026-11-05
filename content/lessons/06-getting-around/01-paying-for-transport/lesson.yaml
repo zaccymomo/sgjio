@@ -1,6 +1,7 @@
 title: Paying for Public Transport
 summary: Tap in, tap out, and what happens if you forget.
 topic: Getting Around
+level: 1
 cards:
   - image: { file: cover.png, alt: "A contactless card being tapped on a fare reader" }
     text: |-

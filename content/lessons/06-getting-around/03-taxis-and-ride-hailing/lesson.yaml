@@ -1,6 +1,7 @@
 title: Taxis and Ride-Hailing
 summary: Fares, surcharges and the tipping question.
 topic: Getting Around
+level: 3
 cards:
   - image: { file: cover.png, alt: "A taxi beside a phone showing a ride-hailing map pin" }
     text: |-
