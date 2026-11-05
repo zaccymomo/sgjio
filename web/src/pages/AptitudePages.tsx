@@ -185,6 +185,10 @@ export function AptitudeQuizPage() {
           ))}
         </div>
       </section>
+      <p className="text-sm text-muted">
+        If you don’t know, choose “I’m not sure” instead of guessing. A lucky guess could mark
+        lessons as done that you would find useful.
+      </p>
       {error && <Alert tone="error">{error}</Alert>}
       <Button loading={submitting} onClick={() => void next()}>
         Continue
