@@ -10,19 +10,23 @@ import random
 import uuid
 from collections.abc import Callable, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.exemptions import is_exempted
 from app.models import (
     MAX_LEVEL,
     MIN_LEVEL,
     AptitudeAttempt,
     AptitudeQuestion,
+    Lesson,
+    LessonStatus,
     Topic,
     TopicExemption,
     User,
     UserType,
 )
+from app.topics import visible_to_users
 
 
 class AptitudeError(ValueError):
@@ -320,12 +324,36 @@ def submit_quiz(db: Session, user: User, answers) -> AptitudeAttempt:
 
 
 def result_out(db: Session, attempt: AptitudeAttempt) -> dict:
+    """The quiz's placement in each topic it covered, with how many of the topic's lessons
+    that exempts (SCRUM-100 AC1).
+
+    The counts are worked out now, over currently published lessons, so they always agree
+    with the circles: a lesson published since at an exempted level counts (SCRUM-104 AC3).
+    A lesson the user has also completed still counts as exempted here, so the figure does
+    not shrink as they study. Topics archived since the quiz are left out, as from the
+    circles.
+    """
+    published = Lesson.status == LessonStatus.PUBLISHED
+    counts = {
+        row.topic_id: row
+        for row in db.execute(
+            select(
+                Lesson.topic_id,
+                func.count(Lesson.id).label("available"),
+                func.count(Lesson.id).filter(is_exempted(attempt.user_id)).label("exempted"),
+            )
+            .where(published)
+            .group_by(Lesson.topic_id)
+        )
+    }
     placements = list(
         db.execute(
-            select(TopicExemption, Topic)
-            .join(Topic, Topic.id == TopicExemption.topic_id)
-            .where(TopicExemption.user_id == attempt.user_id)
-            .order_by(Topic.position, Topic.name)
+            visible_to_users(
+                select(TopicExemption, Topic)
+                .join(Topic, Topic.id == TopicExemption.topic_id)
+                .where(TopicExemption.user_id == attempt.user_id)
+                .order_by(Topic.position, Topic.name)
+            )
         )
     )
     return {
@@ -337,6 +365,8 @@ def result_out(db: Session, attempt: AptitudeAttempt) -> dict:
                 "topic_id": exemption.topic_id,
                 "topic": topic.name,
                 "level": exemption.level,
+                "exempted": counts[topic.id].exempted if topic.id in counts else 0,
+                "available": counts[topic.id].available if topic.id in counts else 0,
             }
             for exemption, topic in placements
         ],

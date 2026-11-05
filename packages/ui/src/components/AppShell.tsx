@@ -1,11 +1,17 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 
 import { cn } from "../lib/cn";
 import { Logo } from "./Logo";
 
-export type NavItem = { to: string; label: string; icon: LucideIcon };
+export type NavItem = {
+  to: string;
+  label: string;
+  icon: LucideIcon;
+  /** Other paths, with the pages under them, that belong to this tab and highlight it. */
+  also?: string[];
+};
 
 /**
  * The main app's frame, from the Figma home screen: a header with the logo and location,
@@ -24,6 +30,10 @@ export function AppShell({
   location?: string;
   children: ReactNode;
 }) {
+  const { pathname } = useLocation();
+  const highlighted = (item: NavItem, isActive: boolean) =>
+    isActive || !!item.also?.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+
   return (
     <div className="min-h-dvh bg-white">
       <header className="sticky top-0 z-10 border-b border-line bg-white/95 backdrop-blur">
@@ -41,7 +51,9 @@ export function AppShell({
                 className={({ isActive }) =>
                   cn(
                     "flex items-center gap-2 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors",
-                    isActive ? "bg-brand-soft text-brand" : "text-muted hover:text-ink",
+                    highlighted(item, isActive)
+                      ? "bg-brand-soft text-brand"
+                      : "text-muted hover:text-ink",
                   )
                 }
               >
@@ -73,7 +85,7 @@ export function AppShell({
                 className={({ isActive }) =>
                   cn(
                     "flex flex-col items-center gap-1 py-2.5 text-2xs font-medium",
-                    isActive ? "text-brand" : "text-subtle hover:text-muted",
+                    highlighted(item, isActive) ? "text-brand" : "text-subtle hover:text-muted",
                   )
                 }
               >

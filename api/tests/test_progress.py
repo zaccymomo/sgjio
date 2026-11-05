@@ -178,6 +178,8 @@ def test_a_topic_with_no_completions_reads_zero_out_of_available(client, db, mak
         "completed": 0,
         "exempted": 0,
         "available": 2,
+        "level": 0,
+        "quiz_level": None,
     }
 
 
@@ -209,6 +211,9 @@ def test_circle_counts_completed_and_exempted_lessons_once(client, db, make_user
         "completed": 2,
         "exempted": 1,
         "available": 3,
+        # SCRUM-100: Levels 1 and 2 are covered, Level 3 is not.
+        "level": 2,
+        "quiz_level": 2,
     }
     assert (body["completed"], body["exempted"], body["available"]) == (2, 1, 3)
     assert body["aptitude_taken"] is True

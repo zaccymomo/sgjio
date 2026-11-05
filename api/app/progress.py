@@ -27,6 +27,9 @@ the first lesson of the first topic. With everything completed there is no sugge
 
 Learners can also search every topic's lessons by a word or phrase (SCRUM-85), by the same
 rules: published lessons only, as their latest version reads, in topics that aren't archived.
+
+Each circle also carries the level the user has reached in its topic, which the Profile
+tab's chart draws (SCRUM-100); `level_reached` explains the rule.
 """
 
 import uuid
@@ -39,10 +42,11 @@ from sqlalchemy.orm import Session
 
 from app import lesson_doc, media
 from app.aptitude import has_taken_quiz
-from app.exemptions import is_exempted
+from app.exemptions import exemption_levels, is_exempted
 from app.lesson_doc import LessonDoc
 from app.lessons import latest_version
 from app.models import (
+    MAX_LEVEL,
     Lesson,
     LessonAttempt,
     LessonCompletion,
@@ -62,6 +66,10 @@ class TopicProgress:
     # Exempted and not also completed, so the two parts never double count.
     exempted: int
     available: int
+    # The level reached in this topic, 0 to 5 (SCRUM-100), and the level the aptitude quiz
+    # gave it, or None if the quiz did not cover it (not taken, skipped, or added since).
+    level: int
+    quiz_level: int | None
 
 
 @dataclass(frozen=True)
@@ -117,8 +125,50 @@ def _topic_rows(user_id: uuid.UUID) -> Select:
     return visible_to_users(query)
 
 
+def level_reached(quiz_level: int | None, lessons: list[tuple[int, bool]]) -> int:
+    """The level a user has reached in one topic, 0 to 5 (SCRUM-100).
+
+    `lessons` is each published lesson's level and whether it is covered (completed or
+    exempted). The level is the highest one at which every lesson at that level and below
+    is covered, counting only levels that have lessons, so a level with none neither holds
+    the user back nor lifts them. It is never below what the aptitude quiz gave the topic.
+    Covering every lesson reaches Level 5, so a finished topic fills its spoke on the chart.
+    """
+    reached = 0
+    for level in sorted({level for level, _ in lessons}):
+        if not all(covered for lesson_level, covered in lessons if lesson_level == level):
+            break
+        reached = level
+    if lessons and all(covered for _, covered in lessons):
+        reached = MAX_LEVEL
+    return max(reached, quiz_level or 0)
+
+
+def _levels(db: Session, user_id: uuid.UUID, quiz: dict[uuid.UUID, int]) -> dict[uuid.UUID, int]:
+    """`level_reached` for every topic with a published lesson, by topic id."""
+    covered = or_(
+        select(LessonCompletion.id)
+        .where(LessonCompletion.lesson_id == Lesson.id, LessonCompletion.user_id == user_id)
+        .exists(),
+        is_exempted(user_id),
+    )
+    lessons: dict[uuid.UUID, list[tuple[int, bool]]] = {}
+    for row in db.execute(
+        select(Lesson.topic_id, Lesson.level, covered.label("covered")).where(
+            Lesson.status == LessonStatus.PUBLISHED
+        )
+    ):
+        lessons.setdefault(row.topic_id, []).append((row.level, row.covered))
+    return {
+        topic_id: level_reached(quiz.get(topic_id), topic_lessons)
+        for topic_id, topic_lessons in lessons.items()
+    }
+
+
 def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
     """Per-topic and overall figures for one user."""
+    quiz = exemption_levels(db, user_id)
+    levels = _levels(db, user_id, quiz)
     topics = [
         TopicProgress(
             id=row.id,
@@ -126,6 +176,8 @@ def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
             completed=row.completed,
             exempted=row.exempted,
             available=row.available,
+            level=levels.get(row.id, 0),
+            quiz_level=quiz.get(row.id),
         )
         for row in db.execute(_topic_rows(user_id)).all()
     ]

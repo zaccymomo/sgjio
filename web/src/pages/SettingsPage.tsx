@@ -1,5 +1,5 @@
 import { Alert, Button, ErrorState, Spinner, formatDate, useAuth, type UserType } from "@sgjio/ui";
-import { Heart, Languages, LogOut, MapPin, Pencil, Sparkles } from "lucide-react";
+import { ChevronLeft, Heart, Languages, LogOut, MapPin, Pencil, Sparkles } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
@@ -42,6 +42,14 @@ export function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Settings opens from the Profile tab (SCRUM-100), so it leads back there. */}
+      <Link
+        to="/profile"
+        className="inline-flex w-fit items-center gap-1 rounded-sm text-sm font-medium text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+      >
+        <ChevronLeft className="size-4" aria-hidden />
+        Profile
+      </Link>
       <h1 className="text-[22px] font-bold text-ink">Settings</h1>
 
       {profileSaved && <Alert tone="success">Your profile has been updated.</Alert>}
@@ -284,7 +292,7 @@ function Chips({ values }: { values: string[] }) {
 }
 
 /** A circle with the first letters of the first and last names. */
-function Initials({ name }: { name: string }) {
+export function Initials({ name }: { name: string }) {
   const parts = name.trim().split(/\s+/);
   const letters = (parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "");
   return (

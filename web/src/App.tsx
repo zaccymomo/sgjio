@@ -1,5 +1,5 @@
 import { AppShell, AuthProvider, RequireAuth, type NavItem } from "@sgjio/ui";
-import { BookOpen, Home, MessageSquare, Settings, Users } from "lucide-react";
+import { BookOpen, Home, MessageSquare, UserRound, Users } from "lucide-react";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 
 import { ComingSoonPage } from "./pages/ComingSoonPage";
@@ -14,6 +14,7 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 import { EditProfilePage, ProfileSetupPage } from "./pages/ProfileSetupPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { ReviewPage } from "./pages/ReviewPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SignInPage } from "./pages/SignInPage";
@@ -25,7 +26,8 @@ const NAV: NavItem[] = [
   { to: "/practice", label: "Practice", icon: MessageSquare },
   { to: "/buddies", label: "Buddies", icon: Users },
   { to: "/portfolio", label: "Portfolio", icon: BookOpen },
-  { to: "/settings", label: "Settings", icon: Settings },
+  // SCRUM-100: Profile replaced the Settings tab; Settings opens from it, so it stays lit.
+  { to: "/profile", label: "Profile", icon: UserRound, also: ["/settings"] },
 ];
 
 function SignedInLayout() {
@@ -79,6 +81,7 @@ export function App() {
                   path="portfolio"
                   element={<ComingSoonPage title="Integration portfolio" module="Module 3" />}
                 />
+                <Route path="profile" element={<ProfilePage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="settings/change-password" element={<ChangePasswordPage />} />
                 <Route path="settings/delete-account" element={<DeleteAccountPage />} />
