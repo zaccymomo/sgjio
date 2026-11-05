@@ -1,5 +1,5 @@
 import { ErrorState, Spinner, cn, formatDate, useAuth } from "@sgjio/ui";
-import { ChevronRight, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { TopicRadar } from "../components/TopicRadar";
@@ -9,8 +9,7 @@ import { Initials } from "./SettingsPage";
 /**
  * The Profile tab (SCRUM-100), which took the place of the Settings tab: who you are, and
  * the level you have reached in each topic as a radar chart that grows as you complete
- * lessons, until every spoke is full. A Newcomer's aptitude test results are a link away
- * (or the test itself, if they skipped it). Settings opens from the gear at the top.
+ * lessons, until every spoke is full. Settings opens from the gear at the top.
  */
 export function ProfilePage() {
   const { user } = useAuth();
@@ -79,53 +78,20 @@ export function ProfilePage() {
                     level: topic.level,
                   }))}
                 />
-                {/* The same figures in words, and the only view with fewer than three topics. */}
-                <ul className="mt-3 divide-y divide-line rounded-lg border border-line">
-                  {state.progress.topics.map((topic) => (
-                    <li key={topic.id}>
-                      <Link
-                        to={`/topics/${topic.id}`}
-                        className={cn(
-                          "flex items-center justify-between gap-3 p-3 text-sm",
-                          "transition-colors hover:bg-surface",
-                          "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand",
-                        )}
-                      >
-                        <span className="font-medium text-ink">{topic.name}</span>
-                        <span className="flex shrink-0 items-center gap-1.5">
-                          <span className="font-semibold text-brand">
-                            {topic.completed >= topic.available
-                              ? "Complete"
-                              : `Level ${topic.level}`}
-                          </span>
-                          <ChevronRight className="size-4 text-subtle" aria-hidden />
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                {/* The chart needs three topics to make a shape; with fewer, say it in words. */}
+                {state.progress.topics.length < 3 && (
+                  <ul className="flex flex-col gap-1 text-sm">
+                    {state.progress.topics.map((topic) => (
+                      <li key={topic.id} className="flex justify-between gap-3">
+                        <span className="text-ink">{topic.name}</span>
+                        <span className="font-semibold text-brand">Level {topic.level}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </>
           )}
-
-          {user?.user_type === "newcomer" &&
-            (state.progress.aptitude_taken ? (
-              <Link
-                to="/aptitude/results"
-                className="mt-3 inline-flex items-center gap-0.5 text-sm font-semibold text-brand hover:underline"
-              >
-                See your aptitude test results
-                <ChevronRight className="size-4" aria-hidden />
-              </Link>
-            ) : (
-              <Link
-                to="/aptitude"
-                className="mt-3 inline-flex items-center gap-0.5 text-sm font-semibold text-brand hover:underline"
-              >
-                Take the aptitude test to find your starting point
-                <ChevronRight className="size-4" aria-hidden />
-              </Link>
-            ))}
         </section>
       )}
     </div>

@@ -1,11 +1,9 @@
-import { Alert, ApiError, Button, Spinner, cn, useAuth } from "@sgjio/ui";
-import { ChevronDown } from "lucide-react";
+import { Alert, ApiError, Button, Spinner, useAuth } from "@sgjio/ui";
+import { ChevronLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
-import { LessonMark } from "../components/LessonMark";
 import { TopicRadar } from "../components/TopicRadar";
-import { useTopic } from "../lib/topic";
 import { aptitudeApi, type QuizAnswer, type QuizQuestion, type QuizResult } from "../lib/aptitude";
 
 export function AptitudeIntroPage() {
@@ -45,7 +43,11 @@ export function AptitudeIntroPage() {
           Your starting point for each topic has been saved. The aptitude test can only be taken
           once during this version of SGJio.
         </p>
-        <Link className="text-sm font-semibold text-brand" to="/aptitude/results">
+        <Link
+          className="text-sm font-semibold text-brand"
+          to="/aptitude/results"
+          state={{ back: { label: "Back" } }}
+        >
           View my topic placements
         </Link>
         <Button onClick={() => navigate("/", { replace: true })}>Go to my lessons</Button>
@@ -202,9 +204,14 @@ export function AptitudeQuizPage() {
   );
 }
 
+/** Where a link to the results came from, so the page can offer a way back (SCRUM-100). */
+export type ResultsBack = { label: string };
+
 export function AptitudeResultsPage() {
   const location = useLocation();
-  const stateResult = (location.state as { result?: QuizResult } | null)?.result;
+  const navigate = useNavigate();
+  const state = location.state as { result?: QuizResult; back?: ResultsBack } | null;
+  const stateResult = state?.result;
   const [result, setResult] = useState<QuizResult | null>(stateResult ?? null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -214,6 +221,20 @@ export function AptitudeResultsPage() {
         .then(setResult)
         .catch(() => setError("No result is available yet."));
   }, [stateResult]);
+
+  // Opened from "See why" on Home or a topic page: step back there. Straight after the
+  // aptitude test there is nowhere to go back to, so "Go to my lessons" is the way on.
+  const back = state?.back && (
+    <button
+      type="button"
+      onClick={() => navigate(-1)}
+      className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-sm text-sm font-medium text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+    >
+      <ChevronLeft className="size-4" aria-hidden />
+      {state.back.label}
+    </button>
+  );
+
   if (error) return <Alert tone="error">{error}</Alert>;
   if (!result) {
     return (
@@ -225,47 +246,50 @@ export function AptitudeResultsPage() {
   const exempted = result.placements.reduce((total, placement) => total + placement.exempted, 0);
   const available = result.placements.reduce((total, placement) => total + placement.available, 0);
   return (
-    <div className="mx-auto flex max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-6">
-      <div className="text-center">
-        <p className="text-sm font-semibold text-brand">Your topic placements</p>
-        <h1 className="mt-1 text-2xl font-bold text-ink">Your starting points are ready</h1>
-        <p className="mt-2 text-sm text-muted">
-          Introductory lessons at or below each placement are marked exempted.
-        </p>
-        {available > 0 && (
-          <p className="mt-1 text-sm text-muted">
-            The aptitude test exempted you from{" "}
-            <span className="font-semibold text-ink">
-              {exempted} of {available} {available === 1 ? "lesson" : "lessons"}
-            </span>
-            . They already count in your topic circles.
+    <div className="flex flex-col gap-4">
+      {back}
+      <div className="mx-auto flex w-full max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-6">
+        <div className="text-center">
+          <p className="text-sm font-semibold text-brand">Your topic placements</p>
+          <h1 className="mt-1 text-2xl font-bold text-ink">Your starting points are ready</h1>
+          <p className="mt-2 text-sm text-muted">
+            Introductory lessons at or below each placement are marked exempted.
           </p>
-        )}
+          {available > 0 && (
+            <p className="mt-1 text-sm text-muted">
+              The aptitude test exempted you from{" "}
+              <span className="font-semibold text-ink">
+                {exempted} of {available} {available === 1 ? "lesson" : "lessons"}
+              </span>
+              . They already count in your topic circles.
+            </p>
+          )}
+        </div>
+        {/* SCRUM-100: the level in each topic as a shape; the list below says the same in
+            words, with the counts. */}
+        <TopicRadar
+          topics={result.placements.map((placement) => ({
+            id: placement.topic_id,
+            name: placement.topic,
+            level: placement.level,
+          }))}
+        />
+        <ul className="divide-y divide-line rounded-lg border border-line">
+          {result.placements.map((placement) => (
+            <PlacementRow key={placement.topic_id} placement={placement} />
+          ))}
+        </ul>
+        <p className="text-center text-xs text-muted">
+          You can still open exempted lessons any time.
+        </p>
+        <Link
+          to="/"
+          className="flex h-11 items-center justify-center rounded-sm bg-ink px-4 text-sm font-semibold text-white"
+        >
+          Go to my lessons
+        </Link>
+        <p className="text-center text-xs text-muted">The aptitude test cannot be retaken.</p>
       </div>
-      {/* SCRUM-100: the level in each topic as a shape; the list below says the same in
-          words, with the counts. */}
-      <TopicRadar
-        topics={result.placements.map((placement) => ({
-          id: placement.topic_id,
-          name: placement.topic,
-          level: placement.level,
-        }))}
-      />
-      <ul className="divide-y divide-line rounded-lg border border-line">
-        {result.placements.map((placement) => (
-          <PlacementRow key={placement.topic_id} placement={placement} />
-        ))}
-      </ul>
-      <p className="text-center text-xs text-muted">
-        You can still open exempted lessons any time.
-      </p>
-      <Link
-        to="/"
-        className="flex h-11 items-center justify-center rounded-sm bg-ink px-4 text-sm font-semibold text-white"
-      >
-        Go to my lessons
-      </Link>
-      <p className="text-center text-xs text-muted">The aptitude test cannot be retaken.</p>
     </div>
   );
 }
@@ -273,138 +297,34 @@ export function AptitudeResultsPage() {
 type Placement = QuizResult["placements"][number];
 
 /**
- * One topic in the results (SCRUM-100): how many of its lessons the quiz exempted (AC1), or
- * that the learner starts from its first lesson (AC2). Selecting it opens the topic's
- * lessons in place, marked as on the topic page, with where to start.
+ * One topic in the results (SCRUM-100): how many of its lessons the aptitude test exempted
+ * (AC1), or that the learner starts from its first lesson (AC2). The topic's name opens it.
  */
 function PlacementRow({ placement }: { placement: Placement }) {
-  const [open, setOpen] = useState(false);
   const { topic_id, topic, level, exempted, available } = placement;
-  const panelId = `placement-${topic_id}`;
+  const lessons = (count: number) => `${count} ${count === 1 ? "lesson" : "lessons"}`;
 
   const [count, detail] =
     available === 0
       ? ["No lessons yet", "Its lessons will appear when they're published"]
       : exempted === 0
-        ? ["None exempted", "You'll start from the first lesson"]
+        ? ["No lessons exempted", "You'll start from the first lesson"]
         : exempted === available
-          ? [`All ${available} exempted`, `Up to Level ${level}`]
-          : [`${exempted} of ${available} exempted`, `Up to Level ${level}`];
+          ? [`All ${lessons(available)} exempted`, `Up to Level ${level}`]
+          : [`${exempted} of ${lessons(available)} exempted`, `Up to Level ${level}`];
 
-  const summary = (
-    <>
+  return (
+    <li className="flex items-center justify-between gap-3 p-3 text-sm">
       <span className="flex min-w-0 flex-col">
-        <span className="font-medium text-ink">{topic}</span>
+        <Link
+          to={`/topics/${topic_id}`}
+          className="w-fit rounded-sm font-medium text-ink underline-offset-2 hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+        >
+          {topic}
+        </Link>
         <span className="text-caption text-muted">{detail}</span>
       </span>
-      <span className="flex shrink-0 items-center gap-1.5">
-        <span className="font-semibold text-brand">{count}</span>
-        {available > 0 && (
-          <ChevronDown
-            className={cn("size-4 text-subtle transition-transform", open && "rotate-180")}
-            aria-hidden
-          />
-        )}
-      </span>
-    </>
-  );
-
-  return (
-    <li className="text-sm">
-      {available === 0 ? (
-        <div className="flex items-center justify-between gap-3 p-3">{summary}</div>
-      ) : (
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={panelId}
-          onClick={() => setOpen((value) => !value)}
-          className={cn(
-            // Buttons get the arrow by default; this one opens the row, so it shows the hand.
-            "flex w-full cursor-pointer items-center justify-between gap-3 p-3 text-left",
-            "transition-colors hover:bg-surface",
-            "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand",
-          )}
-        >
-          {summary}
-        </button>
-      )}
-      {open && (
-        <div id={panelId} className="border-t border-line bg-surface p-3">
-          <PlacementLessons topicId={topic_id} />
-        </div>
-      )}
+      <span className="shrink-0 text-right font-semibold text-brand">{count}</span>
     </li>
-  );
-}
-
-/** A topic's lessons, lowest level first as on its page, loaded when its row is opened. */
-function PlacementLessons({ topicId }: { topicId: string }) {
-  const { state, reload } = useTopic(topicId);
-
-  if (state.status === "loading") {
-    return (
-      <div className="flex justify-center py-3 text-brand">
-        <Spinner className="size-5" label="Loading this topic's lessons" />
-      </div>
-    );
-  }
-  if (state.status === "unavailable")
-    return <p className="text-caption text-muted">{state.message}</p>;
-  if (state.status === "error") {
-    return (
-      <p className="text-caption text-muted">
-        {state.message}{" "}
-        <button
-          type="button"
-          onClick={reload}
-          className="cursor-pointer font-semibold text-brand underline"
-        >
-          Try again
-        </button>
-      </p>
-    );
-  }
-
-  const { lessons } = state.topic;
-  const start = lessons.find((lesson) => !lesson.completed && !lesson.exempted);
-  return (
-    <div className="flex flex-col gap-2">
-      <ul className="flex flex-col gap-2">
-        {lessons.map((lesson) => (
-          <li key={lesson.id}>
-            <Link
-              to={`/lessons/${lesson.id}`}
-              className={cn(
-                "flex items-center gap-3 rounded-lg border bg-white px-3 py-2.5",
-                lesson === start ? "border-ink" : "border-line",
-                "transition-colors hover:border-brand/40 hover:bg-brand-soft/40",
-                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
-              )}
-            >
-              <LessonMark completed={lesson.completed} exempted={lesson.exempted} />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="text-sm font-semibold text-ink">{lesson.title}</span>
-                <span className="text-caption text-subtle">
-                  Level {lesson.level}
-                  {lesson.completed ? " · Completed" : lesson.exempted ? " · Exempted" : ""}
-                </span>
-              </span>
-              {lesson === start && (
-                <span className="shrink-0 rounded-sm bg-brand-soft px-1.5 py-0.5 text-2xs font-semibold text-brand">
-                  Start here
-                </span>
-              )}
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <Link
-        to={`/topics/${topicId}`}
-        className="self-start text-caption font-semibold text-brand hover:underline"
-      >
-        Open this topic
-      </Link>
-    </div>
   );
 }

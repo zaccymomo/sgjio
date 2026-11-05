@@ -95,6 +95,7 @@ function TopicDetail({ topic }: { topic: Topic }) {
                     {/* SCRUM-100: back to the quiz results that explain it. */}
                     <Link
                       to="/aptitude/results"
+                      state={{ back: { label: name } }}
                       className="font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
                     >
                       See why
