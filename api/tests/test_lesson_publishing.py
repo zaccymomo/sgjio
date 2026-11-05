@@ -42,7 +42,7 @@ def topic(db) -> Topic:
 
 
 def _create(client, topic: Topic | None, title="Ordering kopi", doc=READY_DOC) -> dict:
-    body = {"title": title, "doc": doc, "topic_id": str(topic.id) if topic else None}
+    body = {"title": title, "doc": doc, "topic_id": str(topic.id) if topic else None, "level": 1}
     response = client.post(URL, json=body)
     assert response.status_code == 201
     return response.json()

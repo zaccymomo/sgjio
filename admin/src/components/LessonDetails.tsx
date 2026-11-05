@@ -1,30 +1,37 @@
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { cn } from "@sgjio/ui";
-import { useId } from "react";
+import { Check, ChevronDown, Lock } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import type { Topic } from "../lib/content";
 import { MAX_SUMMARY, MAX_TITLE } from "../lib/lessons";
+import { LEVEL_DESCRIPTIONS, LEVELS, levelLabel, type Level } from "../lib/levels";
 
 const NO_TOPIC = "";
 
 /**
  * A lesson's own details at the top of the editor (SCRUM-19, SCRUM-64): its title, written
- * large like a document's, its topic and a one-line summary. Any may be empty in a draft;
- * the title and topic are needed to publish (SCRUM-56).
+ * large like a document's, its topic, its level and a one-line summary. Any but the level
+ * may be empty in a draft; the title and topic are needed to publish (SCRUM-56). The level
+ * is needed before a new lesson is saved at all, and is fixed once published (SCRUM-103).
  */
 export function LessonDetails({
   title,
   summary,
   topicId,
+  level,
   topics,
   savedTopicId,
   published,
   titleError,
   topicError,
+  levelError,
   onChange,
 }: {
   title: string;
   summary: string;
   topicId: string | null;
+  level: number | null;
   /** Every topic, archived ones included, in order. */
   topics: Topic[];
   /** The topic the lesson is saved in, offered even if it has since been archived. */
@@ -33,7 +40,13 @@ export function LessonDetails({
   published: boolean;
   titleError?: string;
   topicError?: string;
-  onChange: (change: { title?: string; summary?: string; topic_id?: string | null }) => void;
+  levelError?: string;
+  onChange: (change: {
+    title?: string;
+    summary?: string;
+    topic_id?: string | null;
+    level?: number;
+  }) => void;
 }) {
   const titleId = useId();
   const summaryId = useId();
@@ -64,6 +77,12 @@ export function LessonDetails({
           savedTopicId={savedTopicId}
           published={published}
           error={topicError}
+        />
+        <LevelSelect
+          value={level}
+          onChange={(next) => onChange({ level: next })}
+          locked={published}
+          error={levelError}
         />
         <label htmlFor={summaryId} className="sr-only">
           Summary
@@ -137,5 +156,110 @@ function TopicSelect({
         ))}
       </select>
     </span>
+  );
+}
+
+/**
+ * The lesson's level, 1 to 5 (SCRUM-103). A new lesson starts with none, so the
+ * administrator has to choose. It can change until the lesson is first published; after
+ * that it is shown but fixed, so learners' exemptions never shift.
+ *
+ * A menu rather than a native select, so each level can show its description without the
+ * control growing as wide as the longest one.
+ */
+function LevelSelect({
+  value,
+  onChange,
+  locked,
+  error,
+}: {
+  value: number | null;
+  onChange: (level: number) => void;
+  locked: boolean;
+  error?: string;
+}) {
+  const description = value ? LEVEL_DESCRIPTIONS[value as Level] : undefined;
+  const [open, setOpen] = useState(false);
+  const current = useRef<HTMLDivElement>(null);
+  // Radix focuses the first level on opening; start from the lesson's own instead, so
+  // pressing Enter twice from the keyboard never changes the level by accident.
+  useEffect(() => {
+    if (!open) return;
+    const frame = requestAnimationFrame(() => current.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+  if (locked && value !== null) {
+    return (
+      <span
+        className="flex h-8 items-center gap-1.5 rounded-sm bg-black/5 px-2 text-sm font-medium text-ink"
+        title={`${description}. A published lesson's level is fixed, so learners' exemptions don't change. To offer it at another level, write a new lesson.`}
+      >
+        <Lock className="size-3.5 text-muted" aria-hidden />
+        {levelLabel(value)}
+        <span className="sr-only">, fixed because the lesson has been published</span>
+      </span>
+    );
+  }
+  return (
+    <DropdownMenu.Root modal={false} open={open} onOpenChange={setOpen}>
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          aria-label={value ? `Level: ${levelLabel(value)}. Change level` : "Choose a level"}
+          aria-invalid={error ? true : undefined}
+          title={
+            error ??
+            (description
+              ? `${description}. You can change the level until the lesson is published.`
+              : "Choose how advanced this lesson is. You can change it until it's published.")
+          }
+          className={cn(
+            "flex h-8 items-center gap-1 rounded-sm border bg-white px-2 text-sm font-medium outline-none focus-visible:ring-2",
+            error
+              ? "border-danger text-danger focus-visible:ring-danger/20"
+              : "border-line text-ink focus-visible:border-ink focus-visible:ring-ink/10",
+            value === null && !error && "text-muted",
+          )}
+        >
+          {value ? levelLabel(value) : "Choose a level"}
+          <ChevronDown className="size-3.5 text-muted" aria-hidden />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="start"
+          sideOffset={4}
+          collisionPadding={8}
+          className="z-50 w-80 rounded-md border border-line bg-white p-1 shadow-lg"
+        >
+          <DropdownMenu.Label className="px-2.5 pt-1.5 pb-1 text-2xs text-muted">
+            How advanced is this lesson? You can change it until it&rsquo;s published.
+          </DropdownMenu.Label>
+          <DropdownMenu.RadioGroup
+            value={value ? String(value) : ""}
+            onValueChange={(next) => onChange(Number(next))}
+          >
+            {LEVELS.map((level) => (
+              <DropdownMenu.RadioItem
+                key={level}
+                ref={level === value ? current : undefined}
+                value={String(level)}
+                className="flex cursor-pointer items-start gap-2 rounded-sm px-2.5 py-2 outline-none data-[highlighted]:bg-surface"
+              >
+                <span className="flex size-4 shrink-0 items-center justify-center pt-0.5">
+                  <DropdownMenu.ItemIndicator>
+                    <Check className="size-4 text-ink" aria-hidden />
+                  </DropdownMenu.ItemIndicator>
+                </span>
+                <span className="flex flex-col">
+                  <span className="text-sm font-semibold text-ink">{levelLabel(level)}</span>
+                  <span className="text-caption text-muted">{LEVEL_DESCRIPTIONS[level]}</span>
+                </span>
+              </DropdownMenu.RadioItem>
+            ))}
+          </DropdownMenu.RadioGroup>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }

@@ -20,7 +20,7 @@ lessons/02-hawker-food/01-ordering-kopi/
   kopi-o-kosong.mp3    audio its cards use (MP3, M4A, WAV or Ogg; keep it under 20 seconds)
 ```
 
-Number prefixes set the order new lessons take in their topic. After that, the order is whatever administrators set in the portal; files never move a lesson.
+Lessons are listed by level first (see `level` below); within a level, number prefixes set the order new lessons take in their topic. After that, the order is whatever administrators set in the portal; files never move a lesson.
 
 ## lesson.yaml
 
@@ -28,7 +28,7 @@ Number prefixes set the order new lessons take in their topic. After that, the o
 title: Ordering at a Local Hawker Centre
 summary: Chope a seat first, then order your kopi in code. # one line, up to 160 characters
 topic: Hawker & Food # created at the end if it doesn't exist yet
-level: 1 # 1 to 5; learners see lessons at their current level
+level: 1 # 1 to 5 (see below); left out, a new lesson is Level 1
 # publish: false            # keep it a draft, e.g. for a lesson still being written
 cards:
   - image: { file: cover.png, alt: "Two cups of kopi on a marble kopitiam table" }
@@ -61,6 +61,7 @@ Each card has **text**, and may have an **image**, **audio** or both, and a **qu
 - **A question** has 1 to 4 options and an `explanation` shown after answering. A scored question needs at least 2 distinct options with exactly one marked `correct: true`; every published lesson needs at least one scored question. A question with a single option needs no marking: it's a tap that keeps learners doing something, and isn't scored. Without a blank, the options are shown below the text.
 - **`why_not`** on a wrong option is shown when a learner picks it: why it isn't the norm. Worth writing for the tempting ones.
 - **Images** need `alt` text describing them, and **audio** a `transcript`.
+- **`level`** is how advanced the lesson is, from 1 (essentials for your first weeks) to 5 (insider knowledge); the admin portal describes each one. The aptitude quiz exempts learners from a topic's lessons up to the level they reach there. A file can change a lesson's level only until it is first published; after that it is fixed, and the import says so if the file disagrees.
 - **Put text in quotes** when it is on the same line as its name, as above. Without them, a comma or a colon in the text ends it early, and the import says something is wrong. Multi-line text after `|-` needs no quotes.
 
 Every lesson needs a title, a topic and at least one question to be published. The import tells you what is missing, and `api/tests/test_content_import.py` checks every lesson here loads and is ready.

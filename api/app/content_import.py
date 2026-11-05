@@ -12,6 +12,10 @@ Lessons can be written without the admin portal: one folder per lesson, holding 
 - files hold a lesson's content: title, summary and cards. Where a lesson sits (its topic
   and position) is set only when it is first created, so loading files never undoes an
   administrator's reordering. A missing topic is created, at the end.
+- a file may set the lesson's `level` (1 to 5, SCRUM-103). Like the admin portal, it can
+  change a lesson's level only until the lesson is first published; after that a
+  different level is reported and the lesson keeps its own. A file without one leaves the
+  level alone (Level 1 for a new lesson).
 - ids the file leaves out are derived from the key, so loading an unchanged file changes
   nothing at all. Images and audio are stored once however often they are loaded.
 - with `publish`, a lesson is published when its content is new or changed, unless the file
@@ -31,7 +35,7 @@ from sqlalchemy.orm import Session
 
 from app import lessons, media
 from app.lesson_doc import LessonDoc
-from app.models import Lesson, LessonStatus, Topic
+from app.models import MAX_LEVEL, MIN_LEVEL, Lesson, LessonStatus, Topic
 from app.problems import ContentProblem
 from app.topics import next_topic_position
 
@@ -49,7 +53,7 @@ class LessonFile(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     summary: str = Field(default="", max_length=160)
     topic: str | None = Field(default=None, max_length=80)
-    level: int = Field(default=1, ge=1, le=5)
+    level: int | None = Field(default=None, ge=MIN_LEVEL, le=MAX_LEVEL)
     publish: bool = True
     cards: list[dict] = Field(default_factory=list)
 
@@ -189,26 +193,27 @@ def import_file(db: Session, path: Path, root: Path, publish: bool = False) -> R
             draft=draft,
             status=LessonStatus.DRAFT,
             position=lessons.next_lesson_position(db, topic.id if topic else None),
-            level=data.level,
+            level=data.level or MIN_LEVEL,
         )
         db.add(lesson)
         result.action = "created"
-    elif (lesson.title, lesson.summary, lesson.draft, lesson.level) != (
-        data.title,
-        data.summary,
-        draft,
-        data.level,
-    ):
-        lesson.title, lesson.summary, lesson.draft, lesson.level = (
-            data.title,
-            data.summary,
-            draft,
-            data.level,
-        )
+    elif (lesson.title, lesson.summary, lesson.draft) != (data.title, data.summary, draft):
+        lesson.title, lesson.summary, lesson.draft = data.title, data.summary, draft
         result.action = "updated"
     lesson.key = key
     db.flush()
     latest = lessons.latest_version(db, lesson.id)
+    if data.level is not None and data.level != lesson.level:
+        if latest is None:
+            # Like the editor: a new level puts the draft at the end of that level.
+            lesson.level = data.level
+            lesson.position = lessons.next_lesson_position(db, lesson.topic_id)
+            result.action = "updated" if result.action == "unchanged" else result.action
+        else:
+            result.problems.append(
+                f"level not changed: it stays at Level {lesson.level}, because a published "
+                "lesson's level is fixed"
+            )
     lesson.has_unpublished_changes = latest is not None and (
         (lesson.title, lesson.summary, lesson.draft) != (latest.title, latest.summary, latest.doc)
     )
@@ -220,7 +225,7 @@ def import_file(db: Session, path: Path, root: Path, publish: bool = False) -> R
     ):
         blockers = lessons.blockers_of(db, lesson)
         if blockers:
-            result.problems = [f"not published: {issue.message}" for issue in blockers]
+            result.problems += [f"not published: {issue.message}" for issue in blockers]
         else:
             detail = lessons.publish_lesson(db, lesson.id, lesson.updated_at)
             result.published = True

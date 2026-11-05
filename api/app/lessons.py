@@ -6,8 +6,11 @@ Routes stay thin: they call these functions and turn a ContentProblem into an HT
 - the list has every lesson of every status, without its cards, ordered as the admin
   portal shows it: by topic order, then by order within the topic. Lessons with no topic
   come last, and lessons in archived topics are included.
-- lessons are ordered within their topic, and lessons with no topic among themselves.
-  Moving a lesson to another topic belongs to the lesson editor, not to reordering.
+- lessons are ordered within their topic, and lessons with no topic among themselves: by
+  level first (Level 1 at the top, as learners' topic pages do, SCRUM-104 AC4), then by the order
+  administrators set within each level. A reorder can only move a lesson among lessons at
+  its own level. Moving a lesson to another topic belongs to the lesson editor, not to
+  reordering.
 - a reorder must list every lesson in that topic (or with no topic) exactly once, of any
   status, and say which order it replaces; a page that was out of date is refused rather
   than guessed at.
@@ -25,6 +28,8 @@ Routes stay thin: they call these functions and turn a ContentProblem into an HT
 - a lesson can be moved into any active topic, but not into an archived one. A lesson that
   is already in an archived topic keeps saving there. A lesson that has been published
   always keeps a topic.
+- a lesson's level (1 to 5) is chosen when it is created and can change until it is first
+  published, then never again (SCRUM-103): users' exemptions depend on it (SCRUM-104).
 """
 
 import uuid
@@ -36,15 +41,25 @@ from sqlalchemy.orm import Session
 
 from app import lesson_doc, media
 from app.lesson_doc import Issue, LessonDoc, Stats
-from app.models import Lesson, LessonReport, LessonStatus, LessonVersion, ReportStatus, Topic
+from app.models import (
+    MIN_LEVEL,
+    Lesson,
+    LessonReport,
+    LessonStatus,
+    LessonVersion,
+    ReportStatus,
+    Topic,
+)
 from app.problems import (
     ContentProblem,
     check_reorder,
     lesson_has_blockers,
     lesson_not_deletable,
     lesson_not_found,
+    lesson_order_mixes_levels,
     lesson_out_of_date,
     lesson_status_conflict,
+    level_locked,
     topic_archived,
     topic_not_found,
     topic_required,
@@ -60,6 +75,7 @@ class LessonSummary:
     status: LessonStatus
     updated_at: datetime
     position: int
+    level: int
     deletable: bool
     has_unpublished_changes: bool
     # The latest version's number, or None for a lesson never published.
@@ -70,7 +86,6 @@ class LessonSummary:
     cover_asset_id: uuid.UUID | None
     # Problems learners reported that nobody has dealt with yet (SCRUM-83 AC4).
     open_reports: int
-    level: int
 
 
 @dataclass(frozen=True)
@@ -92,6 +107,7 @@ class LessonDetail:
     published_at: datetime | None
     withdrawn_at: datetime | None
     position: int
+    level: int
     created_at: datetime
     updated_at: datetime
     deletable: bool
@@ -138,6 +154,7 @@ def _detail(db: Session, lesson: Lesson) -> LessonDetail:
         published_at=lesson.published_at,
         withdrawn_at=lesson.withdrawn_at,
         position=lesson.position,
+        level=lesson.level,
         created_at=lesson.created_at,
         updated_at=lesson.updated_at,
         deletable=latest is None,
@@ -182,6 +199,7 @@ def list_lessons(db: Session) -> list[LessonSummary]:
             Topic.position.nulls_last(),
             Topic.created_at,
             Topic.id,
+            Lesson.level,
             Lesson.position,
             Lesson.created_at,
             Lesson.id,
@@ -199,6 +217,7 @@ def list_lessons(db: Session) -> list[LessonSummary]:
                 status=lesson.status,
                 updated_at=lesson.updated_at,
                 position=lesson.position,
+                level=lesson.level,
                 deletable=version is None,
                 has_unpublished_changes=lesson.has_unpublished_changes,
                 version=version,
@@ -206,7 +225,6 @@ def list_lessons(db: Session) -> list[LessonSummary]:
                 questions=sum(1 for card in cards if card.get("question")),
                 cover_asset_id=_cover(lesson.draft),
                 open_reports=open_reports,
-                level=lesson.level,
             )
         )
     return summaries
@@ -238,21 +256,26 @@ def reorder_lessons(
     """Put one topic's lessons (or those with no topic) in the order `ids`, replacing the
     order `previous_ids`.
 
-    See check_reorder for what is refused. The group's lessons are locked first, so two
-    reorders of the same topic run one after the other instead of interleaving.
+    See check_reorder for what is refused; the new order must also keep the levels in order
+    (lesson_order_mixes_levels), since lessons are listed by level first. The group's
+    lessons are locked first, so two reorders of the same topic run one after the other
+    instead of interleaving.
     """
     if topic_id is not None and db.get(Topic, topic_id) is None:
         raise topic_not_found()
-    current = list(
-        db.scalars(
-            select(Lesson.id)
-            .where(_in_group(topic_id))
-            .order_by(Lesson.position, Lesson.created_at, Lesson.id)
-            .with_for_update()
-        )
-    )
+    rows = db.execute(
+        select(Lesson.id, Lesson.level)
+        .where(_in_group(topic_id))
+        .order_by(Lesson.level, Lesson.position, Lesson.created_at, Lesson.id)
+        .with_for_update()
+    ).all()
+    current = [row.id for row in rows]
+    levels = {row.id: row.level for row in rows}
     try:
         check_reorder(ids, previous_ids, current)
+        in_order = [levels[lesson_id] for lesson_id in ids]
+        if in_order != sorted(in_order):
+            raise lesson_order_mixes_levels()
     except ContentProblem:
         db.rollback()
         raise
@@ -307,6 +330,7 @@ def create_lesson(
     topic_id: uuid.UUID | None = None,
     doc: LessonDoc | None = None,
     key: str | None = None,
+    level: int = MIN_LEVEL,
 ) -> LessonDetail:
     """A new draft, at the end of its topic (or of the lessons with no topic)."""
     if topic_id is not None:
@@ -319,6 +343,7 @@ def create_lesson(
         draft=prepare_doc(db, doc or LessonDoc()),
         status=LessonStatus.DRAFT,
         position=next_lesson_position(db, topic_id),
+        level=level,
     )
     db.add(lesson)
     db.commit()
@@ -338,8 +363,10 @@ def _for_change(db: Session, lesson_id: uuid.UUID, expected_updated_at: datetime
 def update_lesson(
     db: Session, lesson_id: uuid.UUID, expected_updated_at: datetime, changes: dict
 ) -> LessonDetail:
-    """Change the draft's `title`, `summary`, `doc` or the lesson's `topic_id`: whichever
-    `changes` holds.
+    """Change the draft's `title`, `summary`, `doc` or the lesson's `topic_id` or `level`:
+    whichever `changes` holds. A different level is refused once the lesson has been
+    published (level_locked); sending the level it already has is fine. A new level puts
+    the lesson at the end of that level in its topic.
 
     A save that changes nothing leaves "last updated" alone, since the ORM only writes (and
     only bumps updated_at) when a value differs. A new topic puts the lesson at the end of
@@ -348,6 +375,11 @@ def update_lesson(
     """
     try:
         lesson = _for_change(db, lesson_id, expected_updated_at)
+        if "level" in changes and changes["level"] != lesson.level:
+            if latest_version(db, lesson.id) is not None:
+                raise level_locked()
+            lesson.level = changes["level"]
+            lesson.position = next_lesson_position(db, lesson.topic_id)
         if "topic_id" in changes and changes["topic_id"] != lesson.topic_id:
             topic_id = changes["topic_id"]
             if topic_id is None:

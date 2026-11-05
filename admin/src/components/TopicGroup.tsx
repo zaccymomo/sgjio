@@ -11,8 +11,9 @@ import {
 import { useId } from "react";
 
 import type { LessonSummary, Topic } from "../lib/content";
-import { lessonTitle, type Group } from "../lib/filter";
+import { byLevel, lessonTitle, withLevelReordered, type Group } from "../lib/filter";
 import { formatDate, plural, topicSummary } from "../lib/format";
+import { LEVEL_DESCRIPTIONS, LEVELS, levelLabel, type Level } from "../lib/levels";
 import { DragHandle } from "./DragHandle";
 import { LessonRow } from "./LessonRow";
 import { lessonMenuGroups, moveItems, type LessonActions } from "./menuItems";
@@ -143,6 +144,7 @@ export function TopicGroup({
               onAdd={actions && (() => actions.edit(topic, "description"))}
             />
           )}
+          {topic && <LevelCounts topic={topic} />}
           {allLessons.length === 0 ? (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 pr-4 pl-12 text-sm text-muted">
               <p>No lessons in this topic yet.</p>
@@ -163,49 +165,64 @@ export function TopicGroup({
                   Showing {lessons.length} of {plural(allLessons.length, "lesson")}
                 </p>
               )}
-              {lessonReorder ? (
-                <SortableList
-                  items={lessons}
-                  getId={(lesson) => lesson.id}
-                  getLabel={lessonTitle}
-                  disabled={lessonReorder.disabled}
-                  onReorder={lessonReorder.onReorder}
-                  onDragChange={lessonReorder.onDragChange}
-                  className={lessonListClass}
-                  itemClassName="bg-surface"
-                  renderItem={(lesson, lessonControls) => (
-                    <LessonRow
-                      lesson={lesson}
-                      handle={<DragHandle reorder={lessonControls} />}
-                      menu={
-                        <RowMenu
-                          name={lessonTitle(lesson)}
-                          groups={lessonMenuGroups(lesson, lessonControls, lessonActions)}
-                          moveKey={lessonControls.moveKey}
-                        />
+              {byLevel(lessons).map((run) => (
+                <section key={run.level} aria-label={levelLabel(run.level)}>
+                  <h3
+                    className="pt-3 pb-1 pl-12 text-2xs font-bold tracking-wide text-muted uppercase"
+                    title={LEVEL_DESCRIPTIONS[run.level as Level]}
+                  >
+                    {levelLabel(run.level)}
+                  </h3>
+                  {lessonReorder ? (
+                    <SortableList
+                      items={run.lessons}
+                      getId={(lesson) => lesson.id}
+                      getLabel={lessonTitle}
+                      disabled={lessonReorder.disabled}
+                      onReorder={(ids, previousIds) =>
+                        lessonReorder.onReorder(
+                          withLevelReordered(allLessons, ids),
+                          withLevelReordered(allLessons, previousIds),
+                        )
                       }
+                      onDragChange={lessonReorder.onDragChange}
+                      className={lessonListClass}
+                      itemClassName="bg-surface"
+                      renderItem={(lesson, lessonControls) => (
+                        <LessonRow
+                          lesson={lesson}
+                          handle={<DragHandle reorder={lessonControls} />}
+                          menu={
+                            <RowMenu
+                              name={lessonTitle(lesson)}
+                              groups={lessonMenuGroups(lesson, lessonControls, lessonActions)}
+                              moveKey={lessonControls.moveKey}
+                            />
+                          }
+                        />
+                      )}
+                      renderOverlay={(lesson) => <LessonOverlay lesson={lesson} />}
                     />
-                  )}
-                  renderOverlay={(lesson) => <LessonOverlay lesson={lesson} />}
-                />
-              ) : (
-                <ul className={lessonListClass}>
-                  {lessons.map((lesson) => (
-                    <li key={lesson.id}>
-                      <LessonRow
-                        lesson={lesson}
-                        handle={handleSpace}
-                        menu={
-                          <RowMenu
-                            name={lessonTitle(lesson)}
-                            groups={lessonMenuGroups(lesson, undefined, lessonActions)}
+                  ) : (
+                    <ul className={lessonListClass}>
+                      {run.lessons.map((lesson) => (
+                        <li key={lesson.id}>
+                          <LessonRow
+                            lesson={lesson}
+                            handle={handleSpace}
+                            menu={
+                              <RowMenu
+                                name={lessonTitle(lesson)}
+                                groups={lessonMenuGroups(lesson, undefined, lessonActions)}
+                              />
+                            }
                           />
-                        }
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              ))}
             </>
           )}
         </div>
@@ -289,6 +306,35 @@ function TopicDescription({ topic, onAdd }: { topic: Topic; onAdd?: () => void }
           Add a description
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * Published lessons at each level (SCRUM-103 AC5). Zeros are shown too: a level with
+ * nothing published is a gap the aptitude quiz can exempt learners across.
+ */
+function LevelCounts({ topic }: { topic: Topic }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pt-2 pr-4 pb-1 pl-12 text-caption text-muted">
+      <span className="font-semibold">Published by level:</span>
+      <ul className="flex flex-wrap gap-1.5">
+        {LEVELS.map((level, index) => {
+          const count = topic.published_by_level[index] ?? 0;
+          return (
+            <li
+              key={level}
+              title={LEVEL_DESCRIPTIONS[level]}
+              className={cn(
+                "rounded-full px-2 py-px",
+                count > 0 ? "bg-white font-semibold text-ink ring-1 ring-line" : "text-subtle",
+              )}
+            >
+              {levelLabel(level)}: {count}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

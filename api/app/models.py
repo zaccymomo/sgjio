@@ -279,10 +279,11 @@ class Lesson(Base):
     `key` names a lesson loaded from a file in content/, so loading the file again updates
     that lesson instead of adding another.
 
-    `level` (1 to 5) decides who sees the lesson (SCRUM-104). It is set when the lesson is
-    created and never changed (SCRUM-103), and, like the topic, is not versioned. The
-    database refuses a lesson without one; rows built in Python start at Level 1 until
-    the admin editor asks for it (SCRUM-103 AC1).
+    `level` (1 to 5) decides which users are exempted from the lesson (SCRUM-104); every
+    user still sees it. It is chosen when the lesson is created and can change only until
+    the lesson is first published, so nobody's exemptions shift afterwards (SCRUM-103).
+    Like the topic, it is not versioned. The admin portal must name it when creating a
+    lesson; rows built in Python start at Level 1.
     """
 
     __tablename__ = "lessons"

@@ -252,7 +252,7 @@ def test_a_card_with_an_image_and_audio(admin):
         "audio": {"asset_id": audio["id"], "transcript": "Hello!"},
     }
 
-    response = admin.post("/api/admin/lessons", json={"doc": {"cards": [card]}})
+    response = admin.post("/api/admin/lessons", json={"level": 1, "doc": {"cards": [card]}})
 
     assert response.status_code == 201
     body = response.json()
@@ -269,7 +269,7 @@ def test_a_card_cannot_use_audio_as_an_image(admin):
     audio = _upload(admin, _wav()).json()
     card = {"text": "Wrong kind", "image": {"asset_id": audio["id"]}}
 
-    response = admin.post("/api/admin/lessons", json={"doc": {"cards": [card]}})
+    response = admin.post("/api/admin/lessons", json={"level": 1, "doc": {"cards": [card]}})
 
     assert response.status_code == 422
     assert "no image" in response.json()["detail"][0]["msg"]

@@ -193,14 +193,22 @@ def list_lessons(db: Session = Depends(get_db)) -> list[lessons.LessonSummary]:
 @router.put(
     "/lessons/order",
     response_model=list[LessonSummaryOut],
-    responses={**NOT_FOUND, **OUT_OF_DATE},
+    responses={
+        **NOT_FOUND,
+        409: {
+            "description": "The page was out of date (order_out_of_date), or the order mixes "
+            "levels (lesson_order_mixes_levels)"
+        },
+    },
 )
 def reorder_lessons(
     body: LessonOrderRequest, db: Session = Depends(get_db)
 ) -> list[lessons.LessonSummary]:
     """Set the order of one topic's lessons, or of those with no topic (`topic_id: null`).
     List every lesson in that group exactly once, plus the order the page showed; a page
-    that was out of date gets 409 order_out_of_date. Returns every lesson, in order."""
+    that was out of date gets 409 order_out_of_date. Lessons are ordered by level first, so
+    an order that puts a higher level above a lower one gets 409 lesson_order_mixes_levels.
+    Returns every lesson, in order."""
     try:
         return lessons.reorder_lessons(db, body.topic_id, body.ids, body.previous_ids)
     except ContentProblem as problem:
@@ -224,10 +232,13 @@ CHANGED = {409: {"description": "Changed since it was loaded (lesson_out_of_date
     responses=TOPIC_REFUSED,
 )
 def create_lesson(body: LessonCreateRequest, db: Session = Depends(get_db)) -> lessons.LessonDetail:
-    """Create a draft at the end of its topic. Every field may be empty; `doc` may hold the
-    whole deck, so a script can write a lesson in one request."""
+    """Create a draft at the end of its topic. `level` (1 to 5) is required; every other field
+    may be empty, and `doc` may hold the whole deck, so a script can write a lesson in one
+    request."""
     try:
-        return lessons.create_lesson(db, body.title, body.summary, body.topic_id, body.doc)
+        return lessons.create_lesson(
+            db, body.title, body.summary, body.topic_id, body.doc, level=body.level
+        )
     except ContentProblem as problem:
         raise _refuse(problem) from None
     except ValueError as error:
@@ -251,18 +262,19 @@ def get_lesson(lesson_id: uuid.UUID, db: Session = Depends(get_db)) -> lessons.L
         **TOPIC_REFUSED,
         409: {
             "description": "Changed since it was loaded (lesson_out_of_date), the topic is "
-            "archived (topic_archived), or a published lesson would lose its topic "
-            "(topic_required)"
+            "archived (topic_archived), a published lesson would lose its topic "
+            "(topic_required), or a published lesson's level would change (level_locked)"
         },
     },
 )
 def update_lesson(
     lesson_id: uuid.UUID, body: LessonUpdateRequest, db: Session = Depends(get_db)
 ) -> lessons.LessonDetail:
-    """Change the draft's title, summary or cards, or the lesson's topic; fields left out
-    are kept. Works whatever the status: users keep seeing the published version until the
-    draft is published. A new topic moves the lesson to the end of it straight away. Send
-    the `updated_at` the editor loaded."""
+    """Change the draft's title, summary or cards, or the lesson's topic or level; fields
+    left out are kept. Works whatever the status: users keep seeing the published version
+    until the draft is published. A new topic moves the lesson to the end of it straight
+    away; the level can only change before the lesson is first published. Send the
+    `updated_at` the editor loaded."""
     try:
         return lessons.update_lesson(db, lesson_id, body.updated_at, body.changes())
     except ContentProblem as problem:

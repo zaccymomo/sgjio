@@ -11,6 +11,8 @@ export type Topic = {
   position: number;
   lesson_count: number;
   published_count: number;
+  /** Published lessons at Level 1 to 5, in that order (SCRUM-103 AC5). */
+  published_by_level: number[];
 };
 
 export type LessonStatus = "draft" | "published" | "withdrawn";
@@ -31,6 +33,8 @@ export type LessonSummary = {
   status: LessonStatus;
   updated_at: string;
   position: number;
+  /** 1 to 5 (SCRUM-103). Fixed once the lesson has been published. */
+  level: number;
   /** Never published. Only these can be deleted. */
   deletable: boolean;
   /** The draft differs from what users see: there is something to publish. */
@@ -43,7 +47,6 @@ export type LessonSummary = {
   cover_asset_id: string | null;
   /** Problems learners reported that nobody has dealt with yet (SCRUM-83 AC4). */
   open_reports: number;
-  level: number;
 };
 
 export type Content = { topics: Topic[]; lessons: LessonSummary[] };
@@ -64,11 +67,17 @@ export const topicApi = {
   remove: (id: string) => apiFetch<void>(`${TOPICS}/${id}`, { method: "DELETE" }),
 };
 
-/** The server refuses a reorder of a list that has changed since it was loaded. */
+/**
+ * The server refuses a reorder of a list that has changed since it was loaded. A reorder
+ * that mixes levels can only come from a page that missed a lesson's level changing, so it
+ * is treated the same way: load the latest rather than show an error.
+ */
 function isOutOfDate(error: unknown): boolean {
   return (
     error instanceof ApiError &&
-    (error.code === "order_out_of_date" || error.code === "topic_not_found")
+    (error.code === "order_out_of_date" ||
+      error.code === "topic_not_found" ||
+      error.code === "lesson_order_mixes_levels")
   );
 }
 
