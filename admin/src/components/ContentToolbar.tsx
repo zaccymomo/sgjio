@@ -4,6 +4,7 @@ import { useId, type ReactNode } from "react";
 
 import { STATUS_LABELS, type Topic } from "../lib/content";
 import { NO_FILTERS, type Filters, type StatusFilter } from "../lib/filter";
+import { LEVEL_DESCRIPTIONS, LEVELS, levelLabel } from "../lib/levels";
 
 export type View = "topics" | "recent";
 
@@ -12,7 +13,8 @@ const VIEWS: Array<{ value: View; label: string }> = [
   { value: "recent", label: "Recently updated" },
 ];
 
-/** Search, the status and topic filters (SCRUM-66 AC2), and the choice of view (AC3). */
+/** Search, the status, level (SCRUM-103 AC3) and topic filters (SCRUM-66 AC2), and the
+ * choice of view (AC3). */
 export function ContentToolbar({
   filters,
   onFiltersChange,
@@ -38,7 +40,7 @@ export function ContentToolbar({
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-line bg-white p-3 sm:p-4">
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_33rem]">
         <TextField
           label="Search topics and lessons"
           type="search"
@@ -46,7 +48,7 @@ export function ContentToolbar({
           value={filters.query}
           onChange={(event) => onFiltersChange({ ...filters, query: event.target.value })}
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Select
             label="Status"
             value={filters.status}
@@ -60,7 +62,20 @@ export function ContentToolbar({
             ))}
           </Select>
           <Select
+            label="Level"
+            value={filters.level}
+            onChange={(level) => onFiltersChange({ ...filters, level })}
+          >
+            <option value="all">All levels</option>
+            {LEVELS.map((level) => (
+              <option key={level} value={String(level)} title={LEVEL_DESCRIPTIONS[level]}>
+                {levelLabel(level)}
+              </option>
+            ))}
+          </Select>
+          <Select
             label="Topic"
+            className="col-span-2 sm:col-span-1"
             value={filters.topic}
             onChange={(topic) => onFiltersChange({ ...filters, topic })}
           >
@@ -128,16 +143,18 @@ function Select({
   label,
   value,
   onChange,
+  className,
   children,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  className?: string;
   children: ReactNode;
 }) {
   const id = useId();
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    <div className={cn("flex min-w-0 flex-col gap-1.5", className)}>
       <label htmlFor={id} className="text-xs font-semibold text-ink">
         {label}
       </label>

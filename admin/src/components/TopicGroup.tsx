@@ -13,6 +13,7 @@ import { useId } from "react";
 import type { LessonSummary, Topic } from "../lib/content";
 import { lessonTitle, type Group } from "../lib/filter";
 import { formatDate, plural, topicSummary } from "../lib/format";
+import { LEVEL_DESCRIPTIONS, LEVELS, levelLabel } from "../lib/levels";
 import { DragHandle } from "./DragHandle";
 import { LessonRow } from "./LessonRow";
 import { lessonMenuGroups, moveItems, type LessonActions } from "./menuItems";
@@ -143,6 +144,7 @@ export function TopicGroup({
               onAdd={actions && (() => actions.edit(topic, "description"))}
             />
           )}
+          {topic && <LevelCounts topic={topic} />}
           {allLessons.length === 0 ? (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-3 pr-4 pl-12 text-sm text-muted">
               <p>No lessons in this topic yet.</p>
@@ -289,6 +291,35 @@ function TopicDescription({ topic, onAdd }: { topic: Topic; onAdd?: () => void }
           Add a description
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * Published lessons at each level (SCRUM-103 AC5). Zeros are shown too: a level with
+ * nothing published is a gap the aptitude quiz can exempt learners across.
+ */
+function LevelCounts({ topic }: { topic: Topic }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 pt-2 pr-4 pb-1 pl-12 text-caption text-muted">
+      <span className="font-semibold">Published by level:</span>
+      <ul className="flex flex-wrap gap-1.5">
+        {LEVELS.map((level, index) => {
+          const count = topic.published_by_level[index] ?? 0;
+          return (
+            <li
+              key={level}
+              title={LEVEL_DESCRIPTIONS[level]}
+              className={cn(
+                "rounded-full px-2 py-px",
+                count > 0 ? "bg-white font-semibold text-ink ring-1 ring-line" : "text-subtle",
+              )}
+            >
+              {levelLabel(level)}: {count}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

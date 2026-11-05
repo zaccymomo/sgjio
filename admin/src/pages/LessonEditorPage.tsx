@@ -195,6 +195,17 @@ function SaveIndicator({
   lesson: Lesson | null;
   onRetry: () => void;
 }) {
+  if (status === "needs-level") {
+    return (
+      <span
+        className="flex items-center gap-1.5 text-xs font-semibold text-danger"
+        aria-live="polite"
+      >
+        <CloudOff className="size-3.5" aria-hidden />
+        Not saved: choose a level
+      </span>
+    );
+  }
   if (status === "saving" || status === "pending") {
     return (
       <span className="flex items-center gap-1.5 text-xs text-muted" aria-live="polite">
@@ -268,7 +279,13 @@ function LessonEditor({
     const preset = initialTopics.find(
       (topic) => topic.id === presetTopicId && topic.archived_at === null,
     );
-    return { title: "", summary: "", topic_id: preset?.id ?? null, doc: { cards: [newCard()] } };
+    return {
+      title: "",
+      summary: "",
+      topic_id: preset?.id ?? null,
+      level: null,
+      doc: { cards: [newCard()] },
+    };
   });
   const [assets, setAssets] = useState<Record<string, Asset>>(initialLesson?.assets ?? {});
   const [selectedId, setSelectedId] = useState<string | null>(
@@ -609,11 +626,15 @@ function LessonEditor({
             title={draft.title}
             summary={draft.summary}
             topicId={draft.topic_id}
+            level={draft.level}
             topics={topics}
             savedTopicId={lesson?.topic_id ?? null}
             published={everPublished}
             titleError={titleIssue?.message}
             topicError={topicIssue?.message}
+            levelError={
+              autosave.status === "needs-level" ? "Choose a level to save this lesson." : undefined
+            }
             onChange={edit}
           />
         </div>
@@ -879,7 +900,11 @@ function LessonEditor({
           blocker.reset?.();
         }}
       >
-        <p>Your latest changes couldn&rsquo;t be saved. If you leave now, they&rsquo;ll be lost.</p>
+        <p>
+          {autosave.status === "needs-level"
+            ? "This lesson hasn’t been saved yet because it has no level. Stay and choose a level to keep it, or leave and it will be lost."
+            : "Your latest changes couldn’t be saved. If you leave now, they’ll be lost."}
+        </p>
       </ConfirmDialog>
 
       {toast && (

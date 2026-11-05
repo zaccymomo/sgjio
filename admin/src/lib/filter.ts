@@ -7,17 +7,24 @@ import type { LessonStatus, LessonSummary, Topic } from "./content";
  * - search matches topic names and lesson titles, ignoring case and accents
  * - a topic whose name matches shows all its lessons; a lesson whose title matches keeps
  *   its topic on screen, opened, showing only the matching lessons
- * - the status and topic filters apply on top of the search
+ * - the status, level and topic filters apply on top of the search
  * - lessons with no topic form their own group, which no topic name can match
  */
 
 export type StatusFilter = "all" | LessonStatus;
+/** "all", or a level from 1 to 5 as text (SCRUM-103 AC3). */
+export type LevelFilter = string;
 /** "all", "none" (lessons with no topic), or a topic id. */
 export type TopicFilter = string;
 
-export type Filters = { query: string; status: StatusFilter; topic: TopicFilter };
+export type Filters = {
+  query: string;
+  status: StatusFilter;
+  level: LevelFilter;
+  topic: TopicFilter;
+};
 
-export const NO_FILTERS: Filters = { query: "", status: "all", topic: "all" };
+export const NO_FILTERS: Filters = { query: "", status: "all", level: "all", topic: "all" };
 
 export const UNTITLED = "Untitled lesson";
 
@@ -42,7 +49,12 @@ export type ContentView = {
 };
 
 export function isFiltering(filters: Filters): boolean {
-  return filters.query.trim() !== "" || filters.status !== "all" || filters.topic !== "all";
+  return (
+    filters.query.trim() !== "" ||
+    filters.status !== "all" ||
+    filters.level !== "all" ||
+    filters.topic !== "all"
+  );
 }
 
 /** Lower case, accents removed, so "cafe" finds "Café". */
@@ -70,7 +82,8 @@ export function viewContent(
   const query = normalise(filters.query);
   const filtering = isFiltering(filters);
   const statusMatches = (lesson: LessonSummary) =>
-    filters.status === "all" || lesson.status === filters.status;
+    (filters.status === "all" || lesson.status === filters.status) &&
+    (filters.level === "all" || String(lesson.level) === filters.level);
   const titleMatches = (lesson: LessonSummary) => normalise(lessonTitle(lesson)).includes(query);
 
   const byTopic = new Map<string | null, LessonSummary[]>();
@@ -90,8 +103,9 @@ export function viewContent(
       (lesson) => statusMatches(lesson) && (query === "" || nameMatches || titleMatches(lesson)),
     );
     // A topic stays on screen without lessons only when nothing asked about lessons: no
-    // status filter, and either no search or a search its name matches.
-    const needsLessons = filters.status !== "all" || (query !== "" && !nameMatches);
+    // status or level filter, and either no search or a search its name matches.
+    const needsLessons =
+      filters.status !== "all" || filters.level !== "all" || (query !== "" && !nameMatches);
     if (needsLessons && passing.length === 0) return null;
     return { topic, lessons: passing, allLessons };
   }

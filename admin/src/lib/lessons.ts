@@ -5,19 +5,23 @@ import type { LessonStatus } from "./content";
 
 /**
  * What the editor changes (SCRUM-19, SCRUM-64): the draft's title, summary and cards, and
- * the lesson's topic. Mirrors LessonFields in api/app/schemas.py. `topic_id: null` means no
- * topic yet.
+ * the lesson's topic and level. Mirrors LessonFields in api/app/schemas.py. `topic_id: null`
+ * means no topic yet; `level: null` means a new lesson whose level hasn't been chosen, which
+ * can't be saved yet (SCRUM-103 AC1).
  */
 export type Draft = {
   title: string;
   summary: string;
   topic_id: string | null;
+  level: number | null;
   doc: LessonDoc;
 };
 
 /** One lesson as GET /api/admin/lessons/{id} returns it: the draft, with everything the
  * editor shows about it. */
 export type Lesson = Draft & {
+  /** 1 to 5. Can change until the lesson is first published (`version` is null). */
+  level: number;
   id: string;
   key: string | null;
   status: LessonStatus;
@@ -52,6 +56,7 @@ export function draftOf(lesson: Lesson): Draft {
     title: lesson.title,
     summary: lesson.summary,
     topic_id: lesson.topic_id,
+    level: lesson.level,
     doc: lesson.doc,
   };
 }
@@ -62,6 +67,7 @@ export function sameDraft(a: Draft, b: Draft): boolean {
     a.title.trim() === b.title.trim() &&
     a.summary.trim() === b.summary.trim() &&
     a.topic_id === b.topic_id &&
+    a.level === b.level &&
     JSON.stringify(a.doc) === JSON.stringify(b.doc)
   );
 }

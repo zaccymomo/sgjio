@@ -10,8 +10,10 @@ import { draftOf, lessonApi, sameDraft, type Draft, type Lesson } from "./lesson
  * - error: the last save failed; the next change, or Save now, tries again
  * - conflict: changed elsewhere since it was loaded; saving stops until the latest is loaded
  * - signed-out: the session ended; saving stops until the administrator signs in again
+ * - needs-level: a new lesson can't be created until its level is chosen (SCRUM-103 AC1)
  */
-export type SaveStatus = "idle" | "pending" | "saving" | "error" | "conflict" | "signed-out";
+export type SaveStatus =
+  "idle" | "pending" | "saving" | "error" | "conflict" | "signed-out" | "needs-level";
 
 const DELAY_MS = 1200;
 
@@ -21,7 +23,8 @@ const DELAY_MS = 1200;
  * Users never see a draft, only published versions, so saving as you go is safe. Saves run
  * one at a time: a change made while one is running is saved straight after it. A lesson
  * that has not been created yet is created by its first save (`onCreated`), so opening the
- * editor and leaving never leaves an empty lesson behind.
+ * editor and leaving never leaves an empty lesson behind. That first save waits until a
+ * level has been chosen.
  *
  * `flush()` saves now and says whether everything is saved, for anything that must not run
  * on an older version: publishing, leaving the page. `adopt(lesson)` takes a version of the
@@ -59,6 +62,10 @@ export function useAutosave({
     if (running.current) await running.current;
     const sending = draftRef.current;
     if (sameDraft(sending, savedRef.current)) return true;
+    if (!lessonRef.current && sending.level === null) {
+      setStatus("needs-level");
+      return false;
+    }
 
     setStatus("saving");
     const run = (async () => {

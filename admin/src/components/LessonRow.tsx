@@ -6,12 +6,13 @@ import { Link } from "react-router-dom";
 import type { LessonSummary } from "../lib/content";
 import { lessonTitle } from "../lib/filter";
 import { formatDateTime, formatRelative, plural } from "../lib/format";
+import { LEVEL_DESCRIPTIONS, levelLabel, type Level } from "../lib/levels";
 import { StatusBadge } from "./StatusBadge";
 
 /**
- * One lesson on a single line: title on the left, then its status and when it was last
- * updated in fixed-width columns before the ⋯ menu, so they line up down the list (SCRUM-66
- * AC1). On a phone the status and time wrap under the title, and the file icon is dropped
+ * One lesson on a single line: title on the left, then its level (SCRUM-103 AC3), status
+ * and when it was last updated in fixed-width columns before the ⋯ menu, so they line up
+ * down the list (SCRUM-66 AC1). On a phone the status and time wrap under the title, and the file icon is dropped
  * to leave the title more room. The title opens the
  * lesson (AC4). The drag handle and ⋯ menu are optional, so the same row serves reorderable
  * lists, archived topics and the flat "recently updated" list.
@@ -82,6 +83,15 @@ export function LessonRow({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+          <span
+            className="text-caption font-medium text-muted sm:w-14"
+            title={LEVEL_DESCRIPTIONS[lesson.level as Level]}
+          >
+            {levelLabel(lesson.level)}
+          </span>
+          <span className="text-caption text-subtle sm:hidden" aria-hidden>
+            ·
+          </span>
           <span className="sm:w-24">
             <StatusBadge status={lesson.status} />
           </span>

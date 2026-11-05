@@ -11,6 +11,8 @@ export type Topic = {
   position: number;
   lesson_count: number;
   published_count: number;
+  /** Published lessons at Level 1 to 5, in that order (SCRUM-103 AC5). */
+  published_by_level: number[];
 };
 
 export type LessonStatus = "draft" | "published" | "withdrawn";
@@ -31,6 +33,8 @@ export type LessonSummary = {
   status: LessonStatus;
   updated_at: string;
   position: number;
+  /** 1 to 5 (SCRUM-103). Fixed once the lesson has been published. */
+  level: number;
   /** Never published. Only these can be deleted. */
   deletable: boolean;
   /** The draft differs from what users see: there is something to publish. */
