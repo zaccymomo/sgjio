@@ -28,6 +28,10 @@ from app.models import (
 )
 from app.topics import visible_to_users
 
+# Offered last on every quiz question and always scored as wrong, so a learner who does not
+# know the answer is not nudged into a lucky guess that would exempt them from lessons.
+NOT_SURE_OPTION = {"id": "not-sure", "text": "I’m not sure"}
+
 
 class AptitudeError(ValueError):
     def __init__(self, code: str, message: str, status_code: int = 422):
@@ -39,6 +43,11 @@ def _validate_options(options) -> tuple[list[dict], str]:
     ids = [option.id.strip() for option in options]
     if len(ids) < 2:
         raise AptitudeError("options_required", "Add at least two answer options.")
+    if NOT_SURE_OPTION["id"] in ids:
+        raise AptitudeError(
+            "option_id_reserved",
+            f"The option id “{NOT_SURE_OPTION['id']}” is reserved. Use a different id.",
+        )
     if len(ids) != len(set(ids)):
         raise AptitudeError("option_ids_repeated", "Each answer option needs a different id.")
     correct = [option.id.strip() for option in options if option.correct]
@@ -192,6 +201,11 @@ def _ready_topics(db: Session) -> list[Topic]:
     return [topics[topic_id] for topic_id in topic_ids]
 
 
+def _quiz_options(question: AptitudeQuestion) -> list[dict]:
+    """The authored options in a fresh random order, then "I'm not sure"."""
+    return [*random.sample(question.options, len(question.options)), NOT_SURE_OPTION]
+
+
 def _public_question(question: AptitudeQuestion, topic_index: int, topic_count: int) -> dict:
     return {
         "id": question.id,
@@ -199,7 +213,7 @@ def _public_question(question: AptitudeQuestion, topic_index: int, topic_count: 
         "topic": question.topic.name,
         "level": question.level,
         "prompt": question.prompt,
-        "options": question.options,
+        "options": _quiz_options(question),
         "topic_index": topic_index + 1,
         "topic_count": topic_count,
     }
@@ -261,7 +275,9 @@ def _trace(db: Session, topics: list[Topic], answers) -> tuple[list[dict], int, 
             raise AptitudeError(
                 "invalid_quiz_path", "The answers do not follow the aptitude test's order."
             )
-        option = next((item for item in question.options if item["id"] == answer.option_id), None)
+        option = next(
+            (item for item in _quiz_options(question) if item["id"] == answer.option_id), None
+        )
         if option is None:
             raise AptitudeError("option_not_found", "Choose an answer offered for every question.")
         correct = option["id"] == question.correct_option_id

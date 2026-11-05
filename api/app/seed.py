@@ -23,6 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import content_import, lesson_doc
+from app.aptitude import NOT_SURE_OPTION
 from app.auth import normalise_email
 from app.config import get_settings
 from app.lessons import latest_version
@@ -205,6 +206,10 @@ def _seed_aptitude_questions(db: Session) -> list[str]:
         correct = [option.id for option in item.options if option.correct]
         if len(correct) != 1:
             raise RuntimeError(f"Aptitude question {item.key} must have exactly one correct option")
+        if any(option.id == NOT_SURE_OPTION["id"] for option in item.options):
+            raise RuntimeError(
+                f"Aptitude question {item.key} uses the reserved option id {NOT_SURE_OPTION['id']}"
+            )
         if item.topic not in topics:
             raise RuntimeError(f"Aptitude question {item.key} has unknown topic {item.topic}")
         options = [{"id": option.id, "text": option.text} for option in item.options]
