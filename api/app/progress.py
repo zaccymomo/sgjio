@@ -237,7 +237,7 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
             Lesson.topic_id == topic.id,
             Lesson.status == LessonStatus.PUBLISHED,
         )
-        .order_by(Lesson.position, Lesson.created_at)
+        .order_by(Lesson.level, Lesson.position, Lesson.created_at)
     ).all()
 
     lessons = []
@@ -258,7 +258,9 @@ def topic_lessons(db: Session, user_id: uuid.UUID, topic_id: uuid.UUID) -> Topic
                 reading_seconds=stats.reading_seconds,
                 questions=stats.scored_questions,
                 completed=completion is not None,
-                exempted=exempted,
+                # A completed lesson takes precedence over its aptitude exemption:
+                # it keeps the learner's score and no longer needs an Exempted label.
+                exempted=bool(exempted and completion is None),
                 best_correct=completion.best_correct if completion else None,
                 best_scored=completion.best_scored if completion else None,
                 # A completion recorded before attempts were (or seeded) has no attempt;
