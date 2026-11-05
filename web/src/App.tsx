@@ -4,6 +4,7 @@ import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 
 import { ComingSoonPage } from "./pages/ComingSoonPage";
 import { ChangePasswordPage, DeleteAccountPage } from "./pages/AccountSecurityPages";
+import { AptitudeIntroPage, AptitudeQuizPage, AptitudeResultsPage } from "./pages/AptitudePages";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { RequireIntro } from "./components/RequireIntro";
 import { HomePage } from "./pages/HomePage";
@@ -59,6 +60,9 @@ export function App() {
                 <Route index element={<HomePage />} />
                 {/* Where the introduction leads a new account (SCRUM-94 AC1, SCRUM-61 AC8) */}
                 <Route path="profile-setup" element={<ProfileSetupPage />} />
+                <Route path="aptitude" element={<AptitudeIntroPage />} />
+                <Route path="aptitude/quiz" element={<AptitudeQuizPage />} />
+                <Route path="aptitude/results" element={<AptitudeResultsPage />} />
                 {/* A progress circle leads here (SCRUM-43 AC9) */}
                 <Route path="topics/:topicId" element={<TopicPage />} />
                 {/* "Review mistakes" on the landing page leads here (SCRUM-44 AC1) */}

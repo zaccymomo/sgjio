@@ -70,6 +70,7 @@ class LessonSummary:
     cover_asset_id: uuid.UUID | None
     # Problems learners reported that nobody has dealt with yet (SCRUM-83 AC4).
     open_reports: int
+    level: int
 
 
 @dataclass(frozen=True)
@@ -205,6 +206,7 @@ def list_lessons(db: Session) -> list[LessonSummary]:
                 questions=sum(1 for card in cards if card.get("question")),
                 cover_asset_id=_cover(lesson.draft),
                 open_reports=open_reports,
+                level=lesson.level,
             )
         )
     return summaries

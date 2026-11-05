@@ -460,6 +460,8 @@ def test_a_completion_survives_withdrawal_but_leaves_the_figures(learner, db, le
     assert learner.get("/api/progress").json() == {
         "topics": [],
         "completed": 0,
+        "exempted": 0,
         "available": 0,
         "suggestion": None,
+        "aptitude_taken": False,
     }

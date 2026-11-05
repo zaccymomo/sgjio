@@ -1,4 +1,4 @@
-"""Development seed data (SCRUM-72, SCRUM-77). Safe to run more than once.
+"""Development seed data (SCRUM-72, SCRUM-77, Epic 6). Safe to run more than once.
 
 Creates:
 - one administrator (administrators are not created through registration, SCRUM-68)
@@ -17,6 +17,8 @@ a topic has none, so re-seeding never undoes an administrator's edit.
 
 from datetime import UTC, datetime
 
+import yaml
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -25,11 +27,14 @@ from app.auth import normalise_email
 from app.config import get_settings
 from app.lessons import latest_version
 from app.models import (
+    AptitudeAttempt,
+    AptitudeQuestion,
     Lesson,
     LessonCompletion,
     LessonStatus,
     Profile,
     Topic,
+    TopicExemption,
     User,
     UserRole,
     UserType,
@@ -61,6 +66,50 @@ TOPICS = {
     "Getting Around": (
         "Paying your fare, catching a bus, getting a taxi or ride, and when to give up your seat."
     ),
+}
+
+
+class SeedOption(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=40)
+    text: str = Field(min_length=1, max_length=300)
+    correct: bool = False
+
+
+class SeedQuestion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    key: str = Field(min_length=1, max_length=120)
+    topic: str
+    level: int = Field(ge=1, le=5)
+    prompt: str = Field(min_length=1)
+    options: list[SeedOption] = Field(min_length=2)
+
+
+class SeedQuestionFile(BaseModel):
+    questions: list[SeedQuestion]
+
+
+TEST_USERS: dict[str, tuple[str, dict[str, int] | None]] = {
+    "starter@sgjio.example.com": (
+        "Starter Newcomer",
+        {name: 1 for name in TOPICS},
+    ),
+    "mixed@sgjio.example.com": (
+        "Mixed Placement Newcomer",
+        {
+            "Singlish": 4,
+            "Hawker & Food": 2,
+            "Workplace": 3,
+            "Public Etiquette": 1,
+            "Festivals": 5,
+            "Getting Around": 0,
+        },
+    ),
+    "advanced@sgjio.example.com": (
+        "Advanced Newcomer",
+        {name: 4 for name in TOPICS},
+    ),
+    "skipped@sgjio.example.com": ("Skipped Quiz Newcomer", None),
 }
 
 
@@ -147,6 +196,127 @@ def _seed_completions(db: Session, user: User) -> list[str]:
     return log
 
 
+def _seed_aptitude_questions(db: Session) -> list[str]:
+    path = get_settings().content_dir.parent / "aptitude_questions.yaml"
+    data = SeedQuestionFile.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+    topics = {topic.name: topic for topic in db.scalars(select(Topic))}
+    log: list[str] = []
+    for item in data.questions:
+        correct = [option.id for option in item.options if option.correct]
+        if len(correct) != 1:
+            raise RuntimeError(f"Aptitude question {item.key} must have exactly one correct option")
+        if item.topic not in topics:
+            raise RuntimeError(f"Aptitude question {item.key} has unknown topic {item.topic}")
+        options = [{"id": option.id, "text": option.text} for option in item.options]
+        question = db.scalar(select(AptitudeQuestion).where(AptitudeQuestion.seed_key == item.key))
+        values = (topics[item.topic].id, item.level, item.prompt, options, correct[0], True)
+        if question is None:
+            question = AptitudeQuestion(
+                seed_key=item.key,
+                topic_id=values[0],
+                level=values[1],
+                prompt=values[2],
+                options=values[3],
+                correct_option_id=values[4],
+                is_active=values[5],
+            )
+            db.add(question)
+            log.append(f"aptitude question {item.key}")
+        elif (
+            question.topic_id,
+            question.level,
+            question.prompt,
+            question.options,
+            question.correct_option_id,
+            question.is_active,
+        ) != values:
+            (
+                question.topic_id,
+                question.level,
+                question.prompt,
+                question.options,
+                question.correct_option_id,
+                question.is_active,
+            ) = values
+            log.append(f"updated aptitude question {item.key}")
+    db.commit()
+    return log
+
+
+def _seed_test_users(db: Session) -> list[str]:
+    """Create stable demo users without changing any result that already exists."""
+    topics = {topic.name: topic for topic in db.scalars(select(Topic))}
+    questions = {
+        (question.topic.name, question.level): question
+        for question in db.scalars(
+            select(AptitudeQuestion)
+            .where(AptitudeQuestion.is_active.is_(True))
+            .order_by(AptitudeQuestion.seed_key)
+        )
+    }
+    log: list[str] = []
+    for email, (name, placements) in TEST_USERS.items():
+        user, created = _get_or_create_user(
+            db, email, "UserPass123", name, UserRole.USER, UserType.NEWCOMER
+        )
+        if created:
+            user.profile = Profile(
+                neighbourhood="Tampines", interests=["Food"], languages=["English"]
+            )
+            user.intro_finished_at = datetime.now(UTC)
+            log.append(f"test user {email}")
+            db.flush()
+        if placements is None or db.scalar(
+            select(AptitudeAttempt.id).where(AptitudeAttempt.user_id == user.id)
+        ):
+            continue
+
+        results = []
+        for topic_name, placement in placements.items():
+            last_level = 5 if placement == 5 else placement + 1
+            for level in range(1, last_level + 1):
+                question = questions[(topic_name, level)]
+                correct = level <= placement
+                option_id = (
+                    question.correct_option_id
+                    if correct
+                    else next(
+                        option["id"]
+                        for option in question.options
+                        if option["id"] != question.correct_option_id
+                    )
+                )
+                option_text = next(
+                    option["text"] for option in question.options if option["id"] == option_id
+                )
+                results.append(
+                    {
+                        "question_id": str(question.id),
+                        "topic_id": str(question.topic_id),
+                        "topic": topic_name,
+                        "level": level,
+                        "prompt": question.prompt,
+                        "option_id": option_id,
+                        "option_text": option_text,
+                        "correct": correct,
+                    }
+                )
+
+        db.add(AptitudeAttempt(user_id=user.id, results=results))
+        db.flush()
+        for topic_name, placement in placements.items():
+            db.add(
+                TopicExemption(
+                    user_id=user.id,
+                    topic_id=topics[topic_name].id,
+                    level=placement,
+                )
+            )
+        log.append(f"aptitude result for {email}")
+    db.commit()
+    return log
+
+
 def seed(db: Session) -> list[str]:
     """Insert anything missing and return a short log of what was created."""
     settings = get_settings()
@@ -198,6 +368,9 @@ def seed(db: Session) -> list[str]:
             raise RuntimeError(f"Could not load {result.path}: {'; '.join(result.problems)}")
         if result.action != "unchanged" or result.published:
             log.append(result.describe().strip())
+
+    log.extend(_seed_aptitude_questions(db))
+    log.extend(_seed_test_users(db))
 
     log.extend(_seed_completions(db, user))
 

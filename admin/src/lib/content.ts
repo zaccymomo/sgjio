@@ -43,6 +43,7 @@ export type LessonSummary = {
   cover_asset_id: string | null;
   /** Problems learners reported that nobody has dealt with yet (SCRUM-83 AC4). */
   open_reports: number;
+  level: number;
 };
 
 export type Content = { topics: Topic[]; lessons: LessonSummary[] };

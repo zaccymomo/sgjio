@@ -2,6 +2,7 @@
 # portal and use Preview.
 title: Card gallery
 summary: One of every kind of card, for checking how lessons look.
+level: 1
 publish: false
 cards:
   - image: { file: kopi.png, alt: "Two cups of kopi on a marble kopitiam table" }

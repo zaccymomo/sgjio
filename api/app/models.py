@@ -581,6 +581,9 @@ class AptitudeQuestion(Base):
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
+    # Stable identifier for a question loaded from content/aptitude_questions.yaml.
+    # Admin-authored questions leave this empty.
+    seed_key: Mapped[str | None] = mapped_column(String(120), unique=True)
     topic_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("topics.id", ondelete="RESTRICT"), nullable=False, index=True
     )

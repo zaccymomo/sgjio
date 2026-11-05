@@ -49,6 +49,7 @@ class LessonFile(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     summary: str = Field(default="", max_length=160)
     topic: str | None = Field(default=None, max_length=80)
+    level: int = Field(default=1, ge=1, le=5)
     publish: bool = True
     cards: list[dict] = Field(default_factory=list)
 
@@ -188,11 +189,22 @@ def import_file(db: Session, path: Path, root: Path, publish: bool = False) -> R
             draft=draft,
             status=LessonStatus.DRAFT,
             position=lessons.next_lesson_position(db, topic.id if topic else None),
+            level=data.level,
         )
         db.add(lesson)
         result.action = "created"
-    elif (lesson.title, lesson.summary, lesson.draft) != (data.title, data.summary, draft):
-        lesson.title, lesson.summary, lesson.draft = data.title, data.summary, draft
+    elif (lesson.title, lesson.summary, lesson.draft, lesson.level) != (
+        data.title,
+        data.summary,
+        draft,
+        data.level,
+    ):
+        lesson.title, lesson.summary, lesson.draft, lesson.level = (
+            data.title,
+            data.summary,
+            draft,
+            data.level,
+        )
         result.action = "updated"
     lesson.key = key
     db.flush()

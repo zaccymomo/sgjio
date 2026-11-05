@@ -66,6 +66,10 @@ Sign in with the seeded accounts (development only):
 | Where               | Email                        | Password       |
 | ------------------- | ---------------------------- | -------------- |
 | Main app (5173)     | `newcomer@sgjio.example.com` | `UserPass123`  |
+| Main app — Level 1  | `level1@sgjio.example.com`   | `UserPass123`  |
+| Main app — Level 3  | `level3@sgjio.example.com`   | `UserPass123`  |
+| Main app — Level 5  | `level5@sgjio.example.com`   | `UserPass123`  |
+| Main app — skipped  | `skipped@sgjio.example.com`  | `UserPass123`  |
 | Admin portal (5174) | `admin@sgjio.example.com`    | `AdminPass123` |
 
 Emails the app sends appear in Mailpit at **http://localhost:8025**. To try one:

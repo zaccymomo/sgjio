@@ -1,6 +1,7 @@
 title: Catching a Bus
 summary: Buses only stop if you ask them to.
 topic: Getting Around
+level: 2
 cards:
   - image: { file: cover.png, alt: "A person at a bus stop with a hand out as a bus approaches" }
     text: |-

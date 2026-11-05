@@ -62,7 +62,8 @@ export function LessonRow({
             </Link>
             <p className="text-caption text-muted">
               {topicLabel && <>{topicLabel} · </>}
-              {plural(lesson.cards, "card")} · {plural(lesson.questions, "question")}
+              Level {lesson.level} · {plural(lesson.cards, "card")} ·{" "}
+              {plural(lesson.questions, "question")}
               {lesson.status === "published" && lesson.has_unpublished_changes && (
                 <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-px text-2xs font-bold text-amber-800">
                   Unpublished changes

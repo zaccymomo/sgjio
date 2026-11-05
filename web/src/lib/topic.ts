@@ -10,10 +10,8 @@ export type TopicLesson = {
   /** Scored questions only: a one-option tap is not counted. */
   questions: number;
   completed: boolean;
-  /** Level 1 to 5; the list runs from the lowest (SCRUM-104 AC4). */
-  level: number;
-  /** Exempted by the aptitude quiz and not completed (SCRUM-104 AC5). */
   exempted: boolean;
+  level: number;
   /** The best result so far (SCRUM-16), null until the lesson is completed. */
   best_correct: number | null;
   best_scored: number | null;
@@ -21,16 +19,14 @@ export type TopicLesson = {
   last_attempted_at: string | null;
 };
 
-/**
- * A topic opened from its circle. The figures match that circle (SCRUM-16 AC8), so
- * `completed` includes exempted lessons (SCRUM-104 AC8).
- */
+/** A topic opened from its circle. The figures match that circle (SCRUM-16 AC8). */
 export type Topic = {
   id: string;
   name: string;
   /** What the topic covers, shown under its name (SCRUM-86). Empty when it has none. */
   description: string;
   completed: number;
+  exempted: number;
   available: number;
   lessons: TopicLesson[];
 };

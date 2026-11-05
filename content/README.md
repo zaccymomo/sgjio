@@ -28,6 +28,7 @@ Number prefixes set the order new lessons take in their topic. After that, the o
 title: Ordering at a Local Hawker Centre
 summary: Chope a seat first, then order your kopi in code. # one line, up to 160 characters
 topic: Hawker & Food # created at the end if it doesn't exist yet
+level: 1 # 1 to 5; learners see lessons at their current level
 # publish: false            # keep it a draft, e.g. for a lesson still being written
 cards:
   - image: { file: cover.png, alt: "Two cups of kopi on a marble kopitiam table" }
@@ -63,6 +64,13 @@ Each card has **text**, and may have an **image**, **audio** or both, and a **qu
 - **Put text in quotes** when it is on the same line as its name, as above. Without them, a comma or a colon in the text ends it early, and the import says something is wrong. Multi-line text after `|-` needs no quotes.
 
 Every lesson needs a title, a topic and at least one question to be published. The import tells you what is missing, and `api/tests/test_content_import.py` checks every lesson here loads and is ready.
+
+## Aptitude question bank
+
+`aptitude_questions.yaml` is the separate, version-controlled onboarding question bank.
+Each question has a stable `key`, a topic, a level from 1 to 5, answer options and exactly
+one `correct: true` option. The stable key means editing the file and running the seed again
+updates the same row instead of creating a duplicate.
 
 ## The images and audio here
 

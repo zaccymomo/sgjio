@@ -13,11 +13,6 @@ import { type Topic, type TopicLesson, useTopic } from "../lib/topic";
  *
  * Its description, if it has one, sits under the title (SCRUM-86).
  *
- * Every published lesson is listed, lowest level first (SCRUM-104 AC4). One the aptitude
- * quiz exempted the user from, and that they haven't completed, is labelled "Exempted"
- * (AC5) and counts in the figure as completed (AC8), but opens like any other (AC6).
- * Completing it shows the score instead (AC7).
- *
  * Selecting a lesson opens it (AC2). The lesson says it came from here, so finishing or
  * closing it steps back to this page rather than stacking a second copy on top (AC3); that
  * keeps the browser's back button, like the "All topics" link, leading home (AC4).
@@ -62,7 +57,7 @@ function TopicView({ topicId }: { topicId: string }) {
 }
 
 function TopicDetail({ topic }: { topic: Topic }) {
-  const { name, description, completed, available, lessons } = topic;
+  const { name, description, completed, exempted, available, lessons } = topic;
   const questions = lessons.reduce((total, lesson) => total + lesson.questions, 0);
 
   return (
@@ -85,10 +80,12 @@ function TopicDetail({ topic }: { topic: Topic }) {
             <ProgressRing completed={completed} available={available} size={48} />
             <div>
               <p className="text-sm font-bold text-ink">
-                {completed} of {available} {plural(available, "lesson")} completed
+                {completed} of {available} {plural(available, "lesson")} covered
               </p>
               <p className="text-caption text-muted">
-                {questions} quiz {plural(questions, "question")} in this topic
+                {exempted > 0
+                  ? `${exempted} exempted by your topic placement`
+                  : `${questions} quiz ${plural(questions, "question")} in this topic`}
               </p>
             </div>
           </section>
@@ -120,33 +117,22 @@ function LessonRow({ lesson }: { lesson: TopicLesson }) {
       to={`/lessons/${id}`}
       // Tells the lesson it can step back to this page when it closes (AC3, AC4).
       state={{ from: "topic" }}
-      aria-label={`${title}. ${exempted ? "Exempted. " : ""}${meta}.`}
+      aria-label={`${title}. ${meta}.`}
       className={cn(
         "flex items-center gap-3 rounded-lg border border-line bg-white px-3.5 py-3",
         "transition-colors hover:border-brand/40 hover:bg-brand-soft/40",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
       )}
     >
-      {completed ? (
+      {completed || exempted ? (
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-brand text-white">
           <Check className="size-4" strokeWidth={3} aria-hidden />
-        </span>
-      ) : exempted ? (
-        <span className="flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-brand text-brand">
-          <Check className="size-3.5" strokeWidth={3} aria-hidden />
         </span>
       ) : (
         <span className="size-6 shrink-0 rounded-full border-2 border-line" aria-hidden />
       )}
       <span className="flex min-w-0 flex-1 flex-col" aria-hidden>
-        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="text-sm font-semibold text-ink">{title}</span>
-          {exempted && (
-            <span className="rounded-sm bg-brand-soft px-1.5 py-0.5 text-2xs font-semibold text-brand">
-              Exempted
-            </span>
-          )}
-        </span>
+        <span className="text-sm font-semibold text-ink">{title}</span>
         <span className="text-caption text-subtle">{meta}</span>
       </span>
       <ChevronRight className="size-4 shrink-0 text-subtle" aria-hidden />
@@ -164,6 +150,9 @@ const DATE = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", 
  */
 function rowMeta(lesson: TopicLesson): string {
   const { last_attempted_at, best_correct, best_scored, reading_seconds, questions } = lesson;
+  if (lesson.exempted && !lesson.completed) {
+    return `Exempted by aptitude quiz · Level ${lesson.level}`;
+  }
   if (!last_attempted_at) {
     return [
       "Not attempted yet",

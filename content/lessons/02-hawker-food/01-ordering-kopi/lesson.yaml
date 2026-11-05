@@ -1,6 +1,7 @@
 title: Ordering at a Local Hawker Centre
 summary: Chope a seat first, then order your kopi in code.
 topic: Hawker & Food
+level: 1
 cards:
   - image: { file: cover.png, alt: "Two cups of kopi on a marble kopitiam table" }
     text: |-
