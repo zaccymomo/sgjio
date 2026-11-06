@@ -339,7 +339,7 @@ class TopicProgressOut(BaseModel):
 
 
 class SuggestionOut(BaseModel):
-    """The suggested next lesson beside the circles (SCRUM-6)."""
+    """The suggested next lesson beside the circles (SCRUM-6, SCRUM-106)."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -349,6 +349,8 @@ class SuggestionOut(BaseModel):
     reading_seconds: int
     topic_id: uuid.UUID
     topic_name: str
+    # SCRUM-107: one line on why this lesson, never mentioning a level.
+    reason: str
 
 
 class ProgressOut(BaseModel):
