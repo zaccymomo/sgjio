@@ -236,7 +236,7 @@ export function AptitudeResultsPage() {
   return (
     <div className="flex flex-col gap-4">
       {back}
-      <div className="mx-auto flex w-full max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-4 sm:p-6">
+      <div className="mx-auto flex w-full max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-3 sm:p-6">
         <div className="text-center">
           <p className="text-sm font-semibold text-brand">Your topic placements</p>
           <h1 className="mt-1 text-2xl font-bold text-ink">Your starting points are ready</h1>
@@ -353,21 +353,21 @@ function PlacementRow({ placement }: { placement: Placement }) {
             aria-hidden
           />
         </summary>
-        <div className="flex flex-col gap-1.5 bg-surface px-3.5 pt-1 pb-3">
+        <div className="flex flex-col gap-1.5 bg-surface px-2.5 pt-1 pb-3">
           <ul className="flex flex-col gap-1.5">
             {lessons.map((lesson) => (
               <li key={lesson.id}>
                 <Link
                   to={`/lessons/${lesson.id}`}
                   className={cn(
-                    "flex items-center gap-2.5 rounded-md border border-line bg-white px-2.5 py-2",
-                    "text-sm font-medium text-ink transition-colors hover:border-brand/40",
+                    "flex items-center gap-2 rounded-md border border-line bg-white px-2 py-1.5",
+                    "text-[13px] leading-snug font-medium text-ink transition-colors hover:border-brand/40",
                     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
                   )}
                 >
-                  <LessonMark completed={false} exempted />
+                  <LessonMark completed={false} exempted small />
                   <span className="min-w-0 flex-1">{lesson.title}</span>
-                  <span className="shrink-0 rounded-sm border border-line bg-surface px-1.5 py-0.5 text-2xs font-semibold text-muted">
+                  <span className="shrink-0 rounded-sm bg-surface px-1 py-0.5 text-2xs font-semibold whitespace-nowrap text-muted">
                     Level {lesson.level}
                   </span>
                 </Link>
