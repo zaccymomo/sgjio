@@ -32,6 +32,5 @@ export const aptitudeApi = {
     apiFetch<QuizStep>("/api/aptitude/next", { method: "POST", body: { answers } }),
   submit: (answers: QuizAnswer[]) =>
     apiFetch<QuizResult>("/api/aptitude/submit", { method: "POST", body: { answers } }),
-  skip: () => apiFetch<void>("/api/aptitude/skip", { method: "POST" }),
   result: () => apiFetch<QuizResult>("/api/aptitude/result"),
 };

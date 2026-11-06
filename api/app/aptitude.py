@@ -174,10 +174,6 @@ def has_taken_quiz(db: Session, user_id: uuid.UUID) -> bool:
 def _eligible(db: Session, user: User) -> None:
     if user.user_type != UserType.NEWCOMER:
         raise AptitudeError("quiz_for_newcomers", "The aptitude test is for Newcomers.", 403)
-    if user.profile is None:
-        raise AptitudeError(
-            "profile_required", "Complete your profile before starting the aptitude test.", 409
-        )
     if has_taken_quiz(db, user.id):
         raise AptitudeError(
             "quiz_already_completed",
@@ -390,7 +386,3 @@ def result_out(db: Session, attempt: AptitudeAttempt) -> dict:
             for exemption, topic in placements
         ],
     }
-
-
-def skip_quiz(db: Session, user: User) -> None:
-    _eligible(db, user)

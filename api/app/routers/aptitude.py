@@ -1,6 +1,6 @@
 """Signed-in Newcomer routes for the adaptive per-topic aptitude quiz."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app import aptitude
@@ -43,11 +43,6 @@ def submit(
 ):
     attempt = _call(lambda: aptitude.submit_quiz(db, user, body.answers))
     return aptitude.result_out(db, attempt)
-
-
-@router.post("/aptitude/skip", status_code=status.HTTP_204_NO_CONTENT)
-def skip(user: User = Depends(require_user), db: Session = Depends(get_db)) -> None:
-    _call(lambda: aptitude.skip_quiz(db, user))
 
 
 @router.get("/aptitude/result", response_model=AptitudeResultOut)

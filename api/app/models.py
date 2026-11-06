@@ -603,8 +603,8 @@ class AptitudeQuestion(Base):
 
 class AptitudeAttempt(Base):
     """A user's aptitude quiz (SCRUM-97). The quiz is taken once, so a user has at most one,
-    and only a completed quiz is stored (SCRUM-113 AC2, SCRUM-99 AC7): a user who has set up
-    their profile and has none has skipped it (SCRUM-98).
+    and only a completed quiz is stored (SCRUM-113 AC2, SCRUM-99 AC7): a Newcomer who has
+    none has not taken it yet, and is exempted from nothing (SCRUM-98).
 
     `results` is a list with one entry per question given, in order, each a copy of what
     mattered at the time (question id, topic id, level, prompt, the option chosen and

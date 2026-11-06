@@ -9,7 +9,6 @@ import { aptitudeApi, type QuizAnswer, type QuizQuestion, type QuizResult } from
 export function AptitudeIntroPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [busy, setBusy] = useState<"start" | "skip" | null>(null);
   const [completed, setCompleted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,22 +54,6 @@ export function AptitudeIntroPage() {
     );
   }
 
-  const run = async (which: "start" | "skip") => {
-    setBusy(which);
-    setError(null);
-    try {
-      if (which === "skip") {
-        await aptitudeApi.skip();
-        navigate("/", { replace: true });
-      } else {
-        navigate("/aptitude/quiz");
-      }
-    } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : "Please try again.");
-      setBusy(null);
-    }
-  };
-
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-6">
       <div>
@@ -83,10 +66,10 @@ export function AptitudeIntroPage() {
         </p>
       </div>
       {error && <Alert tone="error">{error}</Alert>}
-      <Button loading={busy === "start"} onClick={() => void run("start")}>
-        Take the aptitude test now
-      </Button>
-      <Button variant="secondary" loading={busy === "skip"} onClick={() => void run("skip")}>
+      <Button onClick={() => navigate("/aptitude/quiz")}>Take the aptitude test now</Button>
+      {/* SCRUM-98: nothing is stored for a skip, so this only leaves the page. Home keeps
+          offering the test for as long as there is no completed attempt. */}
+      <Button variant="secondary" onClick={() => navigate("/", { replace: true })}>
         Skip for now
       </Button>
       <p className="text-center text-xs text-muted">
