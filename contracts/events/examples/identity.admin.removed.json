@@ -1,0 +1,17 @@
+{
+  "event_id": "4c5d6e7f-8a9b-4c0d-9e1f-2a3b4c5d6e7f",
+  "type": "identity.admin.removed",
+  "schema_version": 1,
+  "occurred_at": "2026-11-10T08:00:00.123Z",
+  "producer": "identity",
+  "aggregate_type": "user",
+  "aggregate_id": "8b2e4c61-7d3f-5a90-b1c2-0e9f7a6d5c43",
+  "aggregate_version": 1,
+  "correlation_id": "4f9d2c1b8e7a46c3a1b0d9e8f7c6b5a4",
+  "data": {
+    "admin_id": "8b2e4c61-7d3f-5a90-b1c2-0e9f7a6d5c43",
+    "email": "priya@sgjio.example.com",
+    "name": "Priya",
+    "remover_name": "Sam Admin"
+  }
+}

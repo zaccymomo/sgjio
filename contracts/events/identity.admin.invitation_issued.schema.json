@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/identity.admin.invitation_issued.schema.json",
+  "title": "identity.admin.invitation_issued",
+  "description": "An administrator was sent a link to choose a password: invited, invite resent, access restored, or forgot-password by an admin who has not accepted yet. Notification sends admin_invite_email(to=email, name, inviter=inviter_name, link, hours=expires_in_hours, restored=trigger=='restored'). aggregate_id = admin_id; aggregate_version is always 1.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "identity.admin.invitation_issued"
+    },
+    "producer": {
+      "const": "identity"
+    },
+    "aggregate_type": {
+      "const": "user"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "admin_id",
+        "email",
+        "name",
+        "inviter_name",
+        "link",
+        "expires_in_hours",
+        "trigger"
+      ],
+      "properties": {
+        "admin_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "inviter_name": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 120,
+          "description": "The administrator who sent it; null when the person asked for a new link themselves (trigger forgot_password)."
+        },
+        "link": {
+          "type": "string",
+          "pattern": "^https?://",
+          "maxLength": 2000,
+          "description": "<ADMIN_URL>/set-password?token=..."
+        },
+        "expires_in_hours": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "trigger": {
+          "enum": [
+            "invited",
+            "resent",
+            "restored",
+            "forgot_password"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "forgot_password"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "inviter_name": {
+                "const": null
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "inviter_name": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "aggregate_version": {
+      "const": 1
+    }
+  }
+}

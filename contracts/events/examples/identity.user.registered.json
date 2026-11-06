@@ -1,0 +1,17 @@
+{
+  "event_id": "0e1f2a3b-4c5d-4e6f-8a7b-9c0d1e2f3a4b",
+  "type": "identity.user.registered",
+  "schema_version": 1,
+  "occurred_at": "2026-11-10T08:00:00.123Z",
+  "producer": "identity",
+  "aggregate_type": "user",
+  "aggregate_id": "5f1c2a9e-3b7d-5e21-9a44-6c0d8e2f1a10",
+  "aggregate_version": 1,
+  "correlation_id": "4f9d2c1b8e7a46c3a1b0d9e8f7c6b5a4",
+  "data": {
+    "user_id": "5f1c2a9e-3b7d-5e21-9a44-6c0d8e2f1a10",
+    "role": "user",
+    "user_type": "newcomer",
+    "registered_at": "2026-11-10T08:00:00.120Z"
+  }
+}

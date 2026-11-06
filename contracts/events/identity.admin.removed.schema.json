@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/identity.admin.removed.schema.json",
+  "title": "identity.admin.removed",
+  "description": "An administrator's access was removed. Notification sends admin_removed_email(to=email, name, remover=remover_name). aggregate_id = admin_id; aggregate_version is always 1.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "identity.admin.removed"
+    },
+    "producer": {
+      "const": "identity"
+    },
+    "aggregate_type": {
+      "const": "user"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "admin_id",
+        "email",
+        "name",
+        "remover_name"
+      ],
+      "properties": {
+        "admin_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 254
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "remover_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        }
+      }
+    },
+    "aggregate_version": {
+      "const": 1
+    }
+  }
+}

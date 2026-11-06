@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/envelope.schema.json",
+  "title": "Event envelope",
+  "description": "Every message on sgjio.events. The AMQP properties mirror it: message_id = event_id, type = type, routing key = type, header x-correlation-id = correlation_id. See contracts/README.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "type",
+    "schema_version",
+    "occurred_at",
+    "producer",
+    "aggregate_type",
+    "aggregate_id",
+    "aggregate_version",
+    "correlation_id",
+    "data"
+  ],
+  "properties": {
+    "event_id": {
+      "$ref": "#/$defs/uuid",
+      "description": "Unique per event; the consumer's dedupe key."
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^[a-z]+(\\.[a-z_]+)+$",
+      "description": "<producer>.<aggregate>.<fact>, also the routing key."
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "occurred_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "producer": {
+      "enum": [
+        "identity",
+        "content",
+        "learning",
+        "notification"
+      ]
+    },
+    "aggregate_type": {
+      "type": "string",
+      "pattern": "^[a-z_]+$"
+    },
+    "aggregate_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "aggregate_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The aggregate's own version after this change. A consumer ignores a version <= the one it already stored."
+    },
+    "correlation_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 128,
+      "description": "X-Request-ID of the request that caused it, or null (command line, seed)."
+    },
+    "data": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 / RFC 3339 with a zone, e.g. 2026-11-10T08:00:00Z."
+    }
+  }
+}

@@ -83,3 +83,34 @@ api/                             removed once every service passes its tests and
 | 5 | Cleanup and presentation: delete `api/`, update README/CLAUDE.md/dev.local/CI, write architecture decision records and diagrams, failure demo | Claude, with you | Clean clone runs with one command |
 
 Steps 1–3 can run at the same time because they depend only on `contracts/` and the platform template. Each step is reviewed before the next one starts.
+
+## How to run
+
+Everything runs in Docker under the compose project `sgjio-ms`, so it never touches the monolith's containers or volumes (project `sgjio` on `main`). Stop the monolith's API first if it is running: both use port 8000.
+
+```bash
+docker compose up -d --build --wait     # 4 Postgres, RabbitMQ, Mailpit, 4 services, gateway: all healthy
+scripts/seed-all.sh                     # identity, content, then learning (waits for its read models)
+npm run dev:web                         # http://localhost:5173, Vite proxies /api to the gateway on :8000
+npm run dev:admin                       # http://localhost:5174
+docker compose down                     # keeps the data; `down -v` wipes this project's volumes only
+```
+
+| What | Where |
+|---|---|
+| Gateway (the only way in for the front ends) | http://localhost:8000/api/... |
+| Swagger per service (direct, bypassing the gateway) | identity http://localhost:8001/docs, content :8002/docs, learning :8003/docs |
+| RabbitMQ management (`sgjio` / `sgjio`) | http://localhost:15672 |
+| Mailpit inbox | http://localhost:8025 |
+| Postgres (user = password = db name) | identity 5433, content 5434, learning 5435, notification 5436; each also has `<name>_test` |
+
+Checks that need no service code:
+
+```bash
+docker compose config -q                                     # compose file is valid
+contracts/.venv/bin/python contracts/validate.py             # event schemas and examples (contracts/README.md)
+services/gateway/tests/run.sh                                # gateway routing, auth and errors against stub services
+(cd templates/platform && .venv/bin/python -m pytest)        # platform template (needs the compose broker and DBs)
+```
+
+Where things are: the event, auth and error contracts in [contracts/README.md](../../contracts/README.md); the plumbing each service copies in [templates/platform/README.md](../../templates/platform/README.md); the routing table in `services/gateway/templates/gateway.conf.template`.

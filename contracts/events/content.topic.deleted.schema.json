@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/content.topic.deleted.schema.json",
+  "title": "content.topic.deleted",
+  "description": "A topic was deleted. Only a topic that never had a lesson or an aptitude question can be (topics.assessed_at). aggregate_id = topic_id; aggregate_version = topics.version + 1 (bumped by the delete). Learning tombstones learnable_topics (deleted = true).",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "content.topic.deleted"
+    },
+    "producer": {
+      "const": "content"
+    },
+    "aggregate_type": {
+      "const": "topic"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic_id"
+      ],
+      "properties": {
+        "topic_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        }
+      }
+    }
+  }
+}

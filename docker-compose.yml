@@ -1,28 +1,249 @@
-# Local services for development: the database and a test email inbox.
-# Start with:  docker compose up -d
-services:
-  db:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: sgjio
-      POSTGRES_PASSWORD: sgjio
-      POSTGRES_DB: sgjio
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./api/scripts/create-test-db.sql:/docker-entrypoint-initdb.d/create-test-db.sql:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sgjio"]
-      interval: 5s
-      retries: 10
+# SGJio as microservices (branch arch/microservices). See docs/architecture/README.md.
+#
+#   docker compose up -d --build --wait     everything, healthy
+#   scripts/seed-all.sh                     seed data, service by service
+#
+# The project name keeps these containers, networks and volumes apart from the monolith's
+# (main branch, project "sgjio"). Host ports are bound to 127.0.0.1 except the gateway.
+name: sgjio-ms
 
-  # Catches every email the app sends. Open http://localhost:8025 to read them.
-  mailpit:
-    image: axllent/mailpit:latest
+x-db-healthcheck: &db-healthcheck
+  interval: 5s
+  timeout: 5s
+  retries: 20
+
+# Settings every Python service reads. GATEWAY_KEY is shared with the gateway: Content and
+# Learning refuse a request without it, so nothing reaches them except through the gateway.
+x-service-env: &service-env
+  BROKER_URL: amqp://sgjio:sgjio@rabbitmq:5672/%2F
+  GATEWAY_KEY: ${GATEWAY_KEY:-dev-gateway-key}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  RUN_RELAY: "true"
+  RUN_CONSUMER: "true"
+
+x-api-healthcheck: &api-healthcheck
+  test:
+    - CMD
+    - python
+    - -c
+    - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"
+  interval: 5s
+  timeout: 5s
+  retries: 30
+  start_period: 10s
+
+x-api-command: &api-command
+  - sh
+  - -c
+  - alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+
+services:
+  # --- Databases: one Postgres per service, each with a <name>_test database too --------
+  identity-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: identity
+      POSTGRES_PASSWORD: identity
+      POSTGRES_DB: identity
+    ports: ["127.0.0.1:5433:5432"]
+    volumes:
+      - identity-db:/var/lib/postgresql/data
+      - ./infra/postgres/init-test-db.sh:/docker-entrypoint-initdb.d/10-init-test-db.sh:ro
+    healthcheck:
+      <<: *db-healthcheck
+      test: ["CMD-SHELL", "pg_isready -U identity -d identity"]
+
+  content-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: content
+      POSTGRES_PASSWORD: content
+      POSTGRES_DB: content
+    ports: ["127.0.0.1:5434:5432"]
+    volumes:
+      - content-db:/var/lib/postgresql/data
+      - ./infra/postgres/init-test-db.sh:/docker-entrypoint-initdb.d/10-init-test-db.sh:ro
+    healthcheck:
+      <<: *db-healthcheck
+      test: ["CMD-SHELL", "pg_isready -U content -d content"]
+
+  learning-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: learning
+      POSTGRES_PASSWORD: learning
+      POSTGRES_DB: learning
+    ports: ["127.0.0.1:5435:5432"]
+    volumes:
+      - learning-db:/var/lib/postgresql/data
+      - ./infra/postgres/init-test-db.sh:/docker-entrypoint-initdb.d/10-init-test-db.sh:ro
+    healthcheck:
+      <<: *db-healthcheck
+      test: ["CMD-SHELL", "pg_isready -U learning -d learning"]
+
+  notification-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: notification
+      POSTGRES_PASSWORD: notification
+      POSTGRES_DB: notification
+    ports: ["127.0.0.1:5436:5432"]
+    volumes:
+      - notification-db:/var/lib/postgresql/data
+      - ./infra/postgres/init-test-db.sh:/docker-entrypoint-initdb.d/10-init-test-db.sh:ro
+    healthcheck:
+      <<: *db-healthcheck
+      test: ["CMD-SHELL", "pg_isready -U notification -d notification"]
+
+  # --- Broker and email -------------------------------------------------------------
+  # Management UI: http://localhost:15672 (sgjio / sgjio)
+  rabbitmq:
+    image: rabbitmq:4.4.0-management  # pinned: consumer retry logic relies on 4.4 delivery-limit behaviour
+    hostname: rabbitmq
     ports:
-      - "1025:1025" # SMTP
-      - "8025:8025" # Web inbox
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+      - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
+  # Catches every email. Inbox: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.31.3
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
+  # --- Services -----------------------------------------------------------------------
+  # Swagger for each: http://localhost:8001/docs (identity), :8002 (content), :8003 (learning)
+  identity:
+    build: services/identity
+    command: *api-command
+    environment:
+      <<: *service-env
+      SERVICE_NAME: identity
+      DATABASE_URL: postgresql+psycopg://identity:identity@identity-db:5432/identity
+      # uvicorn --proxy-headers trusts X-Forwarded-For from these addresses. Only the
+      # gateway can reach Identity on the compose network (host port is 127.0.0.1 only),
+      # and the gateway overwrites X-Forwarded-For with the real client address.
+      FORWARDED_ALLOW_IPS: "*"
+      WEB_URL: ${WEB_URL:-http://localhost:5173}
+      ADMIN_URL: ${ADMIN_URL:-http://localhost:5174}
+      COOKIE_SECURE: "false"
+      APP_SESSION_DAYS: "7"
+      ADMIN_SESSION_HOURS: "8"
+      LOGIN_MAX_FAILURES: "5"
+      LOGIN_LOCKOUT_MINUTES: "15"
+      RESET_TOKEN_MINUTES: "15"
+      INVITE_LINK_HOURS: "72"
+      ADMIN_EMAIL_DOMAIN: sgjio.example.com
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-sgjio-966a1}
+      SEED_ADMIN_EMAIL: admin@sgjio.example.com
+      SEED_ADMIN_PASSWORD: AdminPass123
+      SEED_USER_EMAIL: newcomer@sgjio.example.com
+      SEED_USER_PASSWORD: UserPass123
+    ports: ["127.0.0.1:8001:8000"]
+    healthcheck: *api-healthcheck
+    depends_on:
+      identity-db: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  content:
+    build: services/content
+    command: *api-command
+    environment:
+      <<: *service-env
+      SERVICE_NAME: content
+      DATABASE_URL: postgresql+psycopg://content:content@content-db:5432/content
+      MEDIA_MAX_IMAGE_MB: "15"
+      MEDIA_MAX_AUDIO_MB: "10"
+      MEDIA_MAX_AUDIO_SECONDS: "120"
+      # Lesson files and content/aptitude_questions.yaml, read by `python -m app.cli seed`
+      # and `import-lessons`. Mounted, not baked in, so the image builds from services/content.
+      CONTENT_DIR: /srv/content/lessons
+    volumes:
+      - ./content:/srv/content:ro
+    ports: ["127.0.0.1:8002:8000"]
+    healthcheck: *api-healthcheck
+    depends_on:
+      content-db: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  learning:
+    build: services/learning
+    command: *api-command
+    environment:
+      <<: *service-env
+      SERVICE_NAME: learning
+      DATABASE_URL: postgresql+psycopg://learning:learning@learning-db:5432/learning
+      # Learning publishes nothing, so it has no outbox to relay.
+      RUN_RELAY: "false"
+    ports: ["127.0.0.1:8003:8000"]
+    healthcheck: *api-healthcheck
+    depends_on:
+      learning-db: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
+  notification:
+    build: services/notification
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && exec python -m app.worker
+    environment:
+      <<: *service-env
+      SERVICE_NAME: notification
+      DATABASE_URL: postgresql+psycopg://notification:notification@notification-db:5432/notification
+      RUN_RELAY: "false"
+      EMAIL_BACKEND: smtp
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
+      SMTP_STARTTLS: "false"
+      EMAIL_FROM: SGJio <no-reply@sgjio.example.com>
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.cli", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      notification-db: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      mailpit: { condition: service_started }
+
+  # The only way in from a browser. Front ends' Vite servers proxy /api to localhost:8000.
+  gateway:
+    build: services/gateway
+    environment:
+      GATEWAY_KEY: ${GATEWAY_KEY:-dev-gateway-key}
+      IDENTITY_UPSTREAM: identity:8000
+      CONTENT_UPSTREAM: content:8000
+      LEARNING_UPSTREAM: learning:8000
+      MEDIA_MAX_MB: "15"
+    ports: ["8000:8080"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Started, not healthy: the gateway keeps serving the other routes while a service is down.
+    depends_on:
+      identity: { condition: service_started }
+      content: { condition: service_started }
+      learning: { condition: service_started }
 
 volumes:
-  pgdata:
+  identity-db:
+  content-db:
+  learning-db:
+  notification-db:
+  rabbitmq:

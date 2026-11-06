@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/content.lesson.changed.schema.json",
+  "title": "content.lesson.changed",
+  "description": "The learner-facing state of a lesson that has been published at least once (drafts that were never published are never sent). Emitted on publish, withdraw, restore, a draft title change, topic move, reorder, archive or restore of its topic, republish-catalog; after content.lesson_version.published in the same transaction when a publish makes a version. aggregate_id = lesson_id; aggregate_version = lessons.version. Learning upserts learnable_lessons when the version is newer.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "content.lesson.changed"
+    },
+    "producer": {
+      "const": "content"
+    },
+    "aggregate_type": {
+      "const": "lesson"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lesson_id",
+        "key",
+        "topic_id",
+        "level",
+        "position",
+        "created_at",
+        "display_title",
+        "publication_state",
+        "learner_visible",
+        "first_published_at",
+        "published_at",
+        "withdrawn_at",
+        "latest_version_id",
+        "latest_version_number"
+      ],
+      "properties": {
+        "lesson_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200,
+          "description": "Natural key of a lesson loaded from content/ (seed lookups); null for portal-authored lessons."
+        },
+        "topic_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid",
+          "description": "A published lesson always keeps a topic."
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Fixed from the first publish."
+        },
+        "position": {
+          "type": "integer",
+          "description": "Order within the topic (lessons are listed by level, position, created_at)."
+        },
+        "created_at": {
+          "$ref": "envelope.schema.json#/$defs/timestamp",
+          "description": "Tie-breaker for ordering only."
+        },
+        "display_title": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "The current (draft) title admins see, for the insights header. Learners see the version's title."
+        },
+        "publication_state": {
+          "enum": [
+            "published",
+            "withdrawn"
+          ]
+        },
+        "learner_visible": {
+          "type": "boolean",
+          "description": "Content's rule, evaluated by Content: published and its topic not archived."
+        },
+        "first_published_at": {
+          "$ref": "envelope.schema.json#/$defs/timestamp"
+        },
+        "published_at": {
+          "anyOf": [
+            {
+              "$ref": "envelope.schema.json#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "When it last went live (published or restored)."
+        },
+        "withdrawn_at": {
+          "anyOf": [
+            {
+              "$ref": "envelope.schema.json#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "When it was last withdrawn."
+        },
+        "latest_version_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "latest_version_number": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

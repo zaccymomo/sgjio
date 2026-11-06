@@ -1,0 +1,109 @@
+{
+  "event_id": "8a9b0c1d-2e3f-4a4b-9c5d-6e7f8a9b0c1d",
+  "type": "content.lesson_version.published",
+  "schema_version": 1,
+  "occurred_at": "2026-11-10T08:00:00.123Z",
+  "producer": "content",
+  "aggregate_type": "lesson_version",
+  "aggregate_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+  "aggregate_version": 1,
+  "correlation_id": "4f9d2c1b8e7a46c3a1b0d9e8f7c6b5a4",
+  "data": {
+    "version_id": "7a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
+    "lesson_id": "c3d9e1f4-2a6b-4c8d-9e0f-1a2b3c4d5e6f",
+    "number": 2,
+    "title": "Chope-ing a seat",
+    "summary": "Why a packet of tissue on a table means it's taken.",
+    "published_at": "2026-11-10T08:00:00.100Z",
+    "doc": {
+      "cards": [
+        {
+          "type": "story",
+          "id": "c1hawker",
+          "text": "At a hawker centre, a packet of tissue on a seat means someone has **{{blank}}** it.",
+          "image": {
+            "asset_id": "e2f3a4b5-c6d7-4e8f-9a0b-1c2d3e4f5a6b",
+            "alt": "A packet of tissue on a hawker centre table"
+          },
+          "audio": null,
+          "question": {
+            "type": "choice",
+            "id": "q1tap",
+            "options": [
+              {
+                "id": "o1chope",
+                "text": "chope",
+                "correct": false,
+                "why_not": ""
+              }
+            ],
+            "explanation": "To chope is to reserve a seat.",
+            "shuffle": true
+          }
+        },
+        {
+          "type": "story",
+          "id": "c2tray",
+          "text": "What do you do with the tissue packet?\n\n- leave it\n- move it",
+          "image": null,
+          "audio": null,
+          "question": {
+            "type": "choice",
+            "id": "q2move",
+            "options": [
+              {
+                "id": "o2leave",
+                "text": "Leave it and find another seat",
+                "correct": true,
+                "why_not": ""
+              },
+              {
+                "id": "o2move",
+                "text": "Move it and sit down",
+                "correct": false,
+                "why_not": "The seat is taken; moving the packet is rude."
+              }
+            ],
+            "explanation": "Respect the chope and find another seat.",
+            "shuffle": false
+          }
+        }
+      ]
+    },
+    "questions": [
+      {
+        "card_id": "c1hawker",
+        "question_id": "q1tap",
+        "scored": false,
+        "correct_option_id": "o1chope"
+      },
+      {
+        "card_id": "c2tray",
+        "question_id": "q2move",
+        "scored": true,
+        "correct_option_id": "o2leave"
+      }
+    ],
+    "reading_seconds": 16,
+    "scored_questions": 1,
+    "assets": {
+      "e2f3a4b5-c6d7-4e8f-9a0b-1c2d3e4f5a6b": {
+        "id": "e2f3a4b5-c6d7-4e8f-9a0b-1c2d3e4f5a6b",
+        "kind": "image",
+        "mime": "image/webp",
+        "url": "/api/media/e2f3a4b5-c6d7-4e8f-9a0b-1c2d3e4f5a6b",
+        "size": 48213,
+        "width": 1600,
+        "height": 1200,
+        "duration_ms": null,
+        "placeholder": "data:image/webp;base64,UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA",
+        "color": "#c49a6c",
+        "filename": "tissue.jpg"
+      }
+    },
+    "cards_plain_text": [
+      "At a hawker centre, a packet of tissue on a seat means someone has ___ it.",
+      "What do you do with the tissue packet? leave it move it"
+    ]
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/content.aptitude_bank.changed.schema.json",
+  "title": "content.aptitude_bank.changed",
+  "description": "Whether the aptitude test is ready, and the order it asks topics in, as Content's rule decides (aptitude.bank()). Emitted in the same transaction as every change that can alter that result: any question change (create, update incl. topic move, activate, deactivate), topic archive, restore, rename and reorder, seed, republish-catalog. aggregate_id is the fixed id d69a3dc8-6470-5484-a156-901c82a34f06 (uuid5(NAMESPACE_URL, 'sgjio:aptitude-bank')); aggregate_version = aptitude_bank_state.revision. Learning replaces its single quiz_bank row when the revision is newer.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "content.aptitude_bank.changed"
+    },
+    "producer": {
+      "const": "content"
+    },
+    "aggregate_type": {
+      "const": "aptitude_bank"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ready",
+        "topics"
+      ],
+      "properties": {
+        "ready": {
+          "type": "boolean"
+        },
+        "topics": {
+          "type": "array",
+          "description": "The assessed topics (active, with at least one question) in quiz order: Topic.position, then Topic.name, as aptitude._assessed_topics() orders them. This is the order the quiz asks them in; Learning uses it as given and does not re-sort it.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "topic_id",
+              "ready"
+            ],
+            "properties": {
+              "topic_id": {
+                "$ref": "envelope.schema.json#/$defs/uuid"
+              },
+              "ready": {
+                "type": "boolean",
+                "description": "An active question at every level 1 to 5."
+              }
+            }
+          }
+        }
+      }
+    },
+    "aggregate_id": {
+      "const": "d69a3dc8-6470-5484-a156-901c82a34f06"
+    }
+  }
+}

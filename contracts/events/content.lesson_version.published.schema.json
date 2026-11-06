@@ -1,0 +1,366 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/content.lesson_version.published.schema.json",
+  "title": "content.lesson_version.published",
+  "description": "A new immutable version of a lesson, as published. Emitted for every publish that creates a version (and by republish-catalog for every version), before content.lesson.changed in the same transaction. aggregate_id = version_id; aggregate_version is always 1 (versions never change). Learning inserts it into lesson_decks if absent. `doc` is the stored document unchanged (it includes the right answers, so it never leaves the internal network except through Learning's admin insights preview); `questions`, `reading_seconds`, `scored_questions`, `assets` and `cards_plain_text` are worked out by Content so Learning needs neither lesson_doc.py nor media.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "content.lesson_version.published"
+    },
+    "producer": {
+      "const": "content"
+    },
+    "aggregate_type": {
+      "const": "lesson_version"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version_id",
+        "lesson_id",
+        "number",
+        "title",
+        "summary",
+        "published_at",
+        "doc",
+        "questions",
+        "reading_seconds",
+        "scored_questions",
+        "assets",
+        "cards_plain_text"
+      ],
+      "properties": {
+        "version_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "lesson_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "published_at": {
+          "$ref": "envelope.schema.json#/$defs/timestamp"
+        },
+        "doc": {
+          "$ref": "#/$defs/doc"
+        },
+        "questions": {
+          "type": "array",
+          "description": "One per question, in card order: what grading, review, insights and the learner deck need.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "card_id",
+              "question_id",
+              "scored",
+              "correct_option_id"
+            ],
+            "properties": {
+              "card_id": {
+                "$ref": "#/$defs/short_id"
+              },
+              "question_id": {
+                "$ref": "#/$defs/short_id"
+              },
+              "scored": {
+                "type": "boolean",
+                "description": "False for a one-option tap (lesson_doc.is_scored)."
+              },
+              "correct_option_id": {
+                "$ref": "#/$defs/short_id",
+                "description": "lesson_doc.correct_option: the marked option, or the only one."
+              }
+            }
+          }
+        },
+        "reading_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "lesson_doc.stats(doc, media).reading_seconds"
+        },
+        "scored_questions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "assets": {
+          "type": "object",
+          "propertyNames": {
+            "format": "uuid"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/asset"
+          },
+          "description": "Every image and audio file the doc refers to, keyed by asset id (media.assets_for)."
+        },
+        "cards_plain_text": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "lesson_doc.plain_text(card.text) for each card, in card order (search snippets)."
+        }
+      }
+    },
+    "aggregate_version": {
+      "const": 1
+    }
+  },
+  "$defs": {
+    "short_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{1,40}$"
+    },
+    "doc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cards"
+      ],
+      "properties": {
+        "cards": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 30,
+          "items": {
+            "$ref": "#/$defs/card"
+          }
+        }
+      }
+    },
+    "card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "text",
+        "image",
+        "audio",
+        "question"
+      ],
+      "properties": {
+        "type": {
+          "const": "story"
+        },
+        "id": {
+          "$ref": "#/$defs/short_id"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 1500
+        },
+        "image": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "asset_id",
+                "alt"
+              ],
+              "properties": {
+                "asset_id": {
+                  "$ref": "envelope.schema.json#/$defs/uuid"
+                },
+                "alt": {
+                  "type": "string",
+                  "maxLength": 300
+                }
+              }
+            }
+          ]
+        },
+        "audio": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "asset_id",
+                "transcript"
+              ],
+              "properties": {
+                "asset_id": {
+                  "$ref": "envelope.schema.json#/$defs/uuid"
+                },
+                "transcript": {
+                  "type": "string",
+                  "maxLength": 1000
+                }
+              }
+            }
+          ]
+        },
+        "question": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/question"
+            }
+          ]
+        }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "id",
+        "options",
+        "explanation",
+        "shuffle"
+      ],
+      "properties": {
+        "type": {
+          "const": "choice"
+        },
+        "id": {
+          "$ref": "#/$defs/short_id"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "text",
+              "correct",
+              "why_not"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/short_id"
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "correct": {
+                "type": "boolean"
+              },
+              "why_not": {
+                "type": "string",
+                "maxLength": 400
+              }
+            }
+          }
+        },
+        "explanation": {
+          "type": "string",
+          "maxLength": 800
+        },
+        "shuffle": {
+          "type": "boolean"
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "mime",
+        "url",
+        "size",
+        "width",
+        "height",
+        "duration_ms",
+        "placeholder",
+        "color",
+        "filename"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "kind": {
+          "enum": [
+            "image",
+            "audio"
+          ]
+        },
+        "mime": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^/api/media/[0-9a-f-]{36}$"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "width": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "height": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "duration_ms": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "placeholder": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2000,
+          "description": "A tiny blurred copy as a data: URL."
+        },
+        "color": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "filename": {
+          "type": "string",
+          "maxLength": 255
+        }
+      },
+      "description": "Exactly the AssetOut the front ends receive today."
+    }
+  }
+}
