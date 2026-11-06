@@ -3,11 +3,11 @@
  * reader is told what is wrong without waiting for a round trip.
  *
  * The API is still the authority: every rule here is also enforced in
- * `api/app/security.py` and `api/app/schemas.py`. Keep the two in step — if they ever
+ * `services/identity/app/security.py` and `services/identity/app/schemas.py`. Keep the two in step — if they ever
  * disagree, the server's answer is the one shown (see how ApiError.field is used).
  */
 
-/** Mirrors PASSWORD_MIN_LENGTH in api/app/security.py. */
+/** Mirrors PASSWORD_MIN_LENGTH in services/identity/app/security.py. */
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
 
@@ -30,7 +30,7 @@ export const PASSWORD_RULES: Array<{ label: string; met: (password: string) => b
 
 /**
  * One message per password rule the password breaks; empty means it is acceptable.
- * Mirrors password_rule_failures() in api/app/security.py (SCRUM-61 AC4).
+ * Mirrors password_rule_failures() in services/identity/app/security.py (SCRUM-61 AC4).
  */
 export function passwordRuleFailures(password: string): string[] {
   const failures: string[] = [];

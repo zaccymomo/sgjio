@@ -358,6 +358,35 @@ def test_the_relay_publishes_the_outbox_to_rabbitmq(client, monkeypatch):
         close_quietly(connection)
 
 
+def test_every_event_with_an_address_or_link_is_discarded_after_publishing():
+    """The relay deletes EMAIL_EVENTS rows once published (app/main.py), so one-time links
+    and addresses don't stay in the outbox. Any identity event whose contract carries an
+    email address or a link must be in that set."""
+    if not contracts.available():
+        pytest.skip("contracts/events not found (set CONTRACTS_DIR)")
+    sensitive = set()
+    for path in contracts.events_dir().glob("identity.*.schema.json"):
+        schema = json.loads(path.read_text())
+        data = json.dumps(schema["properties"]["data"])
+        if any(f'"{field}"' in data for field in ("email", "link", "sign_in_url")):
+            sensitive.add(schema["title"])
+    assert sensitive == events.EMAIL_EVENTS
+
+
+def test_the_service_passes_the_email_events_to_the_relay(monkeypatch):
+    seen = {}
+
+    def fake_workers(session_factory, **kwargs):
+        seen.update(kwargs)
+        return contextlib.nullcontext()
+
+    monkeypatch.setattr("app.main.background_workers", fake_workers)
+    with TestClient(app):
+        pass
+    assert seen["relay"] is True
+    assert seen["discard_after_publish"] == events.EMAIL_EVENTS
+
+
 # --- Direct use -----------------------------------------------------------------------------
 
 

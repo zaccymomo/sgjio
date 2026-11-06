@@ -67,5 +67,8 @@ def broker():
 
 @pytest.fixture
 def unique() -> str:
-    """A prefix for event types and queue names, so runs never see each other's messages."""
-    return f"platformtest{uuid.uuid4().hex[:8]}"
+    """A prefix for event types and queue names, so runs never see each other's messages.
+    It is also the service name: consumers only accept `<producer>.*` types."""
+    prefix = f"platformtest{uuid.uuid4().hex[:8]}"
+    configure(service_name=prefix)
+    return prefix

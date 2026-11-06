@@ -1,6 +1,6 @@
 /**
  * Counting the words a reader sees in a card's text, for the editor's word count
- * (SCRUM-19). The same rule as count_words in api/app/lesson_doc.py, which decides the
+ * (SCRUM-19). The same rule as count_words in services/content/app/lesson_doc.py, which decides the
  * reading-time checks: most Markdown syntax (**, "- ") has no letters or digits, so it is
  * never counted; numbered-list markers ("1.") are taken off first, and a link counts its
  * text, not its address.

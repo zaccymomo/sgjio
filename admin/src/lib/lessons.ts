@@ -5,7 +5,7 @@ import type { LessonStatus } from "./content";
 
 /**
  * What the editor changes (SCRUM-19, SCRUM-64): the draft's title, summary and cards, and
- * the lesson's topic and level. Mirrors LessonFields in api/app/schemas.py. `topic_id: null`
+ * the lesson's topic and level. Mirrors LessonFields in services/content/app/schemas.py. `topic_id: null`
  * means no topic yet; `level: null` means a new lesson whose level hasn't been chosen, which
  * can't be saved yet (SCRUM-103 AC1).
  */

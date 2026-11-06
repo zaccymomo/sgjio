@@ -6,7 +6,7 @@ import type { LessonStatus } from "./content";
 /**
  * How learners do on one version of a lesson (SCRUM-84), as GET
  * /api/admin/lessons/{id}/insights returns it. Mirrors LessonInsightsOut in
- * api/app/schemas.py. Shares are fractions from 0 to 1. A figure is null where fewer than
+ * services/learning/app/schemas.py. Shares are fractions from 0 to 1. A figure is null where fewer than
  * `min_learners` learners are behind it, and nothing here names a learner.
  */
 export type Learners = "all" | "newcomer" | "singaporean";

@@ -1,6 +1,6 @@
 /**
  * What a lesson is, for both front ends (SCRUM-19). Mirrors app/lesson_doc.py and the lesson
- * schemas in api/app/schemas.py: a change to a lesson's fields starts there and here.
+ * schemas in services/content/app/schemas.py: a change to a lesson's fields starts there and here.
  *
  * A lesson's content is a deck of cards. Every card and question has a `type`, so later
  * formats (chat threads, hotspot scenes, comics; ordering or matching questions) are new

@@ -413,6 +413,17 @@ class AptitudeBankState(Base):
     revision: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
 
 
+class ErasedUser(Base):
+    """An account deleted in Identity (identity.user.deleted), kept for good so a report
+    still in flight when the event is handled can't record the id again (app/erasure.py).
+    Only the id: no personal data."""
+
+    __tablename__ = "erased_users"
+
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    erased_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
 # --- Events ---------------------------------------------------------------------------------
 
 outbox = define_outbox_table(Base.metadata)

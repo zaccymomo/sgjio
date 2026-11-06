@@ -2,6 +2,19 @@
 
 Branch `arch/microservices`, not merged to `main`. This is the source of truth for the build. [detailed-plan.md](detailed-plan.md) is the full multi-agent plan, for reference. Where the two disagree, this page wins.
 
+## Status: built
+
+All five steps are done. The monolith (`api/`) is deleted on this branch; `main` keeps it as the behaviour to compare against.
+
+| What                                                                                                        | Where                                                 |
+| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Why it is built this way: one page per decision                                                             | [decisions/](decisions/README.md) (ADRs 0001 to 0009) |
+| Diagrams: containers, events, publishing, account deletion, gateway auth, what works when something is down | [diagrams.md](diagrams.md)                            |
+| Each service: tables, API, events, commands, tests                                                          | `services/<name>/README.md`                           |
+| Running it, ports, logins, troubleshooting                                                                  | [README.md](../../README.md)                          |
+
+Tests: Identity 209, Content 373, Learning 258, Notification 33, platform template 34, contracts 151 checks, the gateway's route checks, and 44 end-to-end tests through the gateway (4 of them opt-in resilience drills). CI runs all of them (`.github/workflows/ci.yml`; the drills stay manual).
+
 ## Target
 
 ```
@@ -16,12 +29,12 @@ identity  content  learning   notification
        RabbitMQ (topic exchange sgjio.events)
 ```
 
-| Service | Owns | Publishes | Consumes |
-|---|---|---|---|
-| identity | users, profiles, auth_sessions, password_reset_tokens, login_attempts, admin_events, outbox | identity.user.registered, identity.user.deleted, identity.password_reset.requested, identity.admin.invitation_issued, identity.admin.removed | none |
-| content | topics, lessons, lesson_versions, media_assets, lesson_reports, aptitude_questions, aptitude_bank_state, outbox | content.topic.changed, content.topic.deleted, content.lesson.changed, content.lesson_version.published, content.aptitude_question.changed, content.aptitude_bank.changed | identity.user.deleted |
-| learning | lesson_attempts, attempt_answers, lesson_completions, aptitude_attempts, topic_exemptions; read models learnable_topics, learnable_lessons, lesson_decks, quiz_questions, quiz_bank, learners, erased_learners | none (yet) | identity.user.*, content.# |
-| notification | processed_events (inbox) | none | identity.password_reset.requested, identity.admin.* |
+| Service      | Owns                                                                                                                                                                                                           | Publishes                                                                                                                                                                | Consumes                                            |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| identity     | users, profiles, auth_sessions, password_reset_tokens, login_attempts, admin_events, outbox                                                                                                                    | identity.user.registered, identity.user.deleted, identity.password_reset.requested, identity.admin.invitation_issued, identity.admin.removed                             | none                                                |
+| content      | topics, lessons, lesson_versions, media_assets, lesson_reports, aptitude_questions, aptitude_bank_state, erased_users, outbox                                                                                  | content.topic.changed, content.topic.deleted, content.lesson.changed, content.lesson_version.published, content.aptitude_question.changed, content.aptitude_bank.changed | identity.user.deleted                               |
+| learning     | lesson_attempts, attempt_answers, lesson_completions, aptitude_attempts, topic_exemptions; read models learnable_topics, learnable_lessons, lesson_decks, quiz_questions, quiz_bank, learners, erased_learners | none (yet)                                                                                                                                                               | identity.user.*, content.#                          |
+| notification | processed_events (inbox)                                                                                                                                                                                       | none                                                                                                                                                                     | identity.password_reset.requested, identity.admin.* |
 
 The detailed plan holds the service catalogue, the event payloads and the routing table: sections 2, 4.4 and 5.2. They apply as written, except where the rules below differ.
 
@@ -36,15 +49,15 @@ The detailed plan holds the service catalogue, the event payloads and the routin
 
 ## Simplifications to the detailed plan
 
-| Detailed plan | Build plan |
-|---|---|
-| Identity mints an RS256 JWT; 15 s auth cache with stale-if-error | The gateway calls Identity `/internal/auth/{app,admin}` on **every** protected request, with no cache. Identity returns `X-User-Id`, `X-User-Role`, `X-User-Type` and `X-Profile-Completed`. nginx strips any client copies of these headers and forwards Identity's. It also adds `X-Gateway-Key`, which services check, so a request that bypasses the gateway is refused. Sign-out takes effect immediately everywhere. |
-| `libs/chassis` built as a versioned wheel | Each service has its own copy of the plumbing (~300 lines) under `app/platform/`: errors, logging and correlation id, health, principal, outbox and relay, consumer base. A template lives in `templates/platform/`. |
-| Separate `*-worker` containers | Each service runs its relay and consumer as background threads inside its API process (started in the FastAPI lifespan). Notification has no HTTP API, so it is a single worker process. |
-| Gateway legacy mode and a `legacy-api` profile | Dropped. `main` is the monolith to compare against. |
-| RabbitMQ shovel, least-privilege broker users, chaos script | Deferred. The management UI is kept. |
-| Advisory locks on learner writes during account deletion | Dropped. The session is gone before the event is sent, and the gateway checks every request, so the deleted user cannot write afterwards. Learning keeps the `erased_learners` tombstone, so a replayed `user.registered` cannot bring a learner back. |
-| `RESET_TOKEN_MINUTES = 5` | **15** on this branch, because email is now sent asynchronously. |
+| Detailed plan                                                    | Build plan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity mints an RS256 JWT; 15 s auth cache with stale-if-error | The gateway calls Identity `/internal/auth/{app,admin}` on **every** protected request, with no cache. Identity returns `X-User-Id`, `X-User-Scope`, `X-User-Role`, `X-User-Type` and `X-Profile-Completed`. nginx strips any client copies of these headers and forwards Identity's. It also adds `X-Gateway-Key`, which services check, so a request that bypasses the gateway is refused (the compose default key is for development only; set `GATEWAY_KEY` anywhere else). Sign-out takes effect immediately everywhere.                                                                                                 |
+| `libs/chassis` built as a versioned wheel                        | Each service has its own copy of the plumbing (about 1,000 lines with comments) under `app/platform/`: errors, logging and correlation id, health, principal, outbox and relay, consumer base. A template lives in `templates/platform/`.                                                                                                                                                                                                                                                                                                                                                                                     |
+| Separate `*-worker` containers                                   | Each service runs its relay and consumer as background threads inside its API process (started in the FastAPI lifespan). Notification has no HTTP API, so it is a single worker process.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Gateway legacy mode and a `legacy-api` profile                   | Dropped. `main` is the monolith to compare against.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| RabbitMQ shovel, least-privilege broker users, chaos script      | Deferred. The management UI is kept. Until there are broker users per service, consumers refuse an event whose `producer` isn't its type's first segment (ADR 0003 records the remaining risk).                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Advisory locks on learner writes during account deletion         | Kept, narrowly. The session is gone before the event is sent, and the gateway checks every request, so the deleted user cannot start anything new. For a request already in flight, erasure takes the learner's advisory lock, and the two writes that create a learner's first rows (starting an attempt, submitting the quiz) take it in shared mode and refuse an erased id (`services/learning/app/erasure.py`). The `erased_learners` tombstone stops a replayed `user.registered` bringing a learner back. Content does the same for reporting a problem (`services/content/app/erasure.py`, tombstone `erased_users`). |
+| `RESET_TOKEN_MINUTES = 5`                                        | **15** on this branch, because email is now sent asynchronously.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 ## Declared behaviour changes
 
@@ -68,19 +81,20 @@ infra/                           rabbitmq definitions, postgres init
 e2e/                             tests against the whole stack through :8000
 scripts/seed-all.sh
 docker-compose.yml
-api/                             removed once every service passes its tests and the e2e suite
 ```
 
 ## Build order (you and Claude)
 
-| Step | What | How | Done when |
-|---|---|---|---|
-| 0 | Foundations: layout, compose (4 DBs, RabbitMQ, Mailpit), `contracts/`, platform template, gateway skeleton | Claude, inline | `docker compose up` brings everything healthy; the event schemas are reviewed |
-| 1 | Identity and Notification | Parallel agents in separate worktrees, one per service, each building against `contracts/` | Each service's ported tests pass in its own CI job, and the events show up in RabbitMQ |
-| 2 | Content | (same run) | |
-| 3 | Learning, the hardest: read models plus ported progress, exemptions, aptitude and insights | (same run) | Per service: tests green, image healthy |
-| 4 | Integration: full gateway routing, `seed-all.sh`, e2e suite, manual click-through of both front ends | Claude, with you on the click-through | e2e green; checklist signed off |
-| 5 | Cleanup and presentation: delete `api/`, update README/CLAUDE.md/dev.local/CI, write architecture decision records and diagrams, failure demo | Claude, with you | Clean clone runs with one command |
+| Step | What                                                                                                                                          | How                                                                                        | Done when                                                                              |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| 0    | Foundations: layout, compose (4 DBs, RabbitMQ, Mailpit), `contracts/`, platform template, gateway skeleton                                    | Claude, inline                                                                             | `docker compose up` brings everything healthy; the event schemas are reviewed          |
+| 1    | Identity and Notification                                                                                                                     | Parallel agents in separate worktrees, one per service, each building against `contracts/` | Each service's ported tests pass in its own CI job, and the events show up in RabbitMQ |
+| 2    | Content                                                                                                                                       | (same run)                                                                                 |                                                                                        |
+| 3    | Learning, the hardest: read models plus ported progress, exemptions, aptitude and insights                                                    | (same run)                                                                                 | Per service: tests green, image healthy                                                |
+| 4    | Integration: full gateway routing, `seed-all.sh`, e2e suite, manual click-through of both front ends                                          | Claude, with you on the click-through                                                      | e2e green; checklist signed off                                                        |
+| 5    | Cleanup and presentation: delete `api/`, update README/CLAUDE.md/dev.local/CI, write architecture decision records and diagrams, failure demo | Claude, with you                                                                           | Clean clone runs with one command                                                      |
+
+Every step above is done.
 
 Steps 1–3 can run at the same time because they depend only on `contracts/` and the platform template. Each step is reviewed before the next one starts.
 
@@ -96,13 +110,13 @@ npm run dev:admin                       # http://localhost:5174
 docker compose down                     # keeps the data; `down -v` wipes this project's volumes only
 ```
 
-| What | Where |
-|---|---|
-| Gateway (the only way in for the front ends) | http://localhost:8000/api/... |
-| Swagger per service (direct, bypassing the gateway) | identity http://localhost:8001/docs, content :8002/docs, learning :8003/docs |
-| RabbitMQ management (`sgjio` / `sgjio`) | http://localhost:15672 |
-| Mailpit inbox | http://localhost:8025 |
-| Postgres (user = password = db name) | identity 5433, content 5434, learning 5435, notification 5436; each also has `<name>_test` |
+| What                                                | Where                                                                                      |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Gateway (the only way in for the front ends)        | http://localhost:8000/api/...                                                              |
+| Swagger per service (direct, bypassing the gateway) | identity http://localhost:8001/docs, content :8002/docs, learning :8003/docs               |
+| RabbitMQ management (`sgjio` / `sgjio`)             | http://localhost:15672                                                                     |
+| Mailpit inbox                                       | http://localhost:8025                                                                      |
+| Postgres (user = password = db name)                | identity 5433, content 5434, learning 5435, notification 5436; each also has `<name>_test` |
 
 Checks that need no service code:
 

@@ -27,6 +27,7 @@ from typing import Literal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.erasure import refuse_if_erased
 from app.lesson_doc import LessonDoc
 from app.models import Lesson, LessonReport, LessonVersion, ReportReason, ReportStatus, Topic
 from app.problems import (
@@ -81,7 +82,9 @@ def report_problem(
     reason: ReportReason,
     note: str,
 ) -> LessonReport:
-    """Record a learner's report on one card (SCRUM-82 AC2, AC3)."""
+    """Record a learner's report on one card (SCRUM-82 AC2, AC3). A deleted account's
+    report still in flight is refused (app/erasure.py)."""
+    refuse_if_erased(db, user_id)
     lesson = published_lesson(db, lesson_id)
     shown = db.scalar(
         select(LessonVersion).where(

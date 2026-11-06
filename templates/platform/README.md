@@ -10,18 +10,18 @@ Then add `pika==1.3.2` to the service's `requirements.txt` (the rest, FastAPI, S
 
 ## What's in it
 
-| Module | Gives you |
-|---|---|
-| `config.py` | `get_config()`: `SERVICE_NAME`, `GATEWAY_KEY`, `BROKER_URL`, `RUN_RELAY`, `RUN_CONSUMER` from the environment. `configure(...)` overrides them (e.g. from your own Settings, or in tests). |
-| `errors.py` | `Problem(code, message, status_code, field=None, extra=None, headers=None)`, `not_signed_in()`, `install_error_handlers(app)`: the `{"detail": {...}}` shape, FastAPI's own 422, and a 503 `service_unavailable` (`Retry-After: 5`) when the database can't be reached. |
-| `logging.py` | `configure_logging(level=None)`: JSON lines with service and request id, at `LOG_LEVEL` unless a level is given. `CorrelationIdMiddleware`: reads or makes `X-Request-ID`, returns it, keeps it in the `correlation_id` context variable, logs one line per request, and answers an unhandled exception with a logged 500 that keeps the id. |
-| `health.py` | `health_router(SessionLocal)`: `/health/live` and `/health/ready` (`SELECT 1`). |
-| `principal.py` | `Principal` and `require_principal("app" \| "admin")`, the auth contract in `contracts/README.md`. |
-| `outbox.py` | `define_outbox_table(Base.metadata)`, `emit(session, type=..., aggregate_type=..., aggregate_id=..., aggregate_version=..., data=...)`, `run_relay(...)` (also prunes rows published over 7 days ago, hourly), `prune_published(...)`. |
-| `consumer.py` | `Consumer(routing_keys=..., handlers={type: handler(session, envelope)}, session_factory=..., dedupe=None, max_attempts=5, queue_delivery_limit=20, dlq_message_ttl_ms=None)`. |
-| `broker.py` | Exchange names and `connect()`. |
-| `lifespan.py` | `install_platform(app, SessionLocal)` (middleware, error handlers, health) and `background_workers(...)` for the FastAPI lifespan; `run_until_signalled(...)` for a worker with no API. |
-| `testing.py` | `app_headers(user_id, user_type, profile_completed)`, `admin_headers(user_id)`, `headers_for(principal)`, `make_envelope(type, data, aggregate_id, aggregate_version)`. |
+| Module         | Gives you                                                                                                                                                                                                                                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `config.py`    | `get_config()`: `SERVICE_NAME`, `GATEWAY_KEY`, `BROKER_URL`, `RUN_RELAY`, `RUN_CONSUMER` from the environment. `configure(...)` overrides them (e.g. from your own Settings, or in tests).                                                                                                                                                   |
+| `errors.py`    | `Problem(code, message, status_code, field=None, extra=None, headers=None)`, `not_signed_in()`, `install_error_handlers(app)`: the `{"detail": {...}}` shape, FastAPI's own 422, and a 503 `service_unavailable` (`Retry-After: 5`) when the database can't be reached.                                                                      |
+| `logging.py`   | `configure_logging(level=None)`: JSON lines with service and request id, at `LOG_LEVEL` unless a level is given. `CorrelationIdMiddleware`: reads or makes `X-Request-ID`, returns it, keeps it in the `correlation_id` context variable, logs one line per request, and answers an unhandled exception with a logged 500 that keeps the id. |
+| `health.py`    | `health_router(SessionLocal)`: `/health/live` and `/health/ready` (`SELECT 1`).                                                                                                                                                                                                                                                              |
+| `principal.py` | `Principal` and `require_principal("app" \| "admin")`, the auth contract in `contracts/README.md`.                                                                                                                                                                                                                                           |
+| `outbox.py`    | `define_outbox_table(Base.metadata)`, `emit(session, type=..., aggregate_type=..., aggregate_id=..., aggregate_version=..., data=...)`, `run_relay(...)` (also prunes rows published over 7 days ago, hourly), `prune_published(...)`.                                                                                                       |
+| `consumer.py`  | `Consumer(routing_keys=..., handlers={type: handler(session, envelope)}, session_factory=..., dedupe=None, max_attempts=5, queue_delivery_limit=20, dlq_message_ttl_ms=None)`.                                                                                                                                                               |
+| `broker.py`    | Exchange names and `connect()`.                                                                                                                                                                                                                                                                                                              |
+| `lifespan.py`  | `install_platform(app, SessionLocal)` (middleware, error handlers, health) and `background_workers(...)` for the FastAPI lifespan; `run_until_signalled(...)` for a worker with no API.                                                                                                                                                      |
+| `testing.py`   | `app_headers(user_id, user_type, profile_completed)`, `admin_headers(user_id)`, `headers_for(principal)`, `make_envelope(type, data, aggregate_id, aggregate_version)`.                                                                                                                                                                      |
 
 ## Using it
 
@@ -88,14 +88,14 @@ def progress(principal: Principal = Depends(require_principal("app")), db=Depend
 
 ## Environment
 
-| Variable | Default | Used by |
-|---|---|---|
-| `SERVICE_NAME` | `unknown` | log lines, the `producer` field, the queue name `<service>.events`, connection names |
-| `GATEWAY_KEY` | empty (refuses every request) | `require_principal` |
-| `BROKER_URL` | `amqp://sgjio:sgjio@localhost:5672/%2F` | relay and consumer |
-| `RUN_RELAY` | `true` | `background_workers(relay=True)` |
-| `RUN_CONSUMER` | `true` | `background_workers(consumers=[...])` |
-| `LOG_LEVEL` | `INFO` | `configure_logging()` |
+| Variable       | Default                                 | Used by                                                                              |
+| -------------- | --------------------------------------- | ------------------------------------------------------------------------------------ |
+| `SERVICE_NAME` | `unknown`                               | log lines, the `producer` field, the queue name `<service>.events`, connection names |
+| `GATEWAY_KEY`  | empty (refuses every request)           | `require_principal`                                                                  |
+| `BROKER_URL`   | `amqp://sgjio:sgjio@localhost:5672/%2F` | relay and consumer                                                                   |
+| `RUN_RELAY`    | `true`                                  | `background_workers(relay=True)`                                                     |
+| `RUN_CONSUMER` | `true`                                  | `background_workers(consumers=[...])`                                                |
+| `LOG_LEVEL`    | `INFO`                                  | `configure_logging()`                                                                |
 
 `docker-compose.yml` sets all of them for every service.
 
@@ -107,6 +107,6 @@ Unit tests run anywhere; the integration tests (outbox, relay to RabbitMQ to con
 docker compose up -d notification-db rabbitmq
 cd templates/platform
 uv venv -p 3.11 .venv && uv pip install -p .venv/bin/python -r requirements.txt
-.venv/bin/python -m pytest          # 30 tests
+.venv/bin/python -m pytest          # 34 tests
 .venv/bin/python -m ruff check . && .venv/bin/python -m ruff format --check .
 ```

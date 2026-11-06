@@ -83,7 +83,7 @@ function HeaderLink({ to, end, children }: { to: string; end?: boolean; children
   );
 }
 
-/** Admin sessions are separate from main-app sessions (see api/app/auth). */
+/** Admin sessions are separate from main-app sessions (see services/identity/app/auth). */
 function Root() {
   return (
     <AuthProvider basePath="/api/admin/auth">

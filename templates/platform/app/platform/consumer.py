@@ -19,6 +19,16 @@ When a handler raises, the consumer asks the database `SELECT 1`:
   holding the message, until the database answers (or the service stops), then requeues
   it without counting an attempt. Nothing is dead-lettered because Postgres restarted.
 
+Before a handler runs, the envelope is checked, and a failed check goes straight to the
+DLQ (a retry could never pass it):
+- `producer` must be the event type's first segment (identity.* from "identity"). Every
+  service shares one broker user for now, so this is what stops one service's bug from
+  publishing another's events and having them acted on (ADR 0003).
+- `schema_version` must be one this consumer understands: `schema_versions` maps a type
+  to the versions its handler accepts, and a type not listed accepts only 1. A breaking
+  change to an event's `data` ships as a new version; consumers add it here when their
+  handler can read it (CONTRIBUTING.md, "Changing an event").
+
 Handlers are `handler(session, envelope)` and must be idempotent: a message can arrive
 twice, and out of order (contracts/README.md). Handlers must not commit.
 `dedupe(session, event_id) -> bool`, if given, is asked first; True skips the message
@@ -31,7 +41,7 @@ import logging
 import threading
 import time
 import uuid
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Collection, Iterable, Mapping
 from enum import Enum
 
 from sqlalchemy import text
@@ -58,7 +68,10 @@ class Outcome(Enum):
     ACK = "ack"
     REQUEUE = "requeue"  # the handler failed: try again (counts as an attempt)
     RETRY = "retry"  # the database is down: wait for it, then try again (not counted)
-    REJECT = "reject"  # can never succeed (not JSON): straight to the DLQ
+    REJECT = "reject"  # can never succeed (not JSON, wrong producer or version): to the DLQ
+
+
+DEFAULT_SCHEMA_VERSIONS = frozenset({1})
 
 
 class Consumer:
@@ -75,9 +88,11 @@ class Consumer:
         dlq_message_ttl_ms: int | None = None,
         prefetch: int = 10,
         broker_url: str | None = None,
+        schema_versions: Mapping[str, Collection[int]] | None = None,
     ):
         self.routing_keys = list(routing_keys)
         self.handlers = handlers
+        self.schema_versions = dict(schema_versions or {})
         self.session_factory = session_factory
         self.queue = queue or f"{get_config().service_name}.events"
         self.dedupe = dedupe
@@ -139,6 +154,18 @@ class Consumer:
         if handler is None:
             log.info("no handler for %s; skipped", event_type)
             return Outcome.ACK
+        producer = envelope.get("producer")
+        if producer != event_type.split(".")[0]:
+            log.error(
+                "rejecting %s %s: producer %r may not publish it", event_type, event_id, producer
+            )
+            return Outcome.REJECT
+        version = envelope.get("schema_version")
+        if version not in self.schema_versions.get(event_type, DEFAULT_SCHEMA_VERSIONS):
+            log.error(
+                "rejecting %s %s: unsupported schema_version %r", event_type, event_id, version
+            )
+            return Outcome.REJECT
         token = correlation_id.set(envelope.get("correlation_id"))
         try:
             with self.session_factory() as session, session.begin():

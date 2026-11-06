@@ -18,7 +18,7 @@ with no HTTP API (Notification) calls `run_until_signalled(...)` from `python -m
 import logging
 import signal
 import threading
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 
 from fastapi import FastAPI
@@ -47,8 +47,10 @@ def background_workers(
     relay: bool = False,
     consumers: Sequence[Consumer] = (),
     stop: threading.Event | None = None,
+    discard_after_publish: Iterable[str] = (),
 ) -> Iterator[threading.Event]:
-    """Run the outbox relay and/or consumers in daemon threads for the duration of the block."""
+    """Run the outbox relay and/or consumers in daemon threads for the duration of the block.
+    `discard_after_publish` is passed to the relay (see outbox.py)."""
     config = get_config()
     stop = stop or threading.Event()
     threads = []
@@ -57,6 +59,7 @@ def background_workers(
             threading.Thread(
                 target=run_relay,
                 args=(session_factory, stop),
+                kwargs={"discard_after_publish": frozenset(discard_after_publish)},
                 name=f"{config.service_name}-relay",
                 daemon=True,
             )

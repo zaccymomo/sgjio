@@ -6,6 +6,12 @@ from sqlalchemy import MetaData, create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
+from app.platform.config import configure, get_config
+
+# Events name their producer from SERVICE_NAME; compose sets it, and a process run on the
+# host without it still writes events that say "content".
+if get_config().service_name == "unknown":
+    configure(service_name="content")
 
 # Predictable constraint names, so Alembic migrations stay readable and reversible.
 NAMING_CONVENTION = {

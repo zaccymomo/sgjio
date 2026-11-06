@@ -8,7 +8,7 @@ export type Profile = {
   neighbourhood: string | null;
 };
 
-/** The choices the form offers, owned by api/app/profile_options.py. */
+/** The choices the form offers, owned by services/identity/app/profile_options.py. */
 export type ProfileOptions = {
   interests: string[];
   languages: string[];

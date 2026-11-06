@@ -2,7 +2,7 @@ import { cn, type UserType } from "@sgjio/ui";
 import type { RefObject } from "react";
 import { Link } from "react-router-dom";
 
-/** Matches NOTICE_VERSION in api/app/privacy.py. */
+/** Matches NOTICE_VERSION in services/identity/app/privacy.py. */
 export const PRIVACY_NOTICE_VERSION = "2026-10-22";
 
 /** The two user types, self-reported (SCRUM-61 AC1). */

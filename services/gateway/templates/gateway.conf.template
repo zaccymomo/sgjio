@@ -35,6 +35,10 @@ server {
     resolver 127.0.0.11 valid=10s ipv6=off;
     resolver_timeout 2s;
 
+    # Any redirect nginx makes itself stays relative: the container's port (8080) means
+    # nothing on the host.
+    absolute_redirect off;
+
     client_max_body_size 10m;
     proxy_http_version 1.1;
     proxy_connect_timeout 2s;
@@ -61,6 +65,18 @@ server {
         include snippets/principal.inc;
         include snippets/proxy.inc;
     }
+
+    # Bare prefixes. Each prefix route below ending in "/" would otherwise answer its bare
+    # path (/api/topics) with nginx's own 301 to the slash form; only an exact location
+    # stops that (a regex is too late). The monolith had no such routes, so: 404.
+    location = /api/auth { return 404; }
+    location = /api/admin/auth { return 404; }
+    location = /api/intro { return 404; }
+    location = /api/media { return 404; }
+    location = /api/lessons { return 404; }
+    location = /api/attempts { return 404; }
+    location = /api/topics { return 404; }
+    location = /api/aptitude { return 404; }
 
     # --- Identity: passed straight through; Identity checks its own cookies ------------
     # 3-8. Sign-in and accounts (both front ends), administrators, profile, introduction.

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-/** Public notice; update the version in this file, RegisterPage and api/app/privacy.py together. */
+/** Public notice; update the version in this file, RegisterPage and services/identity/app/privacy.py together. */
 export function PrivacyPage() {
   return (
     <main className="mx-auto max-w-2xl space-y-6 px-5 py-8 text-sm leading-6 text-ink">

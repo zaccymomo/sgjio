@@ -12,14 +12,17 @@ x-db-healthcheck: &db-healthcheck
   timeout: 5s
   retries: 20
 
-# Settings every Python service reads. GATEWAY_KEY is shared with the gateway: Content and
-# Learning refuse a request without it, so nothing reaches them except through the gateway.
+# Settings every Python service reads.
 x-service-env: &service-env
   BROKER_URL: amqp://sgjio:sgjio@rabbitmq:5672/%2F
-  GATEWAY_KEY: ${GATEWAY_KEY:-dev-gateway-key}
   LOG_LEVEL: ${LOG_LEVEL:-INFO}
   RUN_RELAY: "true"
   RUN_CONSUMER: "true"
+
+# Shared with the gateway, which adds it to every request it forwards. Identity's
+# /internal/auth/* and every protected Content and Learning route refuse a request without
+# it. The default is for development only: set GATEWAY_KEY (in .env) anywhere else.
+x-gateway-key: &gateway-key ${GATEWAY_KEY:-dev-gateway-key}
 
 x-api-healthcheck: &api-healthcheck
   test:
@@ -41,6 +44,7 @@ services:
   # --- Databases: one Postgres per service, each with a <name>_test database too --------
   identity-db:
     image: postgres:16-alpine
+    networks: [identity-data]
     environment:
       POSTGRES_USER: identity
       POSTGRES_PASSWORD: identity
@@ -55,6 +59,7 @@ services:
 
   content-db:
     image: postgres:16-alpine
+    networks: [content-data]
     environment:
       POSTGRES_USER: content
       POSTGRES_PASSWORD: content
@@ -69,6 +74,7 @@ services:
 
   learning-db:
     image: postgres:16-alpine
+    networks: [learning-data]
     environment:
       POSTGRES_USER: learning
       POSTGRES_PASSWORD: learning
@@ -83,6 +89,7 @@ services:
 
   notification-db:
     image: postgres:16-alpine
+    networks: [notification-data]
     environment:
       POSTGRES_USER: notification
       POSTGRES_PASSWORD: notification
@@ -98,7 +105,8 @@ services:
   # --- Broker and email -------------------------------------------------------------
   # Management UI: http://localhost:15672 (sgjio / sgjio)
   rabbitmq:
-    image: rabbitmq:4.4.0-management  # pinned: consumer retry logic relies on 4.4 delivery-limit behaviour
+    image: rabbitmq:4.4.0-management # pinned: consumer retry logic relies on 4.4 delivery-limit behaviour
+    networks: [identity-net, content-net, learning-net, notification-net]
     hostname: rabbitmq
     ports:
       - "127.0.0.1:5672:5672"
@@ -117,6 +125,7 @@ services:
   # Catches every email. Inbox: http://localhost:8025
   mailpit:
     image: axllent/mailpit:v1.31.3
+    networks: [notification-data]
     ports:
       - "127.0.0.1:1025:1025"
       - "127.0.0.1:8025:8025"
@@ -125,14 +134,17 @@ services:
   # Swagger for each: http://localhost:8001/docs (identity), :8002 (content), :8003 (learning)
   identity:
     build: services/identity
+    networks: [identity-data, identity-net]
     command: *api-command
     environment:
       <<: *service-env
       SERVICE_NAME: identity
       DATABASE_URL: postgresql+psycopg://identity:identity@identity-db:5432/identity
-      # uvicorn --proxy-headers trusts X-Forwarded-For from these addresses. Only the
-      # gateway can reach Identity on the compose network (host port is 127.0.0.1 only),
-      # and the gateway overwrites X-Forwarded-For with the real client address.
+      GATEWAY_KEY: *gateway-key
+      # uvicorn --proxy-headers trusts X-Forwarded-For from these addresses. Over the
+      # network only the gateway (and RabbitMQ) can reach Identity (`identity-net`, below),
+      # and the gateway overwrites X-Forwarded-For with the real client address. The host port is
+      # 127.0.0.1 only, for Swagger during development.
       FORWARDED_ALLOW_IPS: "*"
       WEB_URL: ${WEB_URL:-http://localhost:5173}
       ADMIN_URL: ${ADMIN_URL:-http://localhost:5174}
@@ -157,10 +169,12 @@ services:
 
   content:
     build: services/content
+    networks: [content-data, content-net]
     command: *api-command
     environment:
       <<: *service-env
       SERVICE_NAME: content
+      GATEWAY_KEY: *gateway-key
       DATABASE_URL: postgresql+psycopg://content:content@content-db:5432/content
       MEDIA_MAX_IMAGE_MB: "15"
       MEDIA_MAX_AUDIO_MB: "10"
@@ -178,10 +192,12 @@ services:
 
   learning:
     build: services/learning
+    networks: [learning-data, learning-net]
     command: *api-command
     environment:
       <<: *service-env
       SERVICE_NAME: learning
+      GATEWAY_KEY: *gateway-key
       DATABASE_URL: postgresql+psycopg://learning:learning@learning-db:5432/learning
       # Learning publishes nothing, so it has no outbox to relay.
       RUN_RELAY: "false"
@@ -193,6 +209,7 @@ services:
 
   notification:
     build: services/notification
+    networks: [notification-data, notification-net]
     command:
       - sh
       - -c
@@ -223,8 +240,9 @@ services:
   # The only way in from a browser. Front ends' Vite servers proxy /api to localhost:8000.
   gateway:
     build: services/gateway
+    networks: [identity-net, content-net, learning-net]
     environment:
-      GATEWAY_KEY: ${GATEWAY_KEY:-dev-gateway-key}
+      GATEWAY_KEY: *gateway-key
       IDENTITY_UPSTREAM: identity:8000
       CONTENT_UPSTREAM: content:8000
       LEARNING_UPSTREAM: learning:8000
@@ -240,6 +258,20 @@ services:
       identity: { condition: service_started }
       content: { condition: service_started }
       learning: { condition: service_started }
+
+# Two networks per service. `<name>-data` holds only the service and its database, so no
+# other container can reach that database. `<name>-net` joins the service to RabbitMQ and,
+# for the three with an HTTP API, the gateway. No two services share a network, so they
+# can't call each other; only the gateway can call them (ADR 0002).
+networks:
+  identity-data:
+  content-data:
+  learning-data:
+  notification-data: # also Mailpit
+  identity-net:
+  content-net:
+  learning-net:
+  notification-net:
 
 volumes:
   identity-db:

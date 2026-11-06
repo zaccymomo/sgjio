@@ -1,7 +1,7 @@
 import { Alert, ApiError, Button, Dialog, TextAreaField, apiFetch, cn } from "@sgjio/ui";
 import { useState, type FormEvent } from "react";
 
-/** The reasons SCRUM-82 AC1 lists, in its order. Values match api/app/models.py ReportReason. */
+/** The reasons SCRUM-82 AC1 lists, in its order. Values match services/content/app/models.py ReportReason. */
 const REASONS = [
   { value: "wrong", label: "Wrong or outdated" },
   { value: "insensitive", label: "Insensitive" },

@@ -25,6 +25,7 @@ from sqlalchemy.orm import sessionmaker
 from app.platform.broker import EXCHANGE
 from app.platform.consumer import Consumer
 from app.platform.outbox import define_outbox_table, emit, run_relay
+from app.platform.testing import make_envelope
 
 pytestmark = pytest.mark.integration
 
@@ -272,7 +273,7 @@ def test_message_properties_and_dedupe(session_factory, tables, broker, unique, 
         assert properties.type == f"{unique}.mail.requested"
         assert properties.delivery_mode == 2
         assert properties.content_type == "application/json"
-        assert properties.app_id == "platformtest"
+        assert properties.app_id == unique
         assert json.loads(body)["event_id"] == str(event_id)
 
         def unpublished():
@@ -321,7 +322,7 @@ def test_background_workers_follow_the_flags(
 
     configure(run_relay=True, run_consumer=True)
     with background_workers(session_factory, relay=True, consumers=[consumer]):
-        assert {t.name for t in ours()} == {f"{queue}-consumer", "platformtest-relay"}
+        assert {t.name for t in ours()} == {f"{queue}-consumer", f"{unique}-relay"}
         time.sleep(1)  # let them connect, so stopping is tested on live connections
     assert ours() == []
 
@@ -347,9 +348,7 @@ def test_database_outage_does_not_dead_letter(session_factory, broker, unique, c
     )
     channel = broker.channel()
     consumer.declare(channel)
-    body = json.dumps(
-        {"event_id": str(uuid.uuid4()), "type": f"{unique}.thing.changed", "data": {}}
-    ).encode()
+    body = json.dumps(make_envelope(f"{unique}.thing.changed", {})).encode()
     channel.basic_publish(EXCHANGE, f"{unique}.thing.changed", body)
     channel.close()
 

@@ -3,13 +3,15 @@
 The lessons SGJio starts with, written as files so they can be added and changed without the admin portal. The seed loads them, and so can this command:
 
 ```bash
-cd api && python -m app.cli import-lessons --publish    # loads content/lessons
-python -m app.cli import-lessons ../somewhere/else       # or another folder; without --publish they stay drafts
+docker compose exec content python -m app.cli import-lessons --publish   # loads content/lessons
+docker compose exec content python -m app.cli import-lessons /some/folder  # without --publish they stay drafts
 ```
+
+The Content service owns lessons. In compose this folder is mounted read-only into the `content` container at `/srv/content`, so a file you save here is seen at once, with no rebuild. Outside Docker, `services/content/.venv/bin/python -m app.cli import-lessons` reads `content/lessons` directly. Publishing sends the lesson to learners through the Learning service within a second or so.
 
 Running it again is safe. Unchanged files change nothing, changed files update the lesson (and, with `--publish`, publish a new version), and nobody's progress is touched. Lessons are matched by their **key**, which is their folder path without number prefixes: `lessons/02-hawker-food/01-ordering-kopi` is `hawker-food/ordering-kopi`.
 
-To share a lesson you built in the admin portal, copy its text into a file here. Everyone else then gets it with `python -m app.cli seed`.
+To share a lesson you built in the admin portal, copy its text into a file here. Everyone else then gets it with `scripts/seed-all.sh`.
 
 ## A lesson folder
 
@@ -64,7 +66,7 @@ Each card has **text**, and may have an **image**, **audio** or both, and a **qu
 - **`level`** is how advanced the lesson is, from 1 (essentials for your first weeks) to 5 (insider knowledge); the admin portal describes each one. The aptitude quiz exempts learners from a topic's lessons up to the level they reach there. A file can change a lesson's level only until it is first published; after that it is fixed, and the import says so if the file disagrees.
 - **Put text in quotes** when it is on the same line as its name, as above. Without them, a comma or a colon in the text ends it early, and the import says something is wrong. Multi-line text after `|-` needs no quotes.
 
-Every lesson needs a title, a topic and at least one question to be published. The import tells you what is missing, and `api/tests/test_content_import.py` checks every lesson here loads and is ready.
+Every lesson needs a title, a topic and at least one question to be published. The import tells you what is missing, and `services/content/tests/test_content_import.py` checks every lesson here loads and is ready.
 
 ## Aptitude question bank
 

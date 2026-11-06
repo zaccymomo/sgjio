@@ -7,6 +7,8 @@ Every public path is the monolith's, unchanged; the gateway sends /api/auth/*,
 /api/admin/auth/*, /api/admin/admins*, /api/admin/ping, /api/profile* and /api/intro/*
 here. /internal/auth/{app,admin} answers the gateway's session checks. The outbox relay
 runs as a background thread for the life of the process; Identity consumes no events.
+The email events are deleted from the outbox as soon as they are published (their
+one-time links and addresses must not sit in the database; app/events.py).
 """
 
 from contextlib import asynccontextmanager
@@ -14,6 +16,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.db import SessionLocal
+from app.events import EMAIL_EVENTS
 from app.models import AuthScope
 from app.platform.lifespan import background_workers, install_platform
 from app.platform.logging import configure_logging
@@ -25,7 +28,9 @@ configure_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    with background_workers(SessionLocal, relay=True, consumers=[]):
+    with background_workers(
+        SessionLocal, relay=True, consumers=[], discard_after_publish=EMAIL_EVENTS
+    ):
         yield
 
 

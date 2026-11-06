@@ -1,4 +1,5 @@
 import enum
+import json
 import threading
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -9,7 +10,14 @@ from sqlalchemy.orm import sessionmaker
 
 from app.platform.consumer import Consumer, Outcome
 from app.platform.logging import correlation_id
-from app.platform.outbox import define_outbox_table, emit, envelope, run_relay, to_json
+from app.platform.outbox import (
+    define_outbox_table,
+    emit,
+    envelope,
+    publish_pending,
+    run_relay,
+    to_json,
+)
 from app.platform.testing import make_envelope
 
 pytestmark = pytest.mark.integration
@@ -161,3 +169,78 @@ def test_relay_prunes_old_published_rows(session_factory, outbox, broker):
     finally:
         stop.set()
         relay.join(timeout=10)
+
+
+def test_consumer_rejects_the_wrong_producer_and_unknown_versions(session_factory):
+    calls = []
+    consumer = Consumer(
+        routing_keys=[],
+        session_factory=session_factory,
+        handlers={
+            "a.b.ok": lambda s, e: calls.append(e["schema_version"]),
+            "a.b.v2": lambda s, e: calls.append(e["schema_version"]),
+        },
+        schema_versions={"a.b.v2": {1, 2}},
+    )
+
+    def body(type_, **changes):
+        return json.dumps({**make_envelope(type_, {}), **changes}).encode()
+
+    # Only "a" may publish a.*: another service's bug can't act as it.
+    assert consumer.handle(body("a.b.ok", producer="other")) is Outcome.REJECT
+    assert consumer.handle(body("a.b.ok", producer=None)) is Outcome.REJECT
+    # A version the handler doesn't know goes to the DLQ instead of being misread.
+    assert consumer.handle(body("a.b.ok", schema_version=2)) is Outcome.REJECT
+    assert consumer.handle(body("a.b.ok", schema_version=None)) is Outcome.REJECT
+    assert calls == []
+    assert consumer.handle(body("a.b.ok")) is Outcome.ACK
+    assert consumer.handle(body("a.b.v2", schema_version=2)) is Outcome.ACK
+    assert calls == [1, 2]
+
+
+def test_emit_stores_the_schema_version(session_factory, outbox):
+    with session_factory() as session:
+        emit(
+            session,
+            type="platformtest.thing.changed",
+            aggregate_type="thing",
+            aggregate_id=uuid.uuid4(),
+            aggregate_version=1,
+            data={},
+            schema_version=2,
+        )
+        session.commit()
+        assert envelope(session.execute(select(outbox)).one())["schema_version"] == 2
+
+
+class RecordingChannel:
+    def __init__(self):
+        self.published = []
+
+    def basic_publish(self, exchange, routing_key, body, properties):
+        self.published.append(routing_key)
+
+
+def test_discard_after_publish_deletes_sensitive_rows(session_factory, outbox):
+    with session_factory() as session:
+        for type_ in ("platformtest.secret.link", "platformtest.thing.changed"):
+            emit(
+                session,
+                type=type_,
+                aggregate_type="x",
+                aggregate_id=uuid.uuid4(),
+                aggregate_version=1,
+                data={"link": "https://example.test/reset?token=raw"},
+            )
+        session.commit()
+    channel = RecordingChannel()
+    published = publish_pending(
+        session_factory, channel, discard_after_publish={"platformtest.secret.link"}
+    )
+    assert published == 2
+    assert channel.published == ["platformtest.secret.link", "platformtest.thing.changed"]
+    with session_factory() as session:
+        rows = session.execute(select(outbox.c.type, outbox.c.published_at)).all()
+    # The one-time link is gone from the database once the broker has it; the rest stay.
+    assert [row.type for row in rows] == ["platformtest.thing.changed"]
+    assert rows[0].published_at is not None

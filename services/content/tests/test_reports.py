@@ -2,19 +2,24 @@
 version and the card it was sent from. SCRUM-83: administrators see the open reports and
 mark them Fixed or Dismissed."""
 
+import threading
 from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import select
 
+from app.db import SessionLocal
+from app.erasure import erase, refuse_if_erased
 from app.models import (
     Lesson,
     LessonReport,
     LessonStatus,
     LessonVersion,
+    ReportReason,
     ReportStatus,
     Topic,
 )
+from tests.conftest import LEARNER_ID
 
 DOC = {
     "cards": [
@@ -233,3 +238,49 @@ def test_the_lesson_list_counts_each_lessons_open_reports(admin, learner, lesson
     admin.put(f"/api/admin/reports/{report['id']}/status", json={"status": "fixed"})
     [row] = admin.get("/api/admin/lessons").json()
     assert row["open_reports"] == 1
+
+
+def test_a_deleted_accounts_report_still_in_flight_is_refused(db, learner, lesson):
+    """The account was deleted (identity.user.deleted handled) while this request was past
+    the gateway: Content refuses it rather than record the erased id (app/erasure.py)."""
+    erase(db, LEARNER_ID, datetime.now(UTC))
+    db.commit()
+    response = _report(learner, lesson)
+    assert response.status_code == 401
+    assert response.json()["detail"]["code"] == "not_signed_in"
+    assert _reports(db) == []
+
+
+def test_erasing_waits_for_a_report_in_flight(db, lesson):
+    """A report that got the shared lock first commits; the erasure waits for it, then
+    nulls the id it wrote."""
+    reporting = SessionLocal()
+    refuse_if_erased(reporting, LEARNER_ID)  # holds the shared lock until commit
+    erased = threading.Event()
+
+    def erase_now():
+        with SessionLocal() as session:
+            erase(session, LEARNER_ID, datetime.now(UTC))
+            session.commit()
+        erased.set()
+
+    thread = threading.Thread(target=erase_now, daemon=True)
+    thread.start()
+    try:
+        assert not erased.wait(0.5)  # blocked behind the report
+        reporting.add(
+            LessonReport(
+                lesson_id=lesson.id,
+                version_id=lesson.versions[0].id,
+                card_id="c1",
+                reason=ReportReason.WRONG,
+                reporter_id=LEARNER_ID,
+            )
+        )
+        reporting.commit()
+    finally:
+        reporting.close()
+    assert erased.wait(10)
+    thread.join(timeout=10)
+    [report] = _reports(db)
+    assert report.reporter_id is None

@@ -146,7 +146,10 @@ def all_up() -> None:
     check("health", status == 200 and data == b'{"status":"ok"}', f"{status} {data!r}")
     check("health json", headers.get("content-type") == "application/json", str(headers))
     for path in ["/api/nope", "/", "/api/docs", "/api/openapi.json", "/_auth/app",
-                 "/_auth/admin", "/internal/auth/app", "/api/admin/unknown"]:
+                 "/_auth/admin", "/internal/auth/app", "/api/admin/unknown",
+                 # Bare prefixes: 404 as in the monolith, not nginx's 301 to the "/" form
+                 "/api/auth", "/api/admin/auth", "/api/intro", "/api/media", "/api/lessons",
+                 "/api/attempts", "/api/topics", "/api/aptitude"]:
         status, headers, data, _ = request("GET", path, cookie=f"{APP}; {ADMIN}")
         check(f"404 {path}", status == 404 and data == NOT_FOUND, f"{status} {data!r}")
         check(f"404 json {path}", headers.get("content-type") == "application/json")

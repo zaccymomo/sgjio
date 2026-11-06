@@ -1,4 +1,4 @@
-"""Content's lesson document rules, copied for the tests only (api/app/lesson_doc.py).
+"""Content's lesson document rules, copied for the tests only (from Content's app/lesson_doc.py).
 
 The tests stand in for Content: they take the short documents the monolith's tests wrote,
 fill them in as Content stores them (`dump`), and work out what

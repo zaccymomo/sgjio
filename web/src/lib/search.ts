@@ -18,7 +18,7 @@ type State =
   | { status: "ready"; results: SearchResult[] }
   | { status: "error"; message: string };
 
-/** The server refuses anything shorter (api/app/routers/progress.py). */
+/** The server refuses anything shorter (services/learning/app/routers/progress.py). */
 export const MIN_QUERY_LENGTH = 2;
 const DEBOUNCE_MS = 250;
 

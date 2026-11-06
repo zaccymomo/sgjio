@@ -1,4 +1,4 @@
-# Tool configuration for the Content service (copied from api/pyproject.toml).
+# Tool configuration for the Content service (copied from the monolith's api/pyproject.toml on main).
 # Dependencies live in requirements*.txt.
 
 [tool.ruff]

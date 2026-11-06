@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ $clean == 1 ]]; then
-    echo "==> docker compose down -v (sgjio-ms only)"
+    echo "==> docker compose down -v (project ${COMPOSE_PROJECT_NAME:-sgjio-ms} only)"
     docker compose down -v
 fi
 

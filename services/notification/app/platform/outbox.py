@@ -11,6 +11,9 @@
    a crash between publishing and marking publishes the row again, so consumers are
    idempotent (contracts/README.md). The relay also deletes rows published more than
    7 days ago, about once an hour (`prune_published`), so the table stays small.
+4. Types listed in `discard_after_publish` (run_relay, background_workers) are deleted in
+   the same transaction that marks them published instead of being kept for 7 days. Use it
+   for payloads that must not sit in the database: one-time links, email addresses.
 """
 
 import json
@@ -18,7 +21,7 @@ import logging
 import threading
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import UTC, date, datetime, timedelta
 from enum import Enum
 
@@ -29,6 +32,7 @@ from sqlalchemy import (
     DateTime,
     Index,
     MetaData,
+    SmallInteger,
     String,
     Table,
     delete,
@@ -45,7 +49,7 @@ from .broker import EXCHANGE, RECONNECT_BACKOFF_MAX, close_quietly, connect, dec
 from .config import get_config
 from .logging import correlation_id
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 1  # the default for emit(); each row stores its own
 log = logging.getLogger("sgjio.relay")
 _table: Table | None = None
 
@@ -64,6 +68,7 @@ def define_outbox_table(metadata: MetaData, name: str = "outbox") -> Table:
         Column("aggregate_id", UUID(as_uuid=True), nullable=False),
         Column("aggregate_version", BigInteger, nullable=False),
         Column("payload", JSONB, nullable=False),  # the envelope's `data`
+        Column("schema_version", SmallInteger, nullable=False, server_default="1"),
         Column("correlation_id", String(128)),
         Column("occurred_at", DateTime(timezone=True), nullable=False),
         Column("published_at", DateTime(timezone=True)),
@@ -110,9 +115,11 @@ def emit(
     aggregate_id: uuid.UUID | str,
     aggregate_version: int,
     data: dict,
+    schema_version: int = SCHEMA_VERSION,
     table: Table | None = None,
 ) -> uuid.UUID:
-    """Add an event to the outbox in the caller's transaction. Returns its event_id."""
+    """Add an event to the outbox in the caller's transaction. Returns its event_id.
+    `schema_version` changes only with a breaking change to `data` (CONTRIBUTING.md)."""
     event_id = uuid.uuid4()
     session.execute(
         insert(_outbox(table)).values(
@@ -122,6 +129,7 @@ def emit(
             aggregate_id=uuid.UUID(str(aggregate_id)),
             aggregate_version=aggregate_version,
             payload=to_json(data),
+            schema_version=schema_version,
             correlation_id=correlation_id.get(),
             occurred_at=datetime.now(UTC),
         )
@@ -134,7 +142,7 @@ def envelope(row) -> dict:
     return {
         "event_id": str(row.event_id),
         "type": row.type,
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": row.schema_version,
         "occurred_at": _timestamp(row.occurred_at),
         "producer": get_config().service_name,
         "aggregate_type": row.aggregate_type,
@@ -146,9 +154,17 @@ def envelope(row) -> dict:
 
 
 def publish_pending(
-    session_factory: Callable[[], Session], channel, batch_size: int = 100, table=None
+    session_factory: Callable[[], Session],
+    channel,
+    batch_size: int = 100,
+    table=None,
+    discard_after_publish: Iterable[str] = (),
 ) -> int:
     """Publish one batch of unpublished rows, in id order, and mark them published.
+
+    Rows whose type is in `discard_after_publish` are deleted instead of marked: once the
+    broker has confirmed them the outbox has no further use for them, and their payload
+    (a one-time link, say) should not outlive delivery.
 
     FOR UPDATE SKIP LOCKED lets a second relay (if one is ever started) take other rows
     instead of waiting. Returns how many rows were published."""
@@ -177,11 +193,14 @@ def publish_pending(
                     headers={"x-correlation-id": row.correlation_id or ""},
                 ),
             )  # with confirms on, this returns once the broker has the message
-        if rows:
+        discard = set(discard_after_publish)
+        dropped = [row.id for row in rows if row.type in discard]
+        kept = [row.id for row in rows if row.type not in discard]
+        if dropped:
+            session.execute(delete(outbox).where(outbox.c.id.in_(dropped)))
+        if kept:
             session.execute(
-                update(outbox)
-                .where(outbox.c.id.in_([row.id for row in rows]))
-                .values(published_at=func.now())
+                update(outbox).where(outbox.c.id.in_(kept)).values(published_at=func.now())
             )
     return len(rows)
 
@@ -213,10 +232,13 @@ def run_relay(
     broker_url: str | None = None,
     prune_every: float = 3600.0,
     keep_published: timedelta = timedelta(days=7),
+    discard_after_publish: Iterable[str] = (),
 ) -> None:
     """Publish the outbox until `stop` is set. Reconnects with backoff on any failure
     (broker or database down), so it never dies while the service runs. Every
-    `prune_every` seconds it also deletes rows published more than `keep_published` ago."""
+    `prune_every` seconds it also deletes rows published more than `keep_published` ago.
+    Rows of a type in `discard_after_publish` are deleted as soon as they are published."""
+    discard_after_publish = frozenset(discard_after_publish)
     backoff = 1.0
     next_prune = time.monotonic()
     while not stop.is_set():
@@ -229,7 +251,10 @@ def run_relay(
             log.info("outbox relay connected")
             backoff = 1.0
             while not stop.is_set():
-                if publish_pending(session_factory, channel, batch_size, table) < batch_size:
+                published = publish_pending(
+                    session_factory, channel, batch_size, table, discard_after_publish
+                )
+                if published < batch_size:
                     connection.sleep(poll_interval)  # also keeps the heartbeat going
                 if time.monotonic() >= next_prune:
                     next_prune = time.monotonic() + prune_every

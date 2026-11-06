@@ -5,7 +5,10 @@ it together with the change it describes. Users have no version column, so every
 aggregate_version is fixed by the contract: registered 1, deleted 2, the email events 1.
 
 The email events carry everything Notification's templates need (one-time links and
-addresses included), so Notification never asks Identity anything.
+addresses included), so Notification never asks Identity anything. Reset tokens are
+stored hashed, so a raw link left in the outbox would undo that: the relay deletes
+EMAIL_EVENTS rows as soon as the broker has them (app/main.py), instead of keeping them
+for 7 days like the other events.
 """
 
 from datetime import UTC, datetime
@@ -23,6 +26,7 @@ USER_DELETED = "identity.user.deleted"
 PASSWORD_RESET_REQUESTED = "identity.password_reset.requested"
 ADMIN_INVITATION_ISSUED = "identity.admin.invitation_issued"
 ADMIN_REMOVED = "identity.admin.removed"
+EMAIL_EVENTS = frozenset({PASSWORD_RESET_REQUESTED, ADMIN_INVITATION_ISSUED, ADMIN_REMOVED})
 
 InviteTrigger = Literal["invited", "resent", "restored", "forgot_password"]
 
