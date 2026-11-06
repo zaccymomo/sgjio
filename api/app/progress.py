@@ -20,10 +20,12 @@ disappears and the overall figure shrinks with it; restoring brings both back.
 Opening a circle lists that topic's lessons (SCRUM-53) by the same rules, so the figure on
 the topic page always matches its circle.
 
-Beside the circles sits one suggested lesson (SCRUM-6): the next lesson not yet completed in
-the topic where progress is weakest, meaning the smallest share of its lessons completed.
-Topics tie in the order administrators set, so someone with no activity at all is pointed at
-the first lesson of the first topic. With everything completed there is no suggestion.
+Beside the circles sits one suggested lesson (SCRUM-6, SCRUM-106): the lowest-level lesson
+neither completed nor exempted in the topic where progress is weakest, meaning the smallest
+share of its lessons covered (completed or exempted, as the circles count). Topics tie in the
+order administrators set, so someone with no activity at all is pointed at the first lesson of
+the first topic. With everything covered there is no suggestion. The suggestion carries a
+one-line reason (SCRUM-107), which never mentions a level.
 
 Learners can also search every topic's lessons by a word or phrase (SCRUM-85), by the same
 rules: published lessons only, as their latest version reads, in topics that aren't archived.
@@ -80,6 +82,8 @@ class Suggestion:
     reading_seconds: int
     topic_id: uuid.UUID
     topic_name: str
+    # Why this lesson, in one line and without a level (SCRUM-107).
+    reason: str
 
 
 @dataclass(frozen=True)
@@ -191,13 +195,18 @@ def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
 
 
 def _suggestion(db: Session, user_id: uuid.UUID, topics: list[TopicProgress]) -> Suggestion | None:
-    """The first lesson not yet completed in the weakest topic (SCRUM-6 AC2).
+    """The lowest-level lesson neither completed nor exempted in the weakest topic
+    (SCRUM-106 AC1 and AC2, replacing SCRUM-6 AC2).
 
-    `topics` are the circles, in order, so `sorted` (which is stable) breaks a tie by the
-    order administrators set. A topic with nothing left to do is never the weakest.
+    `topics` are the circles, in order, and their `completed` already counts exempted
+    lessons (SCRUM-104), so the weakest topic is chosen by the same figures the circles show.
+    `sorted` is stable, so a tie goes to the order administrators set. A topic with nothing
+    left is never the weakest, and the next topic is tried if a topic's lessons are all
+    passed over (AC3); with everything covered there is no suggestion (AC4).
     """
     unfinished = [topic for topic in topics if topic.completed < topic.available]
-    for topic in sorted(unfinished, key=lambda t: Fraction(t.completed, t.available)):
+    ranked = sorted(unfinished, key=lambda t: Fraction(t.completed, t.available))
+    for rank, topic in enumerate(ranked):
         completed = select(LessonCompletion.id).where(
             LessonCompletion.lesson_id == Lesson.id, LessonCompletion.user_id == user_id
         )
@@ -209,7 +218,9 @@ def _suggestion(db: Session, user_id: uuid.UUID, topics: list[TopicProgress]) ->
                 ~completed.exists(),
                 ~is_exempted(user_id),
             )
-            .order_by(Lesson.position, Lesson.created_at)
+            # Lowest level first, then the order administrators set within a level, as the
+            # topic page lists them (SCRUM-104).
+            .order_by(Lesson.level, Lesson.position, Lesson.created_at)
         )
         for lesson in lessons:
             version = latest_version(db, lesson.id)
@@ -225,8 +236,29 @@ def _suggestion(db: Session, user_id: uuid.UUID, topics: list[TopicProgress]) ->
                 reading_seconds=lesson_doc.stats(doc, media.facts_for(db, doc)).reading_seconds,
                 topic_id=topic.id,
                 topic_name=topic.name,
+                reason=suggestion_reason(
+                    topic.name,
+                    weakest=rank == 0,
+                    only_unfinished=len(unfinished) == 1 and len(topics) > 1,
+                    nothing_covered=all(t.completed == 0 for t in topics),
+                ),
             )
     return None
+
+
+def suggestion_reason(
+    topic_name: str, *, weakest: bool, only_unfinished: bool, nothing_covered: bool
+) -> str:
+    """One line on why a lesson is suggested (SCRUM-107 AC1). It names the topic and how
+    the topic was chosen, and never a level, since levels are not shown to users (AC2)."""
+    if nothing_covered:
+        return f"The first lesson in {topic_name}, a good place to start."
+    if only_unfinished:
+        return f"The next lesson in {topic_name}, the only topic you haven't finished yet."
+    if weakest:
+        return f"The next lesson in {topic_name}, where you've done the least so far."
+    # The weakest topic had nothing that could be opened, so this is the next one along.
+    return f"The next lesson in {topic_name}, one of the topics with the most left to do."
 
 
 @dataclass(frozen=True)

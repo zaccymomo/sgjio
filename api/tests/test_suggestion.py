@@ -89,6 +89,7 @@ def test_the_landing_page_figures_include_a_suggestion(client, db, make_user):
         "reading_seconds": suggestion["reading_seconds"],
         "topic_id": str(topic.id),
         "topic_name": "Singlish",
+        "reason": "The first lesson in Singlish, a good place to start.",
     }
     assert 0 < suggestion["reading_seconds"] <= 120
 

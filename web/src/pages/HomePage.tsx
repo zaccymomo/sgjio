@@ -60,7 +60,10 @@ export function HomePage() {
           <ProgressSection progress={state.progress} />
           {state.progress.available > 0 && (
             <>
-              <SuggestionSection suggestion={state.progress.suggestion} />
+              <SuggestionSection
+                suggestion={state.progress.suggestion}
+                anyExempted={state.progress.exempted > 0}
+              />
               {/* SCRUM-44 AC1 */}
               <Link
                 to="/review"
@@ -193,11 +196,18 @@ function ProgressSection({ progress }: { progress: Progress }) {
 }
 
 /**
- * SCRUM-6: the suggested next lesson. The figures reload on return from a lesson, so
- * completing it brings the next suggestion straight away (AC4). With every lesson completed
- * there is none, and the page says so (AC6).
+ * SCRUM-6 and SCRUM-106: the suggested next lesson, skipping exempted ones. The figures
+ * reload on return from a lesson, so completing it brings the next suggestion straight away
+ * (SCRUM-106 AC5). With every lesson completed or exempted there is none, and the page says
+ * so (AC4). SCRUM-107: a one-line reason sits under the lesson.
  */
-function SuggestionSection({ suggestion }: { suggestion: Suggestion | null }) {
+function SuggestionSection({
+  suggestion,
+  anyExempted,
+}: {
+  suggestion: Suggestion | null;
+  anyExempted: boolean;
+}) {
   return (
     <section className="flex flex-col gap-2.5">
       <h2 className="text-caption font-semibold tracking-wide text-muted uppercase">
@@ -206,7 +216,7 @@ function SuggestionSection({ suggestion }: { suggestion: Suggestion | null }) {
       {suggestion ? (
         <Link
           to={`/lessons/${suggestion.lesson_id}`}
-          aria-label={`Suggested lesson: ${suggestion.title}, in ${suggestion.topic_name}. ${readingLabel(suggestion.reading_seconds)}.`}
+          aria-label={`Suggested lesson: ${suggestion.title}, in ${suggestion.topic_name}. ${readingLabel(suggestion.reading_seconds)}. ${suggestion.reason}`}
           className={cn(
             "flex items-center gap-3 rounded-lg border border-brand/30 bg-brand-soft/40 px-3.5 py-3",
             "transition-colors hover:border-brand/60 hover:bg-brand-soft/70",
@@ -224,6 +234,7 @@ function SuggestionSection({ suggestion }: { suggestion: Suggestion | null }) {
             <span className="text-caption text-subtle">
               {suggestion.topic_name} · {readingLabel(suggestion.reading_seconds)}
             </span>
+            <span className="mt-1 text-caption text-muted italic">{suggestion.reason}</span>
           </span>
           <ChevronRight className="size-4 shrink-0 text-subtle" aria-hidden />
         </Link>
@@ -231,8 +242,11 @@ function SuggestionSection({ suggestion }: { suggestion: Suggestion | null }) {
         <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3.5 py-3">
           <PartyPopper className="size-5 shrink-0 text-brand" aria-hidden />
           <p className="text-sm text-ink">
-            You&apos;ve completed every lesson available. There&apos;s nothing further for now; new
-            lessons will appear here when they&apos;re published.
+            {anyExempted
+              ? "You've completed, or been exempted from, every lesson available."
+              : "You've completed every lesson available."}{" "}
+            There&apos;s nothing new for now; new lessons will appear here when they&apos;re
+            published.
           </p>
         </div>
       )}

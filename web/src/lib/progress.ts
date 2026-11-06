@@ -12,7 +12,10 @@ export type TopicProgress = {
   level: number;
 };
 
-/** The suggested next lesson (SCRUM-6), from the topic where progress is weakest. */
+/**
+ * The suggested next lesson (SCRUM-6, SCRUM-106): the lowest-level lesson neither completed
+ * nor exempted, from the topic where progress is weakest.
+ */
 export type Suggestion = {
   lesson_id: string;
   title: string;
@@ -20,6 +23,8 @@ export type Suggestion = {
   reading_seconds: number;
   topic_id: string;
   topic_name: string;
+  /** One line on why it was suggested (SCRUM-107), never mentioning a level. */
+  reason: string;
 };
 
 export type Progress = {
@@ -27,7 +32,7 @@ export type Progress = {
   completed: number;
   exempted: number;
   available: number;
-  /** Null once every lesson available has been completed (SCRUM-6 AC6). */
+  /** Null once every lesson available is completed or exempted (SCRUM-106 AC4). */
   suggestion: Suggestion | null;
   aptitude_taken: boolean;
 };
