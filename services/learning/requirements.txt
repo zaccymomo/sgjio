@@ -1,4 +1,4 @@
-# STUB (step 0): just enough to serve health checks. The service builder replaces this.
+# Learning service runtime. Pinned as the monolith pins them (api/requirements.txt).
 fastapi==0.141.1
 uvicorn[standard]==0.37.0
 sqlalchemy==2.0.43

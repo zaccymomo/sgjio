@@ -1,0 +1,8 @@
+-r requirements.txt
+pytest==8.4.2
+httpx==0.28.1
+ruff==0.13.2
+# Tests validate every event they feed the consumer against contracts/events (as
+# contracts/validate.py does), so the fixtures can only build schema-valid envelopes.
+jsonschema==4.23.0
+rfc3339-validator==0.1.4

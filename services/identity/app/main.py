@@ -1,32 +1,49 @@
-"""STUB (step 0): health endpoints only, so the compose stack can be brought up and checked.
-The identity service builder replaces this file with the real service."""
+"""SGJio Identity: accounts, sessions, credentials, administrators, profile, introduction.
 
-import os
+Run locally with:  uvicorn app.main:app --reload --port 8001
+Interactive API docs: http://localhost:8001/docs (direct, bypassing the gateway)
 
-from fastapi import FastAPI, Response
-from sqlalchemy import create_engine, text
+Every public path is the monolith's, unchanged; the gateway sends /api/auth/*,
+/api/admin/auth/*, /api/admin/admins*, /api/admin/ping, /api/profile* and /api/intro/*
+here. /internal/auth/{app,admin} answers the gateway's session checks. The outbox relay
+runs as a background thread for the life of the process; Identity consumes no events.
+"""
 
-engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
-app = FastAPI(title="SGJio identity (stub)")
+from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
 
-@app.get("/health/live")
-def live() -> dict:
-    return {"status": "ok"}
+from app.db import SessionLocal
+from app.models import AuthScope
+from app.platform.lifespan import background_workers, install_platform
+from app.platform.logging import configure_logging
+from app.routers import admin, internal, onboarding, profile
+from app.routers.auth import build_auth_router
 
-
-@app.get("/health/ready")
-def ready(response: Response) -> dict:
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-    except Exception:
-        response.status_code = 503
-        return {"status": "unavailable"}
-    return {"status": "ok"}
+configure_logging()
 
 
-@app.get("/internal/auth/{scope}")
-def introspect(scope: str, response: Response) -> None:
-    """STUB: nobody is signed in yet, so the gateway answers protected routes with 401."""
-    response.status_code = 401
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    with background_workers(SessionLocal, relay=True, consumers=[]):
+        yield
+
+
+app = FastAPI(
+    title="SGJio identity",
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url=None,
+    openapi_url="/openapi.json",
+    lifespan=lifespan,
+)
+install_platform(app, SessionLocal)
+
+app.include_router(profile.router, prefix="/api", tags=["Profile"])
+app.include_router(onboarding.router, prefix="/api", tags=["Onboarding"])
+app.include_router(build_auth_router(AuthScope.APP), prefix="/api/auth", tags=["Auth (main app)"])
+app.include_router(
+    build_auth_router(AuthScope.ADMIN), prefix="/api/admin/auth", tags=["Auth (admin portal)"]
+)
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(internal.router)

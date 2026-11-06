@@ -1,26 +1,44 @@
-"""STUB (step 0): health endpoints only, so the compose stack can be brought up and checked.
-The learning service builder replaces this file with the real service."""
+"""SGJio Learning service: lesson runs, progress, review, the aptitude quiz and lesson
+insights (docs/architecture/detailed-plan.md, section 2.3).
 
-import os
+Run locally with:  uvicorn app.main:app --reload --port 8003
+Swagger (direct, bypassing the gateway): http://localhost:8003/docs
 
-from fastapi import FastAPI, Response
-from sqlalchemy import create_engine, text
+The event consumer runs as a background thread in this process (RUN_CONSUMER). Learning
+publishes nothing, so it has no outbox relay.
+"""
 
-engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
-app = FastAPI(title="SGJio learning (stub)")
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from app.consumers import consumer
+from app.db import SessionLocal
+from app.platform.lifespan import background_workers, install_platform
+from app.platform.logging import configure_logging
+from app.routers import aptitude, insights, lessons, progress, review
+
+configure_logging()
 
 
-@app.get("/health/live")
-def live() -> dict:
-    return {"status": "ok"}
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    with background_workers(SessionLocal, relay=False, consumers=[consumer]):
+        yield
 
 
-@app.get("/health/ready")
-def ready(response: Response) -> dict:
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-    except Exception:
-        response.status_code = 503
-        return {"status": "unavailable"}
-    return {"status": "ok"}
+app = FastAPI(
+    title="SGJio learning",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url=None,
+)
+install_platform(app, SessionLocal)
+
+# Paths are the monolith's, unchanged: the gateway forwards /api/... as it receives it.
+app.include_router(progress.router, prefix="/api", tags=["Progress"])
+app.include_router(lessons.router, prefix="/api", tags=["Lessons (learners)"])
+app.include_router(review.router, prefix="/api", tags=["Review (learners)"])
+app.include_router(aptitude.router, prefix="/api", tags=["Aptitude quiz"])
+app.include_router(insights.router, prefix="/api/admin", tags=["Admin: lesson insights"])

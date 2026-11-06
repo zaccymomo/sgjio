@@ -1,4 +1,4 @@
-# Built only from this directory: docker build services/learning
+# Learning service. Built only from this directory: docker build services/learning
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

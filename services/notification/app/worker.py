@@ -1,20 +1,37 @@
-"""STUB (step 0): idles until stopped. The notification builder replaces it with the real
-consumer (python -m app.worker)."""
+"""Notification's process: `python -m app.worker`. It has no HTTP API; it consumes
+notification.events until SIGTERM or SIGINT, and prunes the processed_events inbox about
+hourly in a background thread."""
 
 import logging
-import signal
 import threading
 
-logging.basicConfig(level=logging.INFO)
-stop = threading.Event()
+from app.config import get_settings
+from app.consumer import consumer
+from app.db import SessionLocal
+from app.handlers import run_inbox_pruner
+from app.platform.lifespan import run_until_signalled
+from app.platform.logging import configure_logging
+
+log = logging.getLogger("sgjio.notification")
 
 
 def main() -> None:
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        signal.signal(sig, lambda *_: stop.set())
-    logging.getLogger("notification").info("notification stub worker running")
-    while not stop.wait(60):
-        pass
+    configure_logging()
+    log.info("notification worker starting (email backend: %s)", get_settings().email_backend)
+    stop_pruner = threading.Event()
+    pruner = threading.Thread(
+        target=run_inbox_pruner,
+        args=(SessionLocal, stop_pruner),
+        name="notification-inbox-pruner",
+        daemon=True,
+    )
+    pruner.start()
+    try:
+        run_until_signalled(SessionLocal, consumers=[consumer])
+    finally:
+        stop_pruner.set()
+        pruner.join(timeout=10)
+    log.info("notification worker stopped")
 
 
 if __name__ == "__main__":
