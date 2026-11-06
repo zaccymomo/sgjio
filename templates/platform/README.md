@@ -13,7 +13,7 @@ Then add `pika==1.3.2` to the service's `requirements.txt` (the rest, FastAPI, S
 | Module | Gives you |
 |---|---|
 | `config.py` | `get_config()`: `SERVICE_NAME`, `GATEWAY_KEY`, `BROKER_URL`, `RUN_RELAY`, `RUN_CONSUMER` from the environment. `configure(...)` overrides them (e.g. from your own Settings, or in tests). |
-| `errors.py` | `Problem(code, message, status_code, field=None, extra=None, headers=None)`, `not_signed_in()`, `install_error_handlers(app)`: the `{"detail": {...}}` shape, and FastAPI's own 422. |
+| `errors.py` | `Problem(code, message, status_code, field=None, extra=None, headers=None)`, `not_signed_in()`, `install_error_handlers(app)`: the `{"detail": {...}}` shape, FastAPI's own 422, and a 503 `service_unavailable` (`Retry-After: 5`) when the database can't be reached. |
 | `logging.py` | `configure_logging(level=None)`: JSON lines with service and request id, at `LOG_LEVEL` unless a level is given. `CorrelationIdMiddleware`: reads or makes `X-Request-ID`, returns it, keeps it in the `correlation_id` context variable, logs one line per request, and answers an unhandled exception with a logged 500 that keeps the id. |
 | `health.py` | `health_router(SessionLocal)`: `/health/live` and `/health/ready` (`SELECT 1`). |
 | `principal.py` | `Principal` and `require_principal("app" \| "admin")`, the auth contract in `contracts/README.md`. |

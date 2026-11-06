@@ -5,4 +5,6 @@ error_page 401 @not_signed_in;
 error_page 404 @not_found;
 # 500 here is an auth_request whose Identity call failed (Identity down or timing out).
 error_page 500 502 503 =503 @unavailable;
-error_page 504 @timeout;
+# "=" lets @timeout choose the status: 504 when a service was slow to answer, 503 when it
+# never accepted the connection.
+error_page 504 = @timeout;

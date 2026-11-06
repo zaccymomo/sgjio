@@ -2,7 +2,7 @@
 # Gateway route tests: builds the gateway image, starts it on a private network beside three
 # stub upstreams (identity, content, learning), checks every route, then takes services down.
 #
-#   services/gateway/tests/run.sh            (needs docker and python3; port 18080 free)
+#   services/gateway/tests/run.sh            (needs docker and python3; ports 18080-18081 free)
 #
 # Uses its own network and containers (sgjio-gwtest-*), removed afterwards.
 set -euo pipefail
@@ -16,8 +16,8 @@ IMAGE="sgjio-gwtest-gateway"
 STUB_IMAGE="python:3.11-slim"
 
 cleanup() {
-    docker rm -f sgjio-gwtest-gateway sgjio-gwtest-identity sgjio-gwtest-content \
-        sgjio-gwtest-learning >/dev/null 2>&1 || true
+    docker rm -f sgjio-gwtest-gateway sgjio-gwtest-gateway-blackhole sgjio-gwtest-identity \
+        sgjio-gwtest-content sgjio-gwtest-learning >/dev/null 2>&1 || true
     docker network rm "$NET" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -48,6 +48,18 @@ for _ in $(seq 1 50); do
 done
 
 python3 "$HERE/check_routes.py" "http://127.0.0.1:$PORT" "$KEY" all-up
+python3 "$HERE/check_routes.py" "http://127.0.0.1:$PORT" "$KEY" slow
+
+# Learning at an address that takes no connections (TEST-NET-1): connecting times out.
+BLACKHOLE_PORT=$((PORT + 1))
+docker run -d --name sgjio-gwtest-gateway-blackhole --network "$NET" \
+    -p "127.0.0.1:$BLACKHOLE_PORT:8080" -e GATEWAY_KEY="$KEY" \
+    -e LEARNING_UPSTREAM=192.0.2.1:8000 "$IMAGE" >/dev/null
+for _ in $(seq 1 50); do
+    curl -fsS "http://127.0.0.1:$BLACKHOLE_PORT/api/health" >/dev/null 2>&1 && break
+    sleep 0.2
+done
+python3 "$HERE/check_routes.py" "http://127.0.0.1:$BLACKHOLE_PORT" "$KEY" unreachable
 docker stop sgjio-gwtest-content >/dev/null
 python3 "$HERE/check_routes.py" "http://127.0.0.1:$PORT" "$KEY" content-down
 docker stop sgjio-gwtest-identity >/dev/null

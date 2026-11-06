@@ -822,7 +822,7 @@ sgjio/  (branch arch/microservices)
 **Timeouts and retries:**
 - **Gateway:** the timeouts in section 5. It never retries, because routes such as finish attempt and publish are not idempotent.
 - **Auth cache:** serves stale entries for up to 240 s when Identity errors.
-- **Relay:** exponential backoff up to 30 s while the broker is down. Rows stay in the outbox until published.
+- **Relay:** exponential backoff up to 5 s while the broker is down. Rows stay in the outbox until published.
 - **Consumers:** requeue up to a delivery limit of 5, then the DLQ.
 - **Recovery:** republish, or move the messages in the RabbitMQ UI.
 

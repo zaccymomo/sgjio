@@ -8,6 +8,10 @@ from .config import get_config
 
 EXCHANGE = "sgjio.events"  # topic exchange; routing key = event type
 DLX = "sgjio.dlx"  # direct exchange; routing key = the queue a message died in
+# The relay and consumers retry a lost broker after 1, 2, 4, then every 5 seconds. A short
+# cap means publishing and consuming resume within ~5 s of RabbitMQ coming back, however
+# long it was down; a retry is one cheap TCP connect.
+RECONNECT_BACKOFF_MAX = 5.0
 
 
 def connect(purpose: str, broker_url: str | None = None) -> pika.BlockingConnection:

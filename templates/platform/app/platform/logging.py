@@ -53,7 +53,10 @@ def configure_logging(level: str | None = None) -> None:
     root.setLevel(level.upper())
     # One access line per request comes from the middleware below instead.
     logging.getLogger("uvicorn.access").disabled = True
-    logging.getLogger("pika").setLevel(logging.WARNING)
+    # pika logs several ERROR lines for every failed connection attempt; the relay and the
+    # consumers already log each failure once (a warning naming the error) and retry, so a
+    # broker outage would otherwise flood the logs with errors nothing needs to act on.
+    logging.getLogger("pika").setLevel(logging.CRITICAL)
 
 
 class CorrelationIdMiddleware:

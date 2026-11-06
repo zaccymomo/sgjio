@@ -37,7 +37,14 @@ from enum import Enum
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from .broker import DLX, EXCHANGE, close_quietly, connect, declare_exchanges
+from .broker import (
+    DLX,
+    EXCHANGE,
+    RECONNECT_BACKOFF_MAX,
+    close_quietly,
+    connect,
+    declare_exchanges,
+)
 from .config import get_config
 from .logging import correlation_id
 
@@ -174,7 +181,7 @@ class Consumer:
                     "consumer %s failed (%s); retrying in %.0fs", self.queue, error, backoff
                 )
                 stop.wait(backoff)
-                backoff = min(backoff * 2, 30.0)
+                backoff = min(backoff * 2, RECONNECT_BACKOFF_MAX)
             finally:
                 close_quietly(connection)
 

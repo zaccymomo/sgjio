@@ -260,6 +260,25 @@ def all_up() -> None:
           echo(data).get("detail", {}).get("code") == "service_unavailable", f"{status} {data!r}")
 
 
+def slow() -> None:
+    # A service that connects but answers too slowly: 504, not 503.
+    status, headers, data, _ = request("GET", "/api/lessons/slow-answer", APP)
+    check("slow service -> 504", status == 504 and
+          echo(data).get("detail", {}).get("code") == "gateway_timeout", f"{status} {data!r}")
+
+
+def unreachable() -> None:
+    # A service whose address takes no connections (as a just-stopped container still in
+    # the resolver cache): the connection attempt times out, and that is 503, not 504.
+    status, headers, data, _ = request("GET", "/api/progress", APP)
+    check("unreachable service -> 503", status == 503 and
+          echo(data).get("detail", {}).get("code") == "service_unavailable" and
+          headers.get("retry-after") == "5" and bool(headers.get("x-request-id")),
+          f"{status} {headers} {data!r}")
+    status, headers, data, _ = request("GET", "/api/admin/topics", ADMIN)
+    check("unreachable: other services still answer", status == 200, f"{status} {data!r}")
+
+
 def content_down() -> None:
     status, headers, data, _ = request("GET", "/api/media/abc")
     check("content down: media 503", status == 503 and
@@ -280,11 +299,27 @@ def identity_down() -> None:
               f"{status} {data!r}")
     status, headers, data, _ = request("GET", "/api/auth/me", APP)
     check("identity down: identity route 503", status == 503, f"{status} {data!r}")
+    # No session cookie for the route's front end at all: signed out for certain, so the
+    # gateway answers 401 itself without asking Identity (a visitor still sees sign-in).
+    for path, cookie in [("/api/progress", None), ("/api/progress", ADMIN),
+                         ("/api/admin/topics", None), ("/api/admin/topics", APP),
+                         ("/api/lessons/abc/reports", "sgjio_session="),
+                         ("/api/admin/lessons/abc/insights", "other=1")]:
+        status, headers, data, _ = request("GET", path, cookie)
+        check(f"identity down: {path} with {cookie} -> 401",
+              status == 401 and data == NOT_SIGNED_IN and bool(headers.get("x-request-id")),
+              f"{status} {data!r}")
     status, headers, data, _ = request("GET", "/api/health")
     check("identity down: health", status == 200, f"{status} {data!r}")
 
 
-{"all-up": all_up, "content-down": content_down, "identity-down": identity_down}[PHASE]()
+{
+    "all-up": all_up,
+    "slow": slow,
+    "unreachable": unreachable,
+    "content-down": content_down,
+    "identity-down": identity_down,
+}[PHASE]()
 for failure in failures:
     print("FAIL", failure)
 print(f"{PHASE}: {checks - len(failures)}/{checks} checks passed")

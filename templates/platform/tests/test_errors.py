@@ -68,3 +68,27 @@ def test_validation_errors_keep_fastapis_shape():
     got = TestClient(ours).post("/validate", json={"name": 3})
     assert got.status_code == expected.status_code == 422
     assert got.content == expected.content
+
+
+def test_a_lost_database_answers_the_gateways_503():
+    """A service whose own database is down says "try again" exactly as the gateway does
+    when the whole service is down, not a bare 500."""
+    from sqlalchemy import create_engine, text
+
+    app = make_app()
+    # Nothing listens on port 1, so the connection is refused at once.
+    engine = create_engine("postgresql+psycopg://nobody:nothing@127.0.0.1:1/none")
+
+    @app.get("/needs-db")
+    def needs_db():
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+
+    install_error_handlers(app)
+    response = TestClient(app, raise_server_exceptions=False).get("/needs-db")
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "5"
+    assert response.content == (
+        b'{"detail":{"code":"service_unavailable",'
+        b'"message":"SGJio is unavailable right now. Please try again in a moment."}}'
+    )

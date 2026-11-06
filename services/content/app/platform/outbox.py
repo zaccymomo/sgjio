@@ -41,7 +41,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Session
 
-from .broker import EXCHANGE, close_quietly, connect, declare_exchanges
+from .broker import EXCHANGE, RECONNECT_BACKOFF_MAX, close_quietly, connect, declare_exchanges
 from .config import get_config
 from .logging import correlation_id
 
@@ -237,6 +237,6 @@ def run_relay(
         except Exception as error:  # noqa: BLE001 - keep the relay alive whatever happens
             log.warning("outbox relay failed (%s); retrying in %.0fs", error, backoff)
             stop.wait(backoff)
-            backoff = min(backoff * 2, 30.0)
+            backoff = min(backoff * 2, RECONNECT_BACKOFF_MAX)
         finally:
             close_quietly(connection)

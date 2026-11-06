@@ -213,13 +213,22 @@ server {
     }
 
     # 23. Session checks against Identity (never reachable from outside: `internal`).
+    # A request without the front end's session cookie is signed out for certain, so it gets
+    # the 401 at once without asking Identity: a visitor still sees sign-in while Identity
+    # is down, and signed-out requests cost Identity nothing.
     location = /_auth/app {
+        if ($cookie_sgjio_session = "") {
+            return 401;
+        }
         set $auth_upstream ${IDENTITY_UPSTREAM};
         proxy_pass http://$auth_upstream/internal/auth/app;
         include snippets/auth_request.inc;
     }
 
     location = /_auth/admin {
+        if ($cookie_sgjio_admin_session = "") {
+            return 401;
+        }
         set $auth_upstream ${IDENTITY_UPSTREAM};
         proxy_pass http://$auth_upstream/internal/auth/admin;
         include snippets/auth_request.inc;
@@ -262,9 +271,18 @@ server {
         return 503 '{"detail":{"code":"service_unavailable","message":"SGJio is unavailable right now. Please try again in a moment."}}';
     }
 
+    # nginx answers 504 both when a service is slow to answer and when it could not even
+    # connect (a stopped container whose address is still in the resolver cache drops the
+    # connection attempt, which times out). Only the first is "too slow": a connection that
+    # never opened leaves $upstream_connect_time at "-", and that service is unreachable.
     location @timeout {
         default_type application/json;
         add_header X-Request-ID $req_id always;
+        if ($upstream_connect_time ~ "^[-, ]*$") {
+            add_header X-Request-ID $req_id always;
+            add_header Retry-After 5 always;
+            return 503 '{"detail":{"code":"service_unavailable","message":"SGJio is unavailable right now. Please try again in a moment."}}';
+        }
         return 504 '{"detail":{"code":"gateway_timeout","message":"SGJio took too long to answer. Please try again."}}';
     }
 }

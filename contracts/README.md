@@ -103,7 +103,7 @@ Changing a queue's arguments later fails with `PRECONDITION_FAILED` until the qu
 
 This replaces the detailed plan's JWT (sections 4.5 and 5.1): the gateway asks Identity on **every** protected request, with no cache.
 
-1. For a protected route (see `services/gateway/templates/gateway.conf.template`) nginx makes a subrequest, without the body, to Identity: `GET /internal/auth/app` or `GET /internal/auth/admin` (the scope comes from the path: `/api/admin/*` is admin, the rest is app). It forwards only `Cookie`, `X-Request-ID`, `X-Forwarded-For` (the client address as nginx sees it) and `X-Gateway-Key`.
+1. For a protected route (see `services/gateway/templates/gateway.conf.template`) nginx makes a subrequest, without the body, to Identity: `GET /internal/auth/app` or `GET /internal/auth/admin` (the scope comes from the path: `/api/admin/*` is admin, the rest is app). It forwards only `Cookie`, `X-Request-ID`, `X-Forwarded-For` (the client address as nginx sees it) and `X-Gateway-Key`. A request that carries no cookie for that scope at all (`sgjio_session` or `sgjio_admin_session` absent or empty) is signed out for certain: nginx answers the 401 below at once without asking Identity, so a visitor still gets sign-in rather than 503 while Identity is down.
 2. Identity reads that scope's cookie (`sgjio_session` or `sgjio_admin_session`) and runs today's session checks (expiry, sliding refresh, removed accounts, `is_admin` for admin). It answers:
    - **200** with headers
      - `X-User-Id`: the user's UUID
@@ -127,6 +127,7 @@ Every service answers errors as the monolith did, so the front ends' `ApiError` 
 - Request validation: FastAPI's default 422 body, `{"detail": [{"type", "loc", "msg", "input", ...}]}`, unchanged.
 - Signed out: 401 `{"detail":{"code":"not_signed_in","message":"Please sign in to continue."}}`, byte for byte.
 - An unhandled exception: 500 `text/plain` "Internal Server Error", as the monolith answered, now with `X-Request-ID` and a logged traceback carrying the same id (`CorrelationIdMiddleware`).
+- The service's own database unreachable (SQLAlchemy `OperationalError` or `InterfaceError`: connection refused or dropped, or a transient failure such as a deadlock): 503 with `Retry-After: 5` and the same `service_unavailable` body as the gateway's (table below), logged as a warning with the request id. The monolith answered 500 here; this is a deliberate change so the front end says "try again in a moment" whether a whole service or only its database is down.
 - Produced by the gateway itself (never replacing a service's own response):
 
 | Status | Body |

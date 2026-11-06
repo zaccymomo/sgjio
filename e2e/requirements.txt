@@ -1,0 +1,5 @@
+# The end-to-end suite: talks only to the gateway (:8000) and Mailpit's API (:8025).
+httpx==0.28.1
+jsonschema==4.23.0
+pillow==11.0.0
+pytest==8.3.4

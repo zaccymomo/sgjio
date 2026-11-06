@@ -102,6 +102,8 @@ class Handler(BaseHTTPRequestHandler):
         if match and SERVICE == "identity":
             return self._auth(match[1])
         length = self._body_length()
+        if "/slow-answer" in self.path:
+            time.sleep(17)  # past the gateway's 15 s read timeout
         status = re.search(r"/status/(\d{3})$", self.path.split("?")[0])
         if status:
             code = int(status[1])
