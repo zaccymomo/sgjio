@@ -14,6 +14,8 @@ import { type Topic, type TopicLesson, useTopic } from "../lib/topic";
  *
  * Its description, if it has one, sits under the title (SCRUM-86).
  *
+ * Lessons come lowest level first under a heading per level (SCRUM-104 AC4).
+ *
  * Selecting a lesson opens it (AC2). The lesson says it came from here, so finishing or
  * closing it steps back to this page rather than stacking a second copy on top (AC3); that
  * keeps the browser's back button, like the "All topics" link, leading home (AC4).
@@ -112,13 +114,20 @@ function TopicDetail({ topic }: { topic: Topic }) {
             <h2 className="text-caption font-semibold tracking-wide text-muted uppercase">
               Lessons &amp; quizzes
             </h2>
-            <ul className="flex flex-col gap-2.5">
-              {lessons.map((lesson) => (
-                <li key={lesson.id}>
-                  <LessonRow lesson={lesson} />
-                </li>
-              ))}
-            </ul>
+            {/* The API sends lessons lowest level first (SCRUM-104 AC4); a heading marks
+                where each level starts. */}
+            {byLevel(lessons).map(([level, group]) => (
+              <div key={level} className="flex flex-col gap-2">
+                <h3 className="text-caption font-semibold text-muted">Level {level}</h3>
+                <ul className="flex flex-col gap-2.5">
+                  {group.map((lesson) => (
+                    <li key={lesson.id}>
+                      <LessonRow lesson={lesson} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </section>
         </>
       )}
@@ -163,7 +172,7 @@ const DATE = new Intl.DateTimeFormat("en-SG", { day: "numeric", month: "short", 
 function rowMeta(lesson: TopicLesson): string {
   const { last_attempted_at, best_correct, best_scored, reading_seconds, questions } = lesson;
   if (lesson.exempted && !lesson.completed) {
-    return `Exempted by aptitude test · Level ${lesson.level}`;
+    return "Exempted by aptitude test";
   }
   if (!last_attempted_at) {
     return [
@@ -175,6 +184,17 @@ function rowMeta(lesson: TopicLesson): string {
   const attempted = `Last attempted on ${DATE.format(new Date(last_attempted_at))}`;
   // A lesson of one-option taps only has nothing to score.
   return best_scored ? `${attempted} · Best score ${best_correct} / ${best_scored}` : attempted;
+}
+
+/** The lessons in runs of one level each, in the order given. */
+function byLevel(lessons: TopicLesson[]): [number, TopicLesson[]][] {
+  const groups: [number, TopicLesson[]][] = [];
+  for (const lesson of lessons) {
+    const last = groups.at(-1);
+    if (last && last[0] === lesson.level) last[1].push(lesson);
+    else groups.push([lesson.level, [lesson]]);
+  }
+  return groups;
 }
 
 function plural(count: number, word: string): string {

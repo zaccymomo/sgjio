@@ -1,5 +1,5 @@
 import { Alert, ApiError, Button, Spinner, useAuth } from "@sgjio/ui";
-import { ChevronLeft } from "lucide-react";
+import { ChevronDown, ChevronLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
@@ -285,10 +285,11 @@ type Placement = QuizResult["placements"][number];
 
 /**
  * One topic in the results (SCRUM-100): how many of its lessons the aptitude test exempted
- * (AC1), or that the learner starts from its first lesson (AC2). The topic's name opens it.
+ * (AC1), or that the learner starts from its first lesson (AC2). The topic's name opens it,
+ * and a dropdown beneath lists the lessons exempted, each opening that lesson.
  */
 function PlacementRow({ placement }: { placement: Placement }) {
-  const { topic_id, topic, level, exempted, available } = placement;
+  const { topic_id, topic, level, exempted, available, lessons } = placement;
 
   const [count, detail] =
     available === 0
@@ -304,17 +305,44 @@ function PlacementRow({ placement }: { placement: Placement }) {
 
   // The name and its detail on the left, the count centred against both on the right.
   return (
-    <li className="flex items-center justify-between gap-3 p-3 text-sm">
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <Link
-          to={`/topics/${topic_id}`}
-          className="w-fit rounded-sm font-medium text-ink underline-offset-2 hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-        >
-          {topic}
-        </Link>
-        <span className="text-caption text-muted">{detail}</span>
-      </span>
-      <span className="shrink-0 text-right font-semibold text-brand">{count}</span>
+    <li className="flex flex-col gap-2 p-3 text-sm">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <Link
+            to={`/topics/${topic_id}`}
+            className="w-fit rounded-sm font-medium text-ink underline-offset-2 hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            {topic}
+          </Link>
+          <span className="text-caption text-muted">{detail}</span>
+        </span>
+        <span className="shrink-0 text-right font-semibold text-brand">{count}</span>
+      </div>
+      {lessons.length > 0 && (
+        <details className="group">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-sm text-caption font-semibold text-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand [&::-webkit-details-marker]:hidden">
+            <ChevronDown
+              className="size-3.5 transition-transform group-open:rotate-180"
+              aria-hidden
+            />
+            <span className="group-open:hidden">Show exempted lessons</span>
+            <span className="hidden group-open:inline">Hide exempted lessons</span>
+          </summary>
+          <ul className="mt-2 flex flex-col gap-1.5 border-l-2 border-line pl-3">
+            {lessons.map((lesson) => (
+              <li key={lesson.id} className="flex items-baseline justify-between gap-3">
+                <Link
+                  to={`/lessons/${lesson.id}`}
+                  className="rounded-sm text-ink underline-offset-2 hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                >
+                  {lesson.title}
+                </Link>
+                <span className="shrink-0 text-caption text-subtle">Level {lesson.level}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </li>
   );
 }

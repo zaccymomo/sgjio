@@ -23,6 +23,8 @@ export type QuizResult = {
     level: number;
     exempted: number;
     available: number;
+    /** The lessons exempted, lowest level first. */
+    lessons: Array<{ id: string; title: string; level: number }>;
   }>;
 };
 

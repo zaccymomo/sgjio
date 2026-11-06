@@ -1,7 +1,7 @@
 /**
  * Lesson levels (SCRUM-103). Lessons and aptitude questions share Level 1 to 5 (Epic 6);
  * the aptitude quiz exempts users from a topic's lessons up to the level they reach there
- * (SCRUM-104). Levels are only seen in the admin portal.
+ * (SCRUM-104). Learners see only the number, on topic pages and their aptitude results.
  *
  * The descriptions keep authors using the scale the same way. They are a first draft for
  * the team to agree (docs/decisions.md); change the wording here.
