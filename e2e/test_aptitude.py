@@ -195,26 +195,18 @@ def test_learner_takes_the_aptitude_test(admin, new_learner):
         assert home["suggestion"]["topic_id"] != first_topic
 
 
-def test_skipping_the_aptitude_test(new_learner):
+def test_skipping_the_aptitude_test_stores_nothing(new_learner):
+    """SCRUM-98: "Skip for now" only leaves the page; there is no skip call any more."""
     learner = new_learner()
-    check(learner.http.post("/api/aptitude/skip"), "POST /api/aptitude/skip", 204)
+    response = learner.http.post("/api/aptitude/skip")
+    assert response.status_code == 404, response.text
     assert progress(learner.http)["aptitude_taken"] is False
-    response = learner.http.get("/api/aptitude/result")
-    problem(response, 404, "attempt_not_found")
+    problem(learner.http.get("/api/aptitude/result"), 404, "attempt_not_found")
 
 
-def test_aptitude_needs_a_profile(new_learner):
+def test_aptitude_does_not_need_a_profile(new_learner):
+    """Profile setup can be skipped too, so the test starts without one."""
     learner = new_learner(onboarded=False)
-    problem(learner.http.post("/api/aptitude/start"), 409, "profile_required")
-    # As soon as the profile is saved, it starts (no stale "profile completed" anywhere).
-    check(
-        learner.http.put(
-            "/api/profile",
-            json={"neighbourhood": "Tampines", "interests": ["Food"], "languages": ["English"]},
-        ),
-        "PUT /api/profile",
-        200,
-    )
     check(learner.http.post("/api/aptitude/start"), "POST /api/aptitude/start", 200)
 
 

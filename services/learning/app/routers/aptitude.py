@@ -1,8 +1,9 @@
-"""Signed-in Newcomer routes for the adaptive per-topic aptitude quiz. Who may take it comes
-from the caller's principal (X-User-Type, X-Profile-Completed), which the gateway asks
-Identity for on every request."""
+"""Signed-in Newcomer routes for the adaptive per-topic aptitude quiz. Who may take it (Newcomers
+only) comes from the caller's principal (X-User-Type), which the gateway asks Identity for on
+every request. "Skip for now" makes no call: not having taken the quiz is simply having no
+attempt (SCRUM-98)."""
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app import aptitude
@@ -37,11 +38,6 @@ def submit(
 ):
     attempt = aptitude.submit_quiz(db, user, body.answers)
     return aptitude.result_out(db, attempt)
-
-
-@router.post("/aptitude/skip", status_code=status.HTTP_204_NO_CONTENT)
-def skip(user: Principal = Depends(signed_in), db: Session = Depends(get_db)) -> None:
-    aptitude.skip_quiz(db, user)
 
 
 @router.get("/aptitude/result", response_model=AptitudeResultOut)

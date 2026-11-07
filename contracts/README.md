@@ -120,7 +120,7 @@ This replaces the detailed plan's JWT (sections 4.5 and 5.1): the gateway asks I
      - `X-User-Scope`: `app` or `admin`
      - `X-User-Role`: `user` or `admin`
      - `X-User-Type`: `newcomer` or `singaporean`; empty for administrators
-     - `X-Profile-Completed`: `true` or `false` (the user has a profile row; aptitude eligibility)
+     - `X-Profile-Completed`: `true` or `false` (the user has a profile row; no service reads it since the aptitude test stopped needing a profile, SCRUM-98, but it stays in the contract)
      - `Set-Cookie`, when it refreshed the session cookie. nginx relays it to the browser.
    - **401** otherwise (no body needed). Identity may check `X-Gateway-Key` and answer 401 without it.
 3. nginx answers the 401 itself with exactly `{"detail":{"code":"not_signed_in","message":"Please sign in to continue."}}`. If Identity can't be reached or takes over 2 s, it answers **503** `service_unavailable`.

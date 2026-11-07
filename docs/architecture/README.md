@@ -13,7 +13,7 @@ All five steps are done. The monolith (`api/`) is deleted on this branch; `main`
 | Each service: tables, API, events, commands, tests                                                          | `services/<name>/README.md`                           |
 | Running it, ports, logins, troubleshooting                                                                  | [README.md](../../README.md)                          |
 
-Tests: Identity 209, Content 373, Learning 258, Notification 33, platform template 34, contracts 151 checks, the gateway's route checks, and 44 end-to-end tests through the gateway (4 of them opt-in resilience drills). CI runs all of them (`.github/workflows/ci.yml`; the drills stay manual).
+Tests: Identity 209, Content 373, Learning 262, Notification 33, platform template 34, contracts 151 checks, the gateway's route checks, and 44 end-to-end tests through the gateway (4 of them opt-in resilience drills). CI runs all of them (`.github/workflows/ci.yml`; the drills stay manual).
 
 ## Target
 

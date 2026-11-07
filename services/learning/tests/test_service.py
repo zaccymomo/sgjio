@@ -25,7 +25,6 @@ MONOLITH_ROUTES = {
     ("POST", "/api/aptitude/start"),
     ("POST", "/api/aptitude/next"),
     ("POST", "/api/aptitude/submit"),
-    ("POST", "/api/aptitude/skip"),
     ("GET", "/api/aptitude/result"),
     ("GET", "/api/admin/lessons/{lesson_id}/insights"),
 }

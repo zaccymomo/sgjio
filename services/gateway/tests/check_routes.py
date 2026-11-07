@@ -126,7 +126,6 @@ ROUTES = [
     ("POST", "/api/aptitude/start", "learning", "app"),
     ("POST", "/api/aptitude/next", "learning", "app"),
     ("POST", "/api/aptitude/submit", "learning", "app"),
-    ("POST", "/api/aptitude/skip", "learning", "app"),
     ("GET", "/api/aptitude/result", "learning", "app"),
 ]
 FORGED = {

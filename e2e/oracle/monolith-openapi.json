@@ -5514,20 +5514,6 @@
     ]
    }
   },
-  "/api/aptitude/skip": {
-   "post": {
-    "operationId": "skip_api_aptitude_skip_post",
-    "responses": {
-     "204": {
-      "description": "Successful Response"
-     }
-    },
-    "summary": "Skip",
-    "tags": [
-     "Aptitude quiz"
-    ]
-   }
-  },
   "/api/aptitude/start": {
    "post": {
     "operationId": "start_api_aptitude_start_post",

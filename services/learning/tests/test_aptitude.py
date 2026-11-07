@@ -165,20 +165,17 @@ def test_singaporean_cannot_take_the_newcomer_quiz(client, bank, make_user):
     }
 
 
-def test_a_newcomer_without_a_profile_is_asked_to_complete_it(client, bank, make_user):
-    """Eligibility comes from X-Profile-Completed, which Identity sets on every request."""
+def test_a_newcomer_without_a_profile_can_take_the_quiz(client, bank, make_user):
+    """SCRUM-98: profile setup can be skipped (SCRUM-14), so the quiz no longer needs one."""
     sign_in(client, make_user("new@example.com", profile_completed=False))
 
-    for path in ("/api/aptitude/start", "/api/aptitude/skip"):
-        response = client.post(path)
-        assert response.status_code == 409
-        assert response.json()["detail"]["code"] == "profile_required"
+    assert client.post("/api/aptitude/start").status_code == 200
 
 
-def test_skipping_is_allowed_once_eligible_and_records_nothing(client, db, bank, newcomer):
-    assert client.post("/api/aptitude/skip").status_code == 204
+def test_there_is_no_skip_endpoint(client, db, bank, newcomer):
+    """ "Skip for now" only leaves the page; nothing is stored, so there is nothing to call."""
+    assert client.post("/api/aptitude/skip").status_code == 404
     assert db.scalar(select(AptitudeAttempt)) is None
-    assert client.get("/api/aptitude/result").json()["detail"]["code"] == "attempt_not_found"
 
 
 def test_quiz_options_are_shuffled_and_end_with_not_sure(client, db, bank, newcomer):
