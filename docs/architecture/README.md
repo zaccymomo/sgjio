@@ -1,10 +1,10 @@
 # SGJio microservices: build plan
 
-Branch `arch/microservices`, not merged to `main`. This is the source of truth for the build. [detailed-plan.md](detailed-plan.md) is the full multi-agent plan, for reference. Where the two disagree, this page wins.
+Merged into `main` in #21. This was the source of truth for the build. [detailed-plan.md](detailed-plan.md) is the full multi-agent plan, for reference. Where the two disagree, this page wins.
 
 ## Status: built
 
-All five steps are done. The monolith (`api/`) is deleted on this branch; `main` keeps it as the behaviour to compare against.
+All five steps are done. The monolith (`api/`) was deleted in #21; its last version is commit `1afb4b3`, and `e2e/oracle/monolith-openapi.json` keeps its API as the behaviour to compare against.
 
 | What                                                                                                        | Where                                                 |
 | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
@@ -13,7 +13,7 @@ All five steps are done. The monolith (`api/`) is deleted on this branch; `main`
 | Each service: tables, API, events, commands, tests                                                          | `services/<name>/README.md`                           |
 | Running it, ports, logins, troubleshooting                                                                  | [README.md](../../README.md)                          |
 
-Tests: Identity 209, Content 373, Learning 262, Notification 33, platform template 34, contracts 151 checks, the gateway's route checks, and 44 end-to-end tests through the gateway (4 of them opt-in resilience drills). CI runs all of them (`.github/workflows/ci.yml`; the drills stay manual).
+Tests: Identity 209, Content 373, Learning 264, Notification 33, platform template 34, contracts 151 checks, the gateway's route checks, and 44 end-to-end tests through the gateway (4 of them opt-in resilience drills). CI runs all of them (`.github/workflows/ci.yml`; the drills stay manual).
 
 ## Target
 
@@ -57,7 +57,7 @@ The detailed plan holds the service catalogue, the event payloads and the routin
 | Gateway legacy mode and a `legacy-api` profile                   | Dropped. `main` is the monolith to compare against.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | RabbitMQ shovel, least-privilege broker users, chaos script      | Deferred. The management UI is kept. Until there are broker users per service, consumers refuse an event whose `producer` isn't its type's first segment (ADR 0003 records the remaining risk).                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Advisory locks on learner writes during account deletion         | Kept, narrowly. The session is gone before the event is sent, and the gateway checks every request, so the deleted user cannot start anything new. For a request already in flight, erasure takes the learner's advisory lock, and the two writes that create a learner's first rows (starting an attempt, submitting the quiz) take it in shared mode and refuse an erased id (`services/learning/app/erasure.py`). The `erased_learners` tombstone stops a replayed `user.registered` bringing a learner back. Content does the same for reporting a problem (`services/content/app/erasure.py`, tombstone `erased_users`). |
-| `RESET_TOKEN_MINUTES = 5`                                        | **15** on this branch, because email is now sent asynchronously.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `RESET_TOKEN_MINUTES = 5`                                        | **15**, because email is now sent asynchronously.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## Declared behaviour changes
 
@@ -100,7 +100,7 @@ Steps 1–3 can run at the same time because they depend only on `contracts/` an
 
 ## How to run
 
-Everything runs in Docker under the compose project `sgjio-ms`, so it never touches the monolith's containers or volumes (project `sgjio` on `main`). Stop the monolith's API first if it is running: both use port 8000.
+Everything runs in Docker under the compose project `sgjio-ms`, so it never touches the old monolith's containers or volumes (project `sgjio`). Stop those once with `docker compose -p sgjio down` if they are still running.
 
 ```bash
 docker compose up -d --build --wait     # 4 Postgres, RabbitMQ, Mailpit, 4 services, gateway: all healthy

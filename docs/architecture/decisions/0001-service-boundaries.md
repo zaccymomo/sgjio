@@ -1,10 +1,10 @@
 # ADR 0001: Four services, split by who owns the data
 
-**Status:** accepted, built (branch `arch/microservices`)
+**Status:** accepted, built (merged in #21)
 
 ## Context
 
-The monolith (`api/` on `main`) was one FastAPI app over one database. Its modules already fell into groups that change for different reasons and are used by different people: accounts and sign-in (everyone), authoring (administrators), learning (learners), and email (nobody directly). We wanted services that each own a coherent set of tables, so that almost no request needs two of them.
+The monolith (`api/`, removed in #21) was one FastAPI app over one database. Its modules already fell into groups that change for different reasons and are used by different people: accounts and sign-in (everyone), authoring (administrators), learning (learners), and email (nobody directly). We wanted services that each own a coherent set of tables, so that almost no request needs two of them.
 
 ## Decision
 

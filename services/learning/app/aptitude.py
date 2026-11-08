@@ -34,6 +34,7 @@ from app.models import (
     AptitudeAttempt,
     LearnableLesson,
     LearnableTopic,
+    LessonDeck,
     QuizBank,
     QuizQuestion,
     TopicExemption,
@@ -255,6 +256,9 @@ def result_out(db: Session, attempt: AptitudeAttempt) -> dict:
     A lesson the user has also completed still counts as exempted here, so the figure does
     not shrink as they study. Topics archived since the quiz are left out, as from the
     circles.
+
+    Each topic also lists the lessons it exempts, lowest level first as on topic pages,
+    titled as their latest version reads, so the results can show which they are.
     """
     counts = {
         row.topic_id: row
@@ -270,6 +274,18 @@ def result_out(db: Session, attempt: AptitudeAttempt) -> dict:
             .group_by(LearnableLesson.topic_id)
         )
     }
+    exempted_by_topic: dict[uuid.UUID, list[dict]] = {}
+    for row in db.execute(
+        select(
+            LearnableLesson.id, LearnableLesson.topic_id, LearnableLesson.level, LessonDeck.title
+        )
+        .join(LessonDeck, LessonDeck.id == LearnableLesson.latest_version_id)
+        .where(lesson_visible(), is_exempted(attempt.user_id))
+        .order_by(LearnableLesson.level, LearnableLesson.position, LearnableLesson.created_at)
+    ):
+        exempted_by_topic.setdefault(row.topic_id, []).append(
+            {"id": row.id, "title": row.title, "level": row.level}
+        )
     placements = list(
         db.execute(
             visible_to_users(
@@ -291,6 +307,7 @@ def result_out(db: Session, attempt: AptitudeAttempt) -> dict:
                 "level": exemption.level,
                 "exempted": counts[topic.id].exempted if topic.id in counts else 0,
                 "available": counts[topic.id].available if topic.id in counts else 0,
+                "lessons": exempted_by_topic.get(topic.id, []),
             }
             for exemption, topic in placements
         ],

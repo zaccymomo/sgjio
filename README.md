@@ -2,7 +2,7 @@
 
 A web app that helps international residents learn Singapore's cultural norms and build an evidenced record of their integration effort. IS4301 team project. Backlog: Jira project **SCRUM** · Design: Figma file **SGJIO**.
 
-> **This is the `arch/microservices` branch.** The back end is split into four services behind an API gateway, talking through RabbitMQ. The front ends are unchanged. `main` still has the single FastAPI back end (`api/`). Why and how: [docs/architecture/](docs/architecture/README.md) (decisions in [decisions/](docs/architecture/decisions/README.md), pictures in [diagrams.md](docs/architecture/diagrams.md)).
+> **The back end is four services behind an API gateway**, talking through RabbitMQ (since #21, which replaced the single FastAPI back end, `api/`). The front ends are unchanged. Why and how: [docs/architecture/](docs/architecture/README.md) (decisions in [decisions/](docs/architecture/decisions/README.md), pictures in [diagrams.md](docs/architecture/diagrams.md)).
 
 ## What is where
 
@@ -60,7 +60,7 @@ npm run dev:admin                     # http://localhost:5174
 
 Ctrl-C stops the two Vite servers; the stack keeps running in Docker. Next time, `./dev.local` without `--seed` is enough. Stop the stack with `docker compose down` (keeps your data) or `docker compose down -v` (wipes it).
 
-The monolith on `main` also uses port 8000: stop its API (and `docker compose down` there) before starting this branch. The two use different compose projects, so their data never mixes.
+Set up before #21 (the monolith)? Its containers were the compose project `sgjio` and hold Mailpit's ports: stop them once with `docker compose -p sgjio down`. The old data is not carried over; `--seed` makes fresh accounts and lessons.
 
 ## Running it
 
@@ -123,7 +123,7 @@ npm install
 
 The seed is safe to run again. It adds missing accounts and topics and never touches anyone's progress. Every lesson that has a file in `content/lessons` is reset to match its file and published as a new version if anything differed, so edits you made to one in the admin portal are replaced; lessons you created yourself are left alone.
 
-**Starting over.** If your local data is in a mess, wipe this branch's volumes (and nobody else's) and build it again:
+**Starting over.** If your local data is in a mess, wipe this project's volumes (and nobody else's) and build it again:
 
 ```bash
 docker compose down -v && ./dev.local --seed
@@ -176,7 +176,7 @@ Add and remove other administrators in the portal: select your name at the top r
 
 | Symptom                                                    | Likely cause and fix                                                                                                                                                                                                                                           |
 | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `port is already allocated` for 8000, 8025 or 1025         | `main`'s stack (its API or Mailpit) or another app holds the port. In the `main` checkout run `docker compose down`; on this branch `docker compose ps` shows what is running.                                                                                 |
+| `port is already allocated` for 8000, 8025 or 1025         | The old monolith stack (project `sgjio`) or another app holds the port. Run `docker compose -p sgjio down` for the old stack; `docker compose ps` shows what this one is running.                                                                              |
 | `docker compose up --wait` fails, a container is unhealthy | `docker compose ps` shows which; `docker compose logs <service>` says why (often a migration or a port clash).                                                                                                                                                 |
 | Every page says "SGJio is unavailable right now" (503)     | A service the page needs is down. `docker compose ps`, then `docker compose up -d --wait`.                                                                                                                                                                     |
 | Vite shows `ECONNREFUSED` for `/api`                       | The gateway isn't running: `docker compose up -d --wait`.                                                                                                                                                                                                      |

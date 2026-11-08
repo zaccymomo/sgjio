@@ -1,8 +1,9 @@
-import { Alert, ApiError, Button, Spinner, useAuth } from "@sgjio/ui";
-import { ChevronLeft } from "lucide-react";
+import { Alert, ApiError, Button, Spinner, cn, useAuth } from "@sgjio/ui";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+import { LessonMark } from "../components/LessonMark";
 import { TopicRadar } from "../components/TopicRadar";
 import { aptitudeApi, type QuizAnswer, type QuizQuestion, type QuizResult } from "../lib/aptitude";
 
@@ -235,7 +236,7 @@ export function AptitudeResultsPage() {
   return (
     <div className="flex flex-col gap-4">
       {back}
-      <div className="mx-auto flex w-full max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-6">
+      <div className="mx-auto flex w-full max-w-lg flex-col gap-4 rounded-xl border border-line bg-white p-3 sm:p-6">
         <div className="text-center">
           <p className="text-sm font-semibold text-brand">Your topic placements</p>
           <h1 className="mt-1 text-2xl font-bold text-ink">Your starting points are ready</h1>
@@ -261,7 +262,7 @@ export function AptitudeResultsPage() {
             level: placement.level,
           }))}
         />
-        <ul className="divide-y divide-line rounded-lg border border-line">
+        <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line">
           {result.placements.map((placement) => (
             <PlacementRow key={placement.topic_id} placement={placement} />
           ))}
@@ -285,36 +286,120 @@ type Placement = QuizResult["placements"][number];
 
 /**
  * One topic in the results (SCRUM-100): how many of its lessons the aptitude test exempted
- * (AC1), or that the learner starts from its first lesson (AC2). The topic's name opens it.
+ * (AC1), or that the learner starts from its first lesson (AC2). Five steps show the level
+ * placed at. A topic with exempted lessons opens, anywhere on its row, to list them, each
+ * opening that lesson, with a link to the topic itself; one without links its name instead.
  */
 function PlacementRow({ placement }: { placement: Placement }) {
-  const { topic_id, topic, level, exempted, available } = placement;
+  const { topic_id, topic, level, exempted, available, lessons } = placement;
 
-  const [count, detail] =
+  const count =
     available === 0
-      ? ["No lessons yet", "Its lessons will appear when they're published"]
+      ? "No lessons yet"
       : exempted === 0
-        ? ["None exempted", "Start from the first lesson"]
+        ? "None exempted"
         : exempted === available
-          ? ["All lessons exempted", `Up to Level ${level}`]
-          : [
-              `${exempted} ${exempted === 1 ? "lesson" : "lessons"} exempted`,
-              `Up to Level ${level}`,
-            ];
-
-  // The name and its detail on the left, the count centred against both on the right.
-  return (
-    <li className="flex items-center justify-between gap-3 p-3 text-sm">
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <Link
-          to={`/topics/${topic_id}`}
-          className="w-fit rounded-sm font-medium text-ink underline-offset-2 hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-        >
-          {topic}
-        </Link>
-        <span className="text-caption text-muted">{detail}</span>
+          ? "All exempted"
+          : `${exempted} exempted`;
+  const detail =
+    available === 0 ? (
+      <span className="text-caption text-muted">
+        Its lessons will appear when they&rsquo;re published
       </span>
-      <span className="shrink-0 text-right font-semibold text-brand">{count}</span>
+    ) : exempted === 0 ? (
+      <span className="text-caption text-muted">Start from the first lesson</span>
+    ) : (
+      <LevelSteps level={level} />
+    );
+  const countClass = cn(
+    "shrink-0 text-right text-sm",
+    exempted > 0 ? "font-semibold text-brand" : "text-subtle",
+  );
+
+  if (lessons.length === 0) {
+    return (
+      <li className="flex items-center gap-3 py-3 pr-10 pl-3.5">
+        <span className="flex min-w-0 flex-1 flex-col gap-1">
+          <Link
+            to={`/topics/${topic_id}`}
+            className="w-fit rounded-sm text-sm font-semibold text-ink underline-offset-2 hover:text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            {topic}
+          </Link>
+          {detail}
+        </span>
+        <span className={countClass}>{count}</span>
+      </li>
+    );
+  }
+
+  return (
+    <li>
+      <details className="group">
+        <summary
+          className={cn(
+            "flex cursor-pointer list-none items-center gap-3 py-3 pr-3 pl-3.5 [&::-webkit-details-marker]:hidden",
+            "hover:bg-surface group-open:bg-surface",
+            "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand",
+          )}
+        >
+          <span className="flex min-w-0 flex-1 flex-col gap-1">
+            <span className="text-sm font-semibold text-ink">{topic}</span>
+            {detail}
+          </span>
+          <span className={countClass}>{count}</span>
+          <ChevronDown
+            className="size-4 shrink-0 text-muted transition-transform group-open:rotate-180"
+            aria-hidden
+          />
+        </summary>
+        <div className="flex flex-col gap-1.5 bg-surface px-2.5 pt-1 pb-3">
+          <ul className="flex flex-col gap-1.5">
+            {lessons.map((lesson) => (
+              <li key={lesson.id}>
+                <Link
+                  to={`/lessons/${lesson.id}`}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md border border-line bg-white px-2 py-1.5",
+                    "text-[13px] leading-snug font-medium text-ink transition-colors hover:border-brand/40",
+                    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
+                  )}
+                >
+                  <LessonMark completed={false} exempted small />
+                  <span className="min-w-0 flex-1">{lesson.title}</span>
+                  <span className="shrink-0 rounded-sm bg-surface px-1 py-0.5 text-2xs font-semibold whitespace-nowrap text-muted">
+                    Level {lesson.level}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <Link
+            to={`/topics/${topic_id}`}
+            className="mt-0.5 inline-flex items-center gap-0.5 self-end rounded-sm text-caption font-semibold text-brand hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          >
+            Open {topic}
+            <ChevronRight className="size-3.5" aria-hidden />
+          </Link>
+        </div>
+      </details>
     </li>
+  );
+}
+
+/** The level placed at as five steps, filled up to it, then "Level n" in words. */
+function LevelSteps({ level }: { level: number }) {
+  return (
+    <span className="flex items-center gap-2">
+      <span className="flex gap-0.5" aria-hidden>
+        {[1, 2, 3, 4, 5].map((step) => (
+          <span
+            key={step}
+            className={cn("h-1.5 w-3 rounded-full", step <= level ? "bg-brand" : "bg-line")}
+          />
+        ))}
+      </span>
+      <span className="text-caption whitespace-nowrap text-muted">Level {level}</span>
+    </span>
   );
 }

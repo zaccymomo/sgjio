@@ -33,7 +33,7 @@ def test_reset_email_is_sent_with_a_working_link(db, make_user):
     assert email["name"] == user.name
     assert email["audience"] == "app"
     assert email["method"] == "password"
-    # 15 minutes on this branch (5 in the monolith): the email now goes out asynchronously.
+    # 15 minutes (5 in the monolith): the email now goes out asynchronously.
     assert email["expires_in_minutes"] == 15
     link, token = _token_from_last_email()
     assert link.startswith("http://localhost:5173/reset-password?token=")

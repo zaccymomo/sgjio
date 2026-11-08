@@ -353,6 +353,30 @@
     "title": "AptitudeBankOut",
     "type": "object"
    },
+   "AptitudeExemptedLessonOut": {
+    "properties": {
+     "id": {
+      "format": "uuid",
+      "title": "Id",
+      "type": "string"
+     },
+     "level": {
+      "title": "Level",
+      "type": "integer"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "title",
+     "level"
+    ],
+    "title": "AptitudeExemptedLessonOut",
+    "type": "object"
+   },
    "AptitudeNextIn": {
     "properties": {
      "answers": {
@@ -427,6 +451,13 @@
       "title": "Exempted",
       "type": "integer"
      },
+     "lessons": {
+      "items": {
+       "$ref": "#/components/schemas/AptitudeExemptedLessonOut"
+      },
+      "title": "Lessons",
+      "type": "array"
+     },
      "level": {
       "title": "Level",
       "type": "integer"
@@ -446,7 +477,8 @@
      "topic",
      "level",
      "exempted",
-     "available"
+     "available",
+     "lessons"
     ],
     "title": "AptitudePlacementOut",
     "type": "object"

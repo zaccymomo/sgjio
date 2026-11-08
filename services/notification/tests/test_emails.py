@@ -109,7 +109,7 @@ def test_a_reset_link_for_the_main_app(db):
     assert "Hi Wei Ling," in email.text
     assert LINK in email.text
     assert f'href="{LINK}"' in email.html
-    # SCRUM-63 AC3: the email says how long the link lasts (15 minutes on this branch).
+    # SCRUM-63 AC3: the email says how long the link lasts (15 minutes).
     assert "valid for 15 minutes" in email.text
     assert "15 minutes" in email.html
     assert "the SGJio admin portal" not in email.text

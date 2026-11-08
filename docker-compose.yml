@@ -1,4 +1,4 @@
-# SGJio as microservices (branch arch/microservices). See docs/architecture/README.md.
+# SGJio as microservices. See docs/architecture/README.md.
 #
 #   docker compose up -d --build --wait     everything, healthy
 #   scripts/seed-all.sh                     seed data, service by service
