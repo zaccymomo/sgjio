@@ -72,6 +72,47 @@ def test_each_topic_says_how_many_of_its_lessons_are_exempted(
     assert (placements["Singlish"]["exempted"], placements["Singlish"]["available"]) == (0, 4)
 
 
+def test_each_topic_lists_the_lessons_it_exempts(client, db, content, lesson_in, make_user):
+    """For the results' list of exempted lessons: lowest level first, as their latest
+    published version is titled, and only the topic's own (none for a topic at 0)."""
+    hawker, singlish = content.topic("Hawker", 0), content.topic("Singlish", 1)
+    lesson_in(hawker, "Hawker 3", 3)
+    second = lesson_in(hawker, "Hawker 2", 2)
+    lesson_in(hawker, "Hawker 1", 1)
+    lesson_in(singlish, "Singlish 1", 1)
+    content.publish(second, DOC, title="Hawker 2, revised")
+    user = _sign_in(client, make_user)
+    quiz(db, user, {hawker: 2, singlish: 0})
+
+    placements = _placements(client)
+    lessons = placements["Hawker"]["lessons"]
+    assert [(row["title"], row["level"]) for row in lessons] == [
+        ("Hawker 1", 1),
+        ("Hawker 2, revised", 2),
+    ]
+    assert lessons[1]["id"] == str(second.id)
+    assert placements["Singlish"]["lessons"] == []
+
+
+def test_the_list_leaves_out_lessons_learners_cannot_open(
+    client, db, content, lesson_in, make_user
+):
+    """The list follows the counts beside it: a withdrawn lesson, a draft, and a lesson
+    whose latest version has not reached Learning yet are left out."""
+    hawker = content.topic("Hawker", 0)
+    lesson_in(hawker, "Published", 1)
+    lesson_in(hawker, "Withdrawn", 1, status="withdrawn")
+    lesson_in(hawker, "Draft", 1, status="draft")
+    held = lesson_in(hawker, "Held back", 1, status="draft")
+    content.publish(held, DOC, deliver_deck=False)
+    user = _sign_in(client, make_user)
+    quiz(db, user, {hawker: 5})
+
+    placement = _placements(client)["Hawker"]
+    assert [row["title"] for row in placement["lessons"]] == ["Published"]
+    assert placement["exempted"] == len(placement["lessons"])
+
+
 def test_only_currently_published_lessons_count(client, db, content, lesson_in, make_user):
     hawker = content.topic("Hawker")
     lesson_in(hawker, "Published", 1)

@@ -160,6 +160,12 @@ class AptitudeNextIn(AptitudeSubmitIn):
     pass
 
 
+class AptitudeExemptedLessonOut(BaseModel):
+    id: uuid.UUID
+    title: str
+    level: int
+
+
 class AptitudePlacementOut(BaseModel):
     topic_id: uuid.UUID
     topic: str
@@ -167,6 +173,8 @@ class AptitudePlacementOut(BaseModel):
     # SCRUM-100 AC1: "4 of 12 exempted", counting currently published lessons only.
     exempted: int
     available: int
+    # Which lessons those are, lowest level first, to list under the topic.
+    lessons: list[AptitudeExemptedLessonOut]
 
 
 class AptitudeResultOut(BaseModel):

@@ -179,6 +179,11 @@ def test_learner_takes_the_aptitude_test(admin, new_learner):
     assert all(
         p["level"] == 0 and p["exempted"] == 0 for t, p in placements.items() if t != first_topic
     )
+    # Each placement lists the lessons it exempts, lowest level first; none where it is 0.
+    listed = placements[first_topic]["lessons"]
+    assert len(listed) == placements[first_topic]["exempted"]
+    assert [row["level"] for row in listed] == sorted(row["level"] for row in listed)
+    assert all(p["lessons"] == [] for t, p in placements.items() if t != first_topic)
 
     assert check(http.get("/api/aptitude/result"), "GET /api/aptitude/result", 200) == result
     # Taken once only.

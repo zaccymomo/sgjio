@@ -1,6 +1,6 @@
 # Architecture decision records
 
-One page each: the context, what we decided, and what it costs. They describe the code on `arch/microservices` as built; [../diagrams.md](../diagrams.md) has the pictures.
+One page each: the context, what we decided, and what it costs. They describe the code as built (merged in #21); [../diagrams.md](../diagrams.md) has the pictures.
 
 | ADR                                                   | Decision                                                                                        |
 | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
