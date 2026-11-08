@@ -1,0 +1,101 @@
+{
+  "rabbit_version": "4.0.0",
+  "users": [
+    {
+      "name": "sgjio",
+      "password_hash": "sX98gt8Ecg/dgj7xUJIIH5/WXXnr8IHEUcFAs1dghAxfAX3U",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": [
+        "administrator"
+      ]
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "sgjio",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "sgjio.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "sgjio.dlx",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "sgjio.unrouted",
+      "vhost": "/",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false,
+      "internal": true,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "sgjio.unrouted",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "sgjio.unrouted",
+      "vhost": "/",
+      "destination": "sgjio.unrouted",
+      "destination_type": "queue",
+      "routing_key": "",
+      "arguments": {}
+    }
+  ],
+  "policies": [
+    {
+      "vhost": "/",
+      "name": "sgjio-events-alternate",
+      "pattern": "^sgjio\\.events$",
+      "apply-to": "exchanges",
+      "priority": 0,
+      "definition": {
+        "alternate-exchange": "sgjio.unrouted"
+      }
+    },
+    {
+      "vhost": "/",
+      "name": "sgjio-unrouted-limits",
+      "pattern": "^sgjio\\.unrouted$",
+      "apply-to": "queues",
+      "priority": 0,
+      "definition": {
+        "max-length": 10000,
+        "overflow": "drop-head",
+        "message-ttl": 604800000
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "event_id": "0c1d2e3f-4a5b-4c6d-9e7f-8a9b0c1d2e3f",
+  "type": "content.aptitude_bank.changed",
+  "schema_version": 1,
+  "occurred_at": "2026-11-10T08:00:00.123Z",
+  "producer": "content",
+  "aggregate_type": "aptitude_bank",
+  "aggregate_id": "d69a3dc8-6470-5484-a156-901c82a34f06",
+  "aggregate_version": 12,
+  "correlation_id": null,
+  "data": {
+    "ready": false,
+    "topics": [
+      {
+        "topic_id": "0a7c3e52-91d4-4b6f-8e2a-5c1d9f3b7e60",
+        "ready": true
+      },
+      {
+        "topic_id": "6e4d2b19-8c7a-4f35-9d1e-2b0a8c6f4d27",
+        "ready": false
+      }
+    ]
+  }
+}

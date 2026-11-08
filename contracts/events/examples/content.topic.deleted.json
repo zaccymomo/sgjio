@@ -1,0 +1,14 @@
+{
+  "event_id": "6e7f8a9b-0c1d-4e2f-9a3b-4c5d6e7f8a9b",
+  "type": "content.topic.deleted",
+  "schema_version": 1,
+  "occurred_at": "2026-11-10T08:00:00.123Z",
+  "producer": "content",
+  "aggregate_type": "topic",
+  "aggregate_id": "6e4d2b19-8c7a-4f35-9d1e-2b0a8c6f4d27",
+  "aggregate_version": 2,
+  "correlation_id": "4f9d2c1b8e7a46c3a1b0d9e8f7c6b5a4",
+  "data": {
+    "topic_id": "6e4d2b19-8c7a-4f35-9d1e-2b0a8c6f4d27"
+  }
+}

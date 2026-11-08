@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/identity.user.deleted.schema.json",
+  "title": "identity.user.deleted",
+  "description": "A learner deleted their account (or clear-demo-learners removed a demo learner). Written in the same transaction as the delete. aggregate_id = user_id; aggregate_version is always 2 (after registered's 1). Learning erases the learner's data and tombstones the id; Content nulls reporter_id, resolved_by, published_by and created_by.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "identity.user.deleted"
+    },
+    "producer": {
+      "const": "identity"
+    },
+    "aggregate_type": {
+      "const": "user"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "user_id",
+        "deleted_at"
+      ],
+      "properties": {
+        "user_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "deleted_at": {
+          "$ref": "envelope.schema.json#/$defs/timestamp"
+        }
+      }
+    },
+    "aggregate_version": {
+      "const": 2
+    }
+  }
+}

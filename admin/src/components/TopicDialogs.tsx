@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import type { Topic, TopicFields } from "../lib/content";
 import { plural } from "../lib/format";
 
-/** Same limits as the API (TopicName and TopicDescription in api/app/schemas.py). */
+/** Same limits as the API (TopicName and TopicDescription in services/content/app/schemas.py). */
 const MAX_NAME = 80;
 const MAX_DESCRIPTION = 200;
 

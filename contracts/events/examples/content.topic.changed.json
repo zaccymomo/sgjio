@@ -1,0 +1,18 @@
+{
+  "event_id": "5d6e7f8a-9b0c-4d1e-8f2a-3b4c5d6e7f8a",
+  "type": "content.topic.changed",
+  "schema_version": 1,
+  "occurred_at": "2026-11-10T08:00:00.123Z",
+  "producer": "content",
+  "aggregate_type": "topic",
+  "aggregate_id": "0a7c3e52-91d4-4b6f-8e2a-5c1d9f3b7e60",
+  "aggregate_version": 3,
+  "correlation_id": "4f9d2c1b8e7a46c3a1b0d9e8f7c6b5a4",
+  "data": {
+    "topic_id": "0a7c3e52-91d4-4b6f-8e2a-5c1d9f3b7e60",
+    "name": "Hawker food",
+    "description": "Ordering, chope-ing and clearing your tray.",
+    "position": 2,
+    "is_archived": false
+  }
+}

@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/content.aptitude_question.changed.schema.json",
+  "title": "content.aptitude_question.changed",
+  "description": "An aptitude question's full current state: on create, update (including a topic move), activate, deactivate, seed, republish-catalog. Always followed by content.aptitude_bank.changed. aggregate_id = question_id; aggregate_version = aptitude_questions.version. Learning upserts quiz_questions when the version is newer.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "content.aptitude_question.changed"
+    },
+    "producer": {
+      "const": "content"
+    },
+    "aggregate_type": {
+      "const": "aptitude_question"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question_id",
+        "topic_id",
+        "level",
+        "prompt",
+        "options",
+        "correct_option_id",
+        "is_active",
+        "seed_key"
+      ],
+      "properties": {
+        "question_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "topic_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Never changes."
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "text"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40,
+                "not": {
+                  "const": "not-sure"
+                }
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "description": "As authored, without the quiz's own \"I'm not sure\" option, which Learning adds."
+        },
+        "correct_option_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "is_active": {
+          "type": "boolean"
+        },
+        "seed_key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 120,
+          "description": "Natural key of a question from content/aptitude_questions.yaml; null if authored in the portal."
+        }
+      }
+    }
+  }
+}

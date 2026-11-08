@@ -1,0 +1,9 @@
+# Only for running the template's own tests. Each service lists these in its own
+# requirements.txt (pika is the one most services won't already have).
+fastapi==0.141.1
+httpx==0.28.1
+sqlalchemy==2.0.43
+psycopg[binary]==3.2.10
+pika==1.3.2
+pytest==8.4.2
+ruff==0.13.2

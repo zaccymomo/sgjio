@@ -8,7 +8,7 @@ import type {
   Question,
 } from "./types";
 
-/** The same pattern as BLANK in api/app/lesson_doc.py. */
+/** The same pattern as BLANK in services/content/app/lesson_doc.py. */
 export const BLANK_PATTERN = /\{\{\s*blank\s*\}\}/;
 export const BLANK_TOKEN = "{{blank}}";
 

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/content.topic.changed.schema.json",
+  "title": "content.topic.changed",
+  "description": "A topic's full current state: on create, rename, describe, archive, restore, reorder (one per topic whose position moved), import, seed, republish-catalog. aggregate_id = topic_id; aggregate_version = topics.version. Learning upserts learnable_topics when the version is newer.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "content.topic.changed"
+    },
+    "producer": {
+      "const": "content"
+    },
+    "aggregate_type": {
+      "const": "topic"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "topic_id",
+        "name",
+        "description",
+        "position",
+        "is_archived"
+      ],
+      "properties": {
+        "topic_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Empty when the topic has none; never null."
+        },
+        "position": {
+          "type": "integer",
+          "description": "Sort key (ties broken by name), not unique."
+        },
+        "is_archived": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

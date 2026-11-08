@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Run SGJio locally: the whole back end in Docker (compose project sgjio-ms), then both
+# front ends' Vite dev servers on this machine.
+#
+#   ./dev.local           start or update the stack (rebuilds changed images), then Vite
+#   ./dev.local --seed    also load the seed data first (scripts/seed-all.sh; safe to repeat)
+#
+# Ctrl-C stops the two Vite servers. The stack keeps running in Docker: stop it with
+# `docker compose down` (keeps the data) or `docker compose down -v` (wipes this project's).
+set -euo pipefail
+cd "$(dirname "$0")"
+
+seed=0
+for arg in "$@"; do
+    case "$arg" in
+        --seed) seed=1 ;;
+        -h | --help)
+            sed -n '2,9p' "$0"
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: $arg (try --help)" >&2
+            exit 2
+            ;;
+    esac
+done
+
+# Node from fnm when it isn't on PATH already.
+if ! command -v npm >/dev/null 2>&1 && command -v fnm >/dev/null 2>&1; then
+    eval "$(fnm env)"
+fi
+if ! command -v npm >/dev/null 2>&1; then
+    echo "npm not found: install Node 20+ (see README.md)" >&2
+    exit 1
+fi
+[[ -d node_modules ]] || npm install
+
+echo "==> docker compose up (databases, RabbitMQ, Mailpit, services, gateway; waits until healthy)"
+docker compose up -d --build --wait
+
+if [[ $seed == 1 ]]; then
+    scripts/seed-all.sh
+fi
+
+pids=()
+stop_vite() {
+    trap - EXIT INT TERM
+    for pid in "${pids[@]}"; do
+        kill -TERM -- "-$pid" 2>/dev/null || true # the whole group: npm and Vite under it
+    done
+    wait 2>/dev/null || true
+}
+trap stop_vite EXIT
+trap 'exit 130' INT TERM
+
+# Each Vite server gets a process group of its own (set -m), so stopping one stops npm and
+# Vite together. Stdin is /dev/null: a background group must not read the terminal.
+set -m
+npm run dev:web </dev/null &
+pids+=($!)
+npm run dev:admin </dev/null &
+pids+=($!)
+set +m
+
+cat <<'EOF'
+==> Main app       http://localhost:5173   (newcomer@sgjio.example.com / UserPass123)
+    Admin portal   http://localhost:5174   (admin@sgjio.example.com / AdminPass123)
+    Gateway        http://localhost:8000   Swagger: :8001/docs identity, :8002/docs content, :8003/docs learning
+    Mailpit        http://localhost:8025   RabbitMQ http://localhost:15672 (sgjio / sgjio)
+    Ctrl-C stops Vite; the stack keeps running (docker compose down to stop it).
+EOF
+wait

@@ -288,7 +288,7 @@ function CircleExplanation({
         </li>
         {/* AC2 */}
         <li>Finishing a lesson completes it, even if you answered some questions incorrectly.</li>
-        {/* AC3: finish() in api/app/learning.py keeps the best score. */}
+        {/* AC3: finish() in services/learning/app/learning.py keeps the best score. */}
         <li>
           Your quiz results are recorded separately and count toward your tier. We keep your best
           result, so retaking a quiz until you get it right counts in full.

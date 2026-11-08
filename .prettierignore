@@ -2,3 +2,10 @@ node_modules
 dist
 api
 package-lock.json
+
+# Not Prettier's to format: nginx config (it would parse .inc as HTML), the frozen e2e oracle
+# (exported on main), and the event schemas and broker definitions, kept as written.
+services/gateway/snippets
+e2e/oracle
+contracts/events
+infra/rabbitmq/definitions.json

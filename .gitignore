@@ -1,3 +1,6 @@
+# Patterns without a leading slash apply at every depth, so these cover services/*, e2e/,
+# contracts/ and templates/platform/ too (.venv, .env, __pycache__, .pytest_cache, .ruff_cache).
+
 # Dependencies
 node_modules/
 .venv/
@@ -12,6 +15,8 @@ dist/
 .env
 .env.local
 *.local
+# ...except the shared start script
+!dev.local
 
 # Tooling
 .pytest_cache/

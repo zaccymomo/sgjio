@@ -1,0 +1,20 @@
+{
+  "event_id": "3b4c5d6e-7f8a-4b9c-8d0e-1f2a3b4c5d6e",
+  "type": "identity.admin.invitation_issued",
+  "schema_version": 1,
+  "occurred_at": "2026-11-10T08:00:00.123Z",
+  "producer": "identity",
+  "aggregate_type": "user",
+  "aggregate_id": "8b2e4c61-7d3f-5a90-b1c2-0e9f7a6d5c43",
+  "aggregate_version": 1,
+  "correlation_id": "4f9d2c1b8e7a46c3a1b0d9e8f7c6b5a4",
+  "data": {
+    "admin_id": "8b2e4c61-7d3f-5a90-b1c2-0e9f7a6d5c43",
+    "email": "priya@sgjio.example.com",
+    "name": "Priya",
+    "inviter_name": "Sam Admin",
+    "link": "http://localhost:5174/set-password?token=Qw3eR5tY7uI9oP1aS2dF4gH6",
+    "expires_in_hours": 72,
+    "trigger": "invited"
+  }
+}

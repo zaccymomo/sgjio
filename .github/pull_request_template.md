@@ -19,7 +19,8 @@ SCRUM-
 
 ## Checklist
 
-- [ ] Tests added or updated (`cd api && pytest`)
+- [ ] Tests added or updated (`services/<name>`: `.venv/bin/python -m pytest`; `scripts/e2e.sh` if a flow crosses services)
 - [ ] Lint and format pass (`ruff`, `npm run lint`, `npm run format:check`)
-- [ ] New database changes have a reviewed migration
-- [ ] New settings added to `api/.env.example`
+- [ ] New database changes have a reviewed migration in the owning service's `alembic/versions/`
+- [ ] Event changes are in `contracts/events/` and `contracts/validate.py` passes
+- [ ] New settings added to the service's `app/config.py`, `docker-compose.yml` and `.env.example` (if it has one)

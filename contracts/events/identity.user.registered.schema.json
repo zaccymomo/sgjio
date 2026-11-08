@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/identity.user.registered.schema.json",
+  "title": "identity.user.registered",
+  "description": "An account was created: register, Google sign-up, admin invite, create-admin, seed, seed-demo-learners, republish-learners. aggregate_id = user_id; aggregate_version is always 1. Learning keeps role=user ones in `learners` (insert if absent, never if erased).",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "identity.user.registered"
+    },
+    "producer": {
+      "const": "identity"
+    },
+    "aggregate_type": {
+      "const": "user"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "user_id",
+        "role",
+        "user_type",
+        "registered_at"
+      ],
+      "properties": {
+        "user_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "role": {
+          "enum": [
+            "user",
+            "admin"
+          ]
+        },
+        "user_type": {
+          "enum": [
+            "newcomer",
+            "singaporean",
+            null
+          ],
+          "description": "null exactly when role is admin"
+        },
+        "registered_at": {
+          "$ref": "envelope.schema.json#/$defs/timestamp"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "user"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "user_type": {
+                "enum": [
+                  "newcomer",
+                  "singaporean"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "user_type": {
+                "const": null
+              }
+            }
+          }
+        }
+      ]
+    },
+    "aggregate_version": {
+      "const": 1
+    }
+  }
+}
