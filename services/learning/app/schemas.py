@@ -3,9 +3,9 @@ defined them (the front ends read exactly these)."""
 
 import uuid
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 
 class ErrorDetail(BaseModel):
@@ -421,3 +421,141 @@ class AttemptResultOut(BaseModel):
     first_completion: bool
     # This completion finished every published lesson in the topic (SCRUM-55 AC1).
     topic_completed: bool
+
+
+# --- AI-generated lessons (docs/ai-lessons-api.md, "Learning") -------------------------------
+
+GeneratedState = Literal["requested", "writing", "checking", "ready", "failed", "cancelled"]
+GenerationFocus = Literal["new", "mistakes"]
+RatingReason = Literal[
+    "right_level",
+    "clear",
+    "more_like_this",
+    "too_easy",
+    "too_hard",
+    "not_relevant",
+    "something_wrong",
+]
+# Content's ReportReason, as ReportProblemDialog offers them.
+ReportReason = Literal["wrong", "insensitive", "typo", "media", "other"]
+
+
+class GenerateTopicOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    mistakes: int
+    level: int
+
+
+class PickForMeOut(BaseModel):
+    new: uuid.UUID | None
+    mistakes: uuid.UUID | None
+
+
+class GenerateOptionsOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    daily_limit: int
+    left_today: int
+    has_generated: bool
+    mistakes_total: int
+    pick_for_me: PickForMeOut
+    topics: list[GenerateTopicOut]
+
+
+class GenerateRequest(BaseModel):
+    """null topic_id is Pick for me. `ask` is trimmed, and empty means none."""
+
+    topic_id: uuid.UUID | None = None
+    focus: GenerationFocus
+    ask: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] | None = None
+    difficulty: Literal["easier", "right", "harder"]
+    length: Literal["short", "usual"]
+
+
+class GeneratedTopicOut(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class GeneratedCoverOut(BaseModel):
+    lesson_id: uuid.UUID
+    lesson_title: str
+    correct: str
+
+
+class GeneratedPreviewOut(BaseModel):
+    title: str
+    summary: str
+    learning_points: list[str]
+    cards: int
+    questions: int
+    reading_seconds: int
+
+
+class GenerationFailureOut(BaseModel):
+    code: Literal["off_topic", "invalid_output", "unsafe", "provider", "timeout"]
+    message: str
+
+
+class GeneratedStatusOut(BaseModel):
+    """One request, as the Generating and Ready screens need it."""
+
+    id: uuid.UUID
+    status: GeneratedState
+    topic: GeneratedTopicOut
+    focus: GenerationFocus
+    difficulty: Literal["easier", "right", "harder"]
+    length: Literal["short", "usual"]
+    level: int
+    ask: str | None
+    covers: list[GeneratedCoverOut]
+    lesson: GeneratedPreviewOut | None
+    failure: GenerationFailureOut | None
+    created_at: datetime
+    left_today: int
+
+
+class GeneratedListItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    status: Literal["requested", "writing", "checking", "ready"]
+    title: str | None
+    topic: GeneratedTopicOut
+    created_at: datetime
+    best: ScoreOut | None
+
+
+class GeneratedAttemptOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+
+
+class GeneratedAttemptResultOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    attempt_id: uuid.UUID
+    score: ScoreOut
+    best: ScoreOut
+
+
+class RatingRequest(BaseModel):
+    useful: bool
+    reasons: list[RatingReason] = Field(default_factory=list, max_length=4)
+
+
+class GeneratedReportRequest(BaseModel):
+    """A problem on one card of a generated lesson, as ReportProblemDialog sends it."""
+
+    card_id: str = Field(min_length=1, max_length=40)
+    reason: ReportReason
+    note: Annotated[str, StringConstraints(strip_whitespace=True, max_length=500)] = ""
+
+
+class GeneratedReportOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    created_at: datetime

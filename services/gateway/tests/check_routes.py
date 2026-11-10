@@ -111,6 +111,8 @@ ROUTES = [
     ("GET", "/api/admin/aptitude-questions", "content", "admin"),
     ("POST", "/api/admin/aptitude-questions", "content", "admin"),
     ("PATCH", "/api/admin/aptitude-questions/abc", "content", "admin"),
+    ("POST", "/api/admin/lessons/generate", "content", "admin"),
+    ("GET", "/api/admin/generation/abc", "content", "admin"),
     ("GET", "/api/media/abc", "content", None),
     ("POST", "/api/lessons/abc/reports", "content", "app"),
     # Learning
@@ -127,6 +129,17 @@ ROUTES = [
     ("POST", "/api/aptitude/next", "learning", "app"),
     ("POST", "/api/aptitude/submit", "learning", "app"),
     ("GET", "/api/aptitude/result", "learning", "app"),
+    ("GET", "/api/generate/options", "learning", "app"),
+    ("POST", "/api/generate", "learning", "app"),
+    ("GET", "/api/generate/abc", "learning", "app"),
+    ("POST", "/api/generate/abc/cancel", "learning", "app"),
+    ("GET", "/api/generated", "learning", "app"),
+    ("GET", "/api/generated/abc/lesson", "learning", "app"),
+    ("POST", "/api/generated/abc/attempts", "learning", "app"),
+    ("POST", "/api/generated/attempts/abc/answers", "learning", "app"),
+    ("POST", "/api/generated/attempts/abc/finish", "learning", "app"),
+    ("POST", "/api/generated/abc/rating", "learning", "app"),
+    ("POST", "/api/generated/abc/reports", "learning", "app"),
 ]
 FORGED = {
     "X-User-Id": "99999999-9999-4999-8999-999999999999",

@@ -36,6 +36,11 @@ export type Lesson = Draft & {
   has_unpublished_changes: boolean;
   /** The latest published version, or null if never published. */
   version: { number: number; published_at: string } | null;
+  /** "ai" for a draft the AI wrote from an administrator's notes (docs/ai-lessons-plan.md).
+   * Its first publish needs `reviewed: true`. */
+  origin: "authored" | "ai";
+  /** When its first publish was reviewed, for an AI draft. */
+  ai_reviewed_at: string | null;
   /** What still stops it being published (blockers), and what is worth a look (warnings). */
   issues: Issue[];
   stats: LessonStats;
@@ -94,10 +99,14 @@ export const lessonApi = {
   change: (
     lesson: Pick<Lesson, "id" | "updated_at">,
     action: "publish" | "discard" | "withdraw" | "restore",
+    /** Publish only: the "I have reviewed every card" tick an AI draft's first publish needs. */
+    reviewed?: boolean,
   ) =>
     apiFetch<Lesson>(`${LESSONS}/${lesson.id}/${action}`, {
       method: "POST",
-      body: { updated_at: lesson.updated_at },
+      body: reviewed
+        ? { updated_at: lesson.updated_at, reviewed }
+        : { updated_at: lesson.updated_at },
     }),
   remove: (lesson: Pick<Lesson, "id" | "updated_at">) =>
     apiFetch<void>(

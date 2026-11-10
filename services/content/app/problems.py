@@ -98,6 +98,15 @@ def level_locked() -> ContentProblem:
     )
 
 
+def review_required() -> ContentProblem:
+    """An AI draft's first publish without the review tick (docs/ai-lessons-plan.md, D10)."""
+    return ContentProblem(
+        "review_required",
+        "Tick “I have reviewed every card” before publishing an AI draft.",
+        409,
+    )
+
+
 def lesson_order_mixes_levels() -> ContentProblem:
     return ContentProblem(
         "lesson_order_mixes_levels",

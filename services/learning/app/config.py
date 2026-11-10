@@ -16,6 +16,10 @@ class Settings:
     test_database_url: str
     # The seed learner whose circles the seed fills in (Identity's SEED_USER_EMAIL).
     seed_user_email: str
+    # AI-generated lessons (docs/ai-lessons-plan.md D14, D15): requests per learner per
+    # Singapore day, and seconds before a waiting request counts as failed (timeout).
+    generation_daily_limit: int = 3
+    generation_timeout_seconds: int = 90
 
 
 @lru_cache
@@ -24,4 +28,6 @@ def get_settings() -> Settings:
         database_url=os.environ.get("DATABASE_URL", LOCAL_DATABASE),
         test_database_url=os.environ.get("TEST_DATABASE_URL", LOCAL_TEST_DATABASE),
         seed_user_email=os.environ.get("SEED_USER_EMAIL", "newcomer@sgjio.example.com"),
+        generation_daily_limit=int(os.environ.get("GENERATION_DAILY_LIMIT", "3")),
+        generation_timeout_seconds=int(os.environ.get("GENERATION_TIMEOUT_SECONDS", "90")),
     )

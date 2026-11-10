@@ -19,14 +19,14 @@ SCRUM-61: add registration form and validation
 1. Push your branch and open a pull request into `main`. The template asks for the Jira key and the acceptance criteria you checked.
 2. CI (`.github/workflows/ci.yml`) must pass. Its jobs:
 
-   | Job                                                           | What it runs                                                                                                                                                       |
-   | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-   | **Service (identity)**, (content), (learning), (notification) | per service: `ruff check`, `ruff format --check`, `alembic upgrade head` + `alembic check` and `pytest`, against its own Postgres, RabbitMQ and Mailpit containers |
-   | **Platform template**                                         | `templates/platform`'s lint and tests, and a check that every service's `app/platform/` is an unchanged copy                                                       |
-   | **Event contracts**                                           | `contracts/validate.py`: every event schema, example and negative case                                                                                             |
-   | **Gateway**                                                   | `services/gateway/tests/run.sh`: builds the nginx image, `nginx -t`, every route against stub services                                                             |
-   | **Front end**                                                 | `npm ci`, `npm run lint`, `npm run format:check`, `npm run build`                                                                                                  |
-   | **End to end**                                                | `docker compose up --build --wait`, `scripts/seed-all.sh --demo`, then the e2e suite through the gateway (resilience drills excluded)                              |
+   | Job                                                                         | What it runs                                                                                                                                                       |
+   | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+   | **Service (identity)**, (content), (learning), (notification), (generation) | per service: `ruff check`, `ruff format --check`, `alembic upgrade head` + `alembic check` and `pytest`, against its own Postgres, RabbitMQ and Mailpit containers |
+   | **Platform template**                                                       | `templates/platform`'s lint and tests, and a check that every service's `app/platform/` is an unchanged copy                                                       |
+   | **Event contracts**                                                         | `contracts/validate.py`: every event schema, example and negative case                                                                                             |
+   | **Gateway**                                                                 | `services/gateway/tests/run.sh`: builds the nginx image, `nginx -t`, every route against stub services                                                             |
+   | **Front end**                                                               | `npm ci`, `npm run lint`, `npm run format:check`, `npm run build`                                                                                                  |
+   | **End to end**                                                              | `docker compose up --build --wait`, `scripts/seed-all.sh --demo`, then the e2e suite through the gateway (resilience drills excluded)                              |
 
 3. Merge with "Squash and merge", then delete the branch.
 
@@ -91,3 +91,5 @@ Producers' tests validate every event they write against the schemas, so a drift
 ## Secrets
 
 Settings come from each service's environment: `docker-compose.yml` for the stack, or `services/<name>/.env` (git ignores it) when running a service on your machine. Add a new setting to the service's `app/config.py`, its `docker-compose.yml` environment, and its `.env.example` if it has one. Real SMTP credentials and API keys never go in the repository.
+
+The one key the team uses is each person's own **NUS SoC LaaS key** for AI-generated lessons. It goes in the git-ignored `.env` next to `docker-compose.yml` (copied from `.env.example`; steps in README.md, "AI-generated lessons"). Without it the generation worker uses its fake model, which is also what CI and the end-to-end tests use, so no key is ever needed to run the checks.

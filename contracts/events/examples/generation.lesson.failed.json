@@ -1,0 +1,17 @@
+{
+  "event_id": "7b1c2d3e-4f50-4a61-8b72-9c83d4e5f601",
+  "type": "generation.lesson.failed",
+  "schema_version": 1,
+  "occurred_at": "2026-11-10T08:00:00.123Z",
+  "producer": "generation",
+  "aggregate_type": "lesson_generation",
+  "aggregate_id": "3c5e7a90-1b2d-4f46-8a1c-2e3f4a5b6c7d",
+  "aggregate_version": 3,
+  "correlation_id": "4f9d2c1b8e7a46c3a1b0d9e8f7c6b5a4",
+  "data": {
+    "request_id": "3c5e7a90-1b2d-4f46-8a1c-2e3f4a5b6c7d",
+    "requester": "learning",
+    "code": "off_topic",
+    "detail": "Model refused: not about everyday life in Singapore."
+  }
+}

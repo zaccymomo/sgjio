@@ -1,0 +1,72 @@
+{
+  "event_id": "7b1c2d3e-4f50-4a61-8b72-9c83d4e5f601",
+  "type": "generation.lesson.generated",
+  "schema_version": 1,
+  "occurred_at": "2026-11-10T08:00:00.123Z",
+  "producer": "generation",
+  "aggregate_type": "lesson_generation",
+  "aggregate_id": "3c5e7a90-1b2d-4f46-8a1c-2e3f4a5b6c7d",
+  "aggregate_version": 3,
+  "correlation_id": "4f9d2c1b8e7a46c3a1b0d9e8f7c6b5a4",
+  "data": {
+    "request_id": "3c5e7a90-1b2d-4f46-8a1c-2e3f4a5b6c7d",
+    "requester": "learning",
+    "title": "Can or Not? Lunch with Colleagues",
+    "summary": "Answer \"can or not?\" the local way.",
+    "learning_points": [
+      "Reply to \"can or not?\" with one word"
+    ],
+    "doc": {
+      "cards": [
+        {
+          "type": "story",
+          "id": "c1",
+          "text": "At work, *can or not?* is a quick yes-or-no question.",
+          "image": null,
+          "audio": null,
+          "question": null
+        },
+        {
+          "type": "story",
+          "id": "c2",
+          "text": "Your colleague asks, \"Lunch at 12, can or not?\" The natural reply is {{blank}}.",
+          "image": null,
+          "audio": null,
+          "question": {
+            "type": "choice",
+            "id": "q1",
+            "explanation": "A quick question gets a quick answer.",
+            "shuffle": true,
+            "options": [
+              {
+                "id": "o1",
+                "text": "Can!",
+                "correct": true,
+                "why_not": ""
+              },
+              {
+                "id": "o2",
+                "text": "Yes, that timing works well for me.",
+                "correct": false,
+                "why_not": "Polite, but stiff here."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "questions": [
+      {
+        "card_id": "c2",
+        "question_id": "q1",
+        "scored": true,
+        "correct_option_id": "o1"
+      }
+    ],
+    "reading_seconds": 40,
+    "cards_plain_text": [
+      "At work, can or not? is a quick yes-or-no question.",
+      "Your colleague asks, \"Lunch at 12, can or not?\" The natural reply is ___."
+    ]
+  }
+}

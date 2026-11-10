@@ -1,0 +1,6 @@
+-r requirements.txt
+pytest==8.4.2
+ruff==0.13.2
+# Tests validate emitted events against contracts/events (as contracts/validate.py does).
+jsonschema==4.23.0
+rfc3339-validator==0.1.4

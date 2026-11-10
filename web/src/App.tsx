@@ -8,9 +8,7 @@ import {
   Heart,
   History,
   Home,
-  Lightbulb,
   MessageSquare,
-  Store,
   UserRound,
   Users,
 } from "lucide-react";
@@ -21,12 +19,16 @@ import { ChangePasswordPage, DeleteAccountPage } from "./pages/AccountSecurityPa
 import { AptitudeIntroPage, AptitudeQuizPage, AptitudeResultsPage } from "./pages/AptitudePages";
 import { ForgotPasswordPage, ResetPasswordPage } from "./pages/PasswordPages";
 import { RequireIntro } from "./components/RequireIntro";
+import { GeneratedLessonPage } from "./pages/GeneratedLessonPage";
+import { GeneratedStatusPage } from "./pages/GeneratedStatusPage";
+import { GeneratePage } from "./pages/GeneratePage";
 import { HomePage } from "./pages/HomePage";
 import { IntroPage } from "./pages/IntroPage";
 import { LessonPage } from "./pages/LessonPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { EditProfilePage, ProfileSetupPage } from "./pages/ProfileSetupPage";
 import { RegisterPage } from "./pages/RegisterPage";
+import { PracticePage } from "./pages/PracticePage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ReviewPage } from "./pages/ReviewPage";
@@ -72,6 +74,7 @@ export function App() {
             <Route element={<RequireIntro />}>
               {/* A lesson fills the screen, without the app's bars (SCRUM-15) */}
               <Route path="lessons/:lessonId" element={<LessonPage />} />
+              <Route path="generated/:id/play" element={<GeneratedLessonPage />} />
               <Route element={<SignedInLayout />}>
                 <Route index element={<HomePage />} />
                 {/* Where the introduction leads a new account (SCRUM-94 AC1, SCRUM-61 AC8) */}
@@ -83,27 +86,10 @@ export function App() {
                 <Route path="topics/:topicId" element={<TopicPage />} />
                 {/* "Review mistakes" on the landing page leads here (SCRUM-44 AC1) */}
                 <Route path="review" element={<ReviewPage />} />
-                <Route
-                  path="practice"
-                  element={
-                    <ComingSoonPage
-                      title="AI Scenario Practice"
-                      icon={MessageSquare}
-                      summary="Practise real conversations with an AI partner, then see how it went."
-                      features={[
-                        {
-                          icon: Store,
-                          text: "Order at a hawker stall, chat with a neighbour or reply to your manager",
-                        },
-                        {
-                          icon: Lightbulb,
-                          text: "Get feedback on what went well and what a local might say instead",
-                        },
-                        { icon: BookOpen, text: "Practise the topics from your lessons" },
-                      ]}
-                    />
-                  }
-                />
+                {/* AI-generated lessons (docs/ai-lessons-plan.md); AI Scenario Practice is still to come */}
+                <Route path="practice" element={<PracticePage />} />
+                <Route path="practice/generate" element={<GeneratePage />} />
+                <Route path="practice/generated/:id" element={<GeneratedStatusPage />} />
                 <Route
                   path="buddies"
                   element={

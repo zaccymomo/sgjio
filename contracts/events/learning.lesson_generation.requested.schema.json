@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/learning.lesson_generation.requested.schema.json",
+  "title": "learning.lesson_generation.requested",
+  "description": "A learner asked for an AI-generated lesson (docs/ai-lessons-plan.md). aggregate_id = request_id, aggregate_version always 1. Learning writes it in the same transaction as its generated_lessons row; Generation answers with generation.lesson.progress, then generation.lesson.generated or generation.lesson.failed, all with requester = learning. It never carries a user id, name or email: Generation never learns who asked. `brief` and `grounding` are defined here and shared with content.lesson_generation.requested.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "learning.lesson_generation.requested"
+    },
+    "producer": {
+      "const": "learning"
+    },
+    "aggregate_type": {
+      "const": "lesson_generation"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "brief", "grounding"],
+      "properties": {
+        "request_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "brief": {
+          "$ref": "#/$defs/brief"
+        },
+        "grounding": {
+          "$ref": "#/$defs/grounding"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "brief": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What to write. Learning fills it for learners (ask, no notes, check_answers true); Content for administrators (notes, no ask, check_answers false).",
+      "required": ["audience", "focus", "topic", "level", "cards", "questions", "ask", "notes", "check_answers"],
+      "properties": {
+        "audience": {
+          "enum": ["learner", "admin"]
+        },
+        "focus": {
+          "enum": ["new", "mistakes", "notes"],
+          "description": "new: an idea the topic's lessons don't cover yet; mistakes: re-teach grounding.mistakes with new questions; notes: teach the administrator's notes."
+        },
+        "topic": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "name", "description"],
+          "properties": {
+            "id": {
+              "$ref": "envelope.schema.json#/$defs/uuid"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "description": {
+              "type": "string",
+              "maxLength": 500
+            }
+          }
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "cards": {
+          "enum": [4, 6, 8]
+        },
+        "questions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "ask": {
+          "type": ["string", "null"],
+          "maxLength": 200,
+          "description": "The learner's optional text, passed to the model as quoted data, never as instructions."
+        },
+        "notes": {
+          "type": ["string", "null"],
+          "maxLength": 2000,
+          "description": "The administrator's 'What should it teach?'."
+        },
+        "check_answers": {
+          "type": "boolean",
+          "description": "Run the second AI call that checks the answers and wording (learners: true; admin drafts are reviewed by a person: false)."
+        }
+      }
+    },
+    "grounding": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Our own content the lesson must agree with. Lesson text only: nothing that identifies a person.",
+      "required": ["lessons", "mistakes", "avoid_titles", "feedback"],
+      "properties": {
+        "lessons": {
+          "type": "array",
+          "maxItems": 20,
+          "description": "The topic's published lessons (latest versions), nearest the brief's level first.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["title", "summary", "level", "cards_text"],
+            "properties": {
+              "title": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "summary": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              },
+              "cards_text": {
+                "type": "array",
+                "maxItems": 30,
+                "items": {
+                  "type": "string",
+                  "maxLength": 1500
+                }
+              }
+            }
+          }
+        },
+        "mistakes": {
+          "type": "array",
+          "maxItems": 5,
+          "description": "focus = mistakes only (else empty): questions the learner last answered wrongly (Learning's mistakes_for()).",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["lesson_title", "card_text", "chosen", "correct", "explanation", "why_not"],
+            "properties": {
+              "lesson_title": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "card_text": {
+                "type": "string",
+                "maxLength": 1500
+              },
+              "chosen": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "correct": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "explanation": {
+                "type": "string",
+                "maxLength": 1500
+              },
+              "why_not": {
+                "type": "string",
+                "maxLength": 400
+              }
+            }
+          }
+        },
+        "avoid_titles": {
+          "type": "array",
+          "maxItems": 50,
+          "description": "Titles not to repeat: the learner's earlier generated lessons in this topic.",
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "feedback": {
+          "type": "array",
+          "maxItems": 5,
+          "description": "The learner's latest ratings of generated lessons, newest first.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["title", "useful", "reasons"],
+            "properties": {
+              "title": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "useful": {
+                "type": "boolean"
+              },
+              "reasons": {
+                "type": "array",
+                "maxItems": 4,
+                "items": {
+                  "enum": ["too_easy", "too_hard", "not_relevant", "something_wrong", "right_level", "clear", "more_like_this"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

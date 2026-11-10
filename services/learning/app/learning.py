@@ -122,17 +122,11 @@ def _learner_question(the_deck: deck.Deck, question: deck.Question, rng: random.
     }
 
 
-def learner_lesson(
-    db: Session, lesson_id: uuid.UUID, rng: random.Random | None = None
-) -> LearnerLesson:
-    """The latest version of a published lesson as a learner sees it (SCRUM-15 AC1)."""
-    lesson = published_lesson(db, lesson_id)
-    version = catalog.latest_deck(db, lesson)
-    if version is None:
-        raise lesson_unavailable()
-    the_deck = deck.of(version)
+def learner_cards(the_deck: deck.Deck, rng: random.Random | None = None) -> list[dict]:
+    """A deck's cards as app/schemas.py's LearnerCardOut: no right answers, options shuffled
+    where the lesson says. Generated lessons use it too (app/generated.py)."""
     rng = rng or random.Random()
-    cards = [
+    return [
         {
             "type": card.type,
             "id": card.id,
@@ -143,6 +137,17 @@ def learner_lesson(
         }
         for card in the_deck.doc.cards
     ]
+
+
+def learner_lesson(
+    db: Session, lesson_id: uuid.UUID, rng: random.Random | None = None
+) -> LearnerLesson:
+    """The latest version of a published lesson as a learner sees it (SCRUM-15 AC1)."""
+    lesson = published_lesson(db, lesson_id)
+    version = catalog.latest_deck(db, lesson)
+    if version is None:
+        raise lesson_unavailable()
+    cards = learner_cards(deck.of(version), rng)
     topic = db.get(LearnableTopic, lesson.topic_id)
     assert topic is not None  # checked in published_lesson
     return LearnerLesson(
@@ -199,7 +204,7 @@ def _deck(db: Session, attempt: LessonAttempt) -> deck.Deck:
     return deck.of(version)
 
 
-def _result(the_deck: deck.Deck, question: deck.Question, option_id: str) -> CheckResult:
+def check_result(the_deck: deck.Deck, question: deck.Question, option_id: str) -> CheckResult:
     answer = the_deck.correct_option(question)
     correct = answer is not None and answer.id == option_id
     chosen = next(option for option in question.options if option.id == option_id)
@@ -229,9 +234,9 @@ def answer(
     earlier = db.get(AttemptAnswer, (attempt.id, question_id))
     if earlier is not None:
         db.commit()  # release the lock
-        return _result(the_deck, question, earlier.option_id)
+        return check_result(the_deck, question, earlier.option_id)
 
-    result = _result(the_deck, question, option_id)
+    result = check_result(the_deck, question, option_id)
     db.add(
         AttemptAnswer(
             attempt_id=attempt.id,
@@ -245,7 +250,7 @@ def answer(
     return result
 
 
-def _share(score: Score) -> Fraction:
+def share(score: Score) -> Fraction:
     # Nothing to score is nothing to get wrong.
     return Fraction(score.correct, score.scored) if score.scored else Fraction(1)
 
@@ -325,7 +330,7 @@ def finish(db: Session, user_id: uuid.UUID, attempt_id: uuid.UUID) -> AttemptRes
     if inserted is None:
         best = Score(completion.best_correct, completion.best_scored)
         # A tie keeps the most recent attempt.
-        if _share(score) >= _share(best):
+        if share(score) >= share(best):
             completion.best_correct, completion.best_scored = score.correct, score.scored
             completion.best_attempt_id = attempt.id
         completion.updated_at = datetime.now(UTC)

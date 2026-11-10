@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/content.lesson_generation.requested.schema.json",
+  "title": "content.lesson_generation.requested",
+  "description": "An administrator asked for an AI-drafted lesson. aggregate_id = request_id (Content's generation_jobs.id), aggregate_version always 1. Same data as learning.lesson_generation.requested; Generation answers with requester = content, and Content turns a generated lesson into an ordinary Draft.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "content.lesson_generation.requested"
+    },
+    "producer": {
+      "const": "content"
+    },
+    "aggregate_type": {
+      "const": "lesson_generation"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "brief", "grounding"],
+      "properties": {
+        "request_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "brief": {
+          "$ref": "learning.lesson_generation.requested.schema.json#/$defs/brief"
+        },
+        "grounding": {
+          "$ref": "learning.lesson_generation.requested.schema.json#/$defs/grounding"
+        }
+      }
+    }
+  }
+}

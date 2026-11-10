@@ -2,7 +2,7 @@
 
 A web app that helps international residents learn Singapore's cultural norms and build an evidenced record of their integration effort. IS4301 team project. Backlog: Jira project **SCRUM** · Design: Figma file **SGJIO**.
 
-> **The back end is four services behind an API gateway**, talking through RabbitMQ (since #21, which replaced the single FastAPI back end, `api/`). The front ends are unchanged. Why and how: [docs/architecture/](docs/architecture/README.md) (decisions in [decisions/](docs/architecture/decisions/README.md), pictures in [diagrams.md](docs/architecture/diagrams.md)).
+> **The back end is four services and an AI worker behind an API gateway**, talking through RabbitMQ (since #21, which replaced the single FastAPI back end, `api/`). The front ends are unchanged. Why and how: [docs/architecture/](docs/architecture/README.md) (decisions in [decisions/](docs/architecture/decisions/README.md), pictures in [diagrams.md](docs/architecture/diagrams.md)).
 
 ## What is where
 
@@ -16,6 +16,7 @@ A web app that helps international residents learn Singapore's cultural norms an
 | `services/content/`      | Topics, lessons and versions, media, reported problems, aptitude questions | :8002 (Swagger at `/docs`)    |
 | `services/learning/`     | Lesson runs, progress, search, review, the aptitude test, lesson insights  | :8003 (Swagger at `/docs`)    |
 | `services/notification/` | Sends the emails (worker, no HTTP API)                                     | Mailpit http://localhost:8025 |
+| `services/generation/`   | Writes and checks AI-generated lessons (worker, no HTTP API)               | NUS SoC LaaS, or a fake model |
 | `contracts/`             | The events the services exchange, as JSON Schemas, and their validator     |                               |
 | `templates/platform/`    | Plumbing every service copies (errors, logging, outbox, consumer, ...)     |                               |
 | `infra/`                 | RabbitMQ definitions, Postgres init script                                 |                               |
@@ -31,7 +32,8 @@ Each service has a README with its tables, API, events, commands and tests.
 - **Front end:** React 19, TypeScript, Vite, React Router, Tailwind CSS v4, lucide icons, Inter font
 - **Services:** Python 3.11, FastAPI, SQLAlchemy 2, Alembic, PostgreSQL 16 (one database per service), Argon2 password hashing
 - **Between services:** nginx gateway with forward auth; RabbitMQ 4.4 topic exchange; transactional outbox
-- **Local:** Docker Compose runs everything except the two Vite servers (project `sgjio-ms`): 4 Postgres, RabbitMQ, Mailpit, 4 services, the gateway
+- **Local:** Docker Compose runs everything except the two Vite servers (project `sgjio-ms`): 5 Postgres, RabbitMQ, Mailpit, 4 services, the generation worker, the gateway
+- **AI-generated lessons:** NUS SoC LaaS (OpenAI-compatible API), or a built-in fake model
 - **Quality:** Ruff, pytest, ESLint and Prettier, GitHub Actions CI (one job per service, platform template, contracts, gateway, front end, end to end)
 
 ## First-time setup
@@ -46,8 +48,11 @@ You need:
 ```bash
 npm install
 cp web/.env.example web/.env.local
+cp .env.example .env                 # AI lessons settings; add your key later (see below)
 ./dev.local --seed                   # builds and starts the stack, seeds it, then both front ends
 ```
+
+AI-generated lessons work straight away with a built-in fake model. To use the real AI, follow [AI-generated lessons](#ai-generated-lessons) below.
 
 The first build takes a few minutes. `./dev.local --seed` does, in order:
 
@@ -64,15 +69,15 @@ Set up before #21 (the monolith)? Its containers were the compose project `sgjio
 
 ## Running it
 
-| What                                                 | Where                                                                                                      |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Main app                                             | http://localhost:5173                                                                                      |
-| Admin portal                                         | http://localhost:5174                                                                                      |
-| Gateway (what the front ends call)                   | http://localhost:8000/api/...                                                                              |
-| Swagger, per service (direct, bypassing the gateway) | Identity http://localhost:8001/docs · Content :8002/docs · Learning :8003/docs                             |
-| RabbitMQ management (`sgjio` / `sgjio`)              | http://localhost:15672: queues `learning.events`, `content.events`, `notification.events` and their `.dlq` |
-| Mailpit: every email the app sends                   | http://localhost:8025                                                                                      |
-| Postgres (user = password = database name)           | identity 5433 · content 5434 · learning 5435 · notification 5436                                           |
+| What                                                 | Where                                                                                                                           |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Main app                                             | http://localhost:5173                                                                                                           |
+| Admin portal                                         | http://localhost:5174                                                                                                           |
+| Gateway (what the front ends call)                   | http://localhost:8000/api/...                                                                                                   |
+| Swagger, per service (direct, bypassing the gateway) | Identity http://localhost:8001/docs · Content :8002/docs · Learning :8003/docs                                                  |
+| RabbitMQ management (`sgjio` / `sgjio`)              | http://localhost:15672: queues `learning.events`, `content.events`, `notification.events`, `generation.events` and their `.dlq` |
+| Mailpit: every email the app sends                   | http://localhost:8025                                                                                                           |
+| Postgres (user = password = database name)           | identity 5433 · content 5434 · learning 5435 · notification 5436 · generation 5438                                              |
 
 Content's and Learning's signed-in routes answer Swagger's "Try it out" with 401: they only accept requests that came through the gateway. Identity's routes and public media work there.
 
@@ -112,6 +117,63 @@ The main app's sign-in and register pages have **Continue with Google** (SCRUM-9
 
 **Using your own Firebase project instead** (optional): in the [Firebase console](https://console.firebase.google.com), add a project, enable **Authentication → Sign-in method → Google**, then add a web app. Put its `firebaseConfig` values in `web/.env.local`, and its project id in a `.env` file next to `docker-compose.yml` as `FIREBASE_PROJECT_ID=...`, then `docker compose up -d identity`. Leaving `web/.env.local` empty removes the Google button and nothing else changes.
 
+## AI-generated lessons
+
+Learners can generate short practice lessons from the **Practice** tab (and from the prompts on topic pages and on Home once every lesson is done), and administrators can generate a **draft** lesson from the **Content** page. A worker, `services/generation`, writes and checks them using **NUS SoC LaaS**, the School of Computing's free LLM service. How it works: [docs/ai-lessons-plan.md](docs/ai-lessons-plan.md). Which models and why: [docs/ai-model-evaluation.md](docs/ai-model-evaluation.md).
+
+**Without a key, everything still works.** The worker uses a built-in fake model that returns simple sample lessons, so you can develop, test and demo the screens; CI and the end-to-end tests always use it.
+
+### Using the real AI
+
+1. **Get your own API key.** Each person uses their own key.
+   1. Connect to the NUS network or the **NUS VPN**. The key portal only opens from inside NUS; the API itself works from anywhere.
+   2. Open **https://soclaas-portal.comp.nus.edu.sg/** and sign in with your **SoC account** (forgotten password: mysoc.nus.edu.sg).
+   3. Create a personal key and copy it.
+2. **Put it in `.env`** next to `docker-compose.yml`. If you don't have one yet, `cp .env.example .env`. Then set:
+
+   ```bash
+   GENERATION_FAKE=false
+   GENERATION_API_KEY=your-key
+   ```
+
+   `.env.example` already has the other values: the API address, `GENERATION_MODEL=qwen3.6:35b` (writes the lesson), `GENERATION_CHECK_MODEL=ornith1.5:35b` (checks learners' lessons) and `GENERATION_FALLBACK_MODEL=ornith1.5:35b` (tried if the main model fails). `.env` is git-ignored: never commit it, and never paste your key into a file that is tracked, an issue or a chat.
+
+3. **Restart the worker** so it reads the new settings:
+
+   ```bash
+   docker compose up -d generation
+   ```
+
+4. **Try it:** in the main app, **Practice → Generate**. A lesson usually takes 10 to 20 seconds with the default model.
+
+To check your key and see which models it can use:
+
+```bash
+curl -s -H "Authorization: Bearer $(grep ^GENERATION_API_KEY= .env | cut -d= -f2-)" \
+  https://soclaas-api.comp.nus.edu.sg/v1/models | python3 -m json.tool | grep '"id"'
+```
+
+### Changing the model
+
+Models are just settings: change them in `.env` and run `docker compose up -d generation`. No code changes.
+
+| Setting                                      | Lessons                           | Typical wait | Notes                                                                  |
+| -------------------------------------------- | --------------------------------- | ------------ | ---------------------------------------------------------------------- |
+| `GENERATION_MODEL=qwen3.6:35b` (the default) | Good (3.3 out of 5 in our tests)  | 10 to 20 s   | Fast and reliable; a stable model                                      |
+| `GENERATION_MODEL=x-test-2` (DeepSeek)       | Best (4.4 out of 5, none blocked) | 30 to 60 s   | A trial model on SoC LaaS: it may be withdrawn; the fallback covers it |
+
+The evaluation behind these numbers, and how to run it again when SoC changes its models, is in [docs/ai-model-evaluation.md](docs/ai-model-evaluation.md) and `services/generation/evaluation/`.
+
+### If something goes wrong
+
+| If you see                                                     | Do this                                                                                                                                                                |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every lesson looks like the same simple sample                 | The fake model is on: set `GENERATION_FAKE=false` in `.env`, then `docker compose up -d generation`                                                                    |
+| "We couldn't create this lesson right now"                     | `docker compose logs generation` says why: `HTTP 401` means the key is wrong; a timeout or `HTTP 5xx` means the model is busy or down (try again, or change the model) |
+| The worker logs say the key or URL is not set                  | `.env` must be next to `docker-compose.yml`, with `GENERATION_API_KEY` and `GENERATION_BASE_URL` filled in                                                             |
+| "You have reached today's limit"                               | Learners get 3 lessons a day and administrators 20 drafts. Failed requests don't count. To test more, register another account                                         |
+| A request says "We couldn't create a lesson from that request" | The AI refused the text (off-topic, unclear, or asking for something it shouldn't). Rephrase it, or leave the box empty                                                |
+
 ## After pulling or merging
 
 Your databases are your own (Docker volumes on your machine). Someone else's changes may need new packages, rebuilt images, new migrations or new lessons. From the repo root:
@@ -138,6 +200,7 @@ docker compose exec identity-db psql -U identity -d identity
 docker compose exec content-db psql -U content -d content
 docker compose exec learning-db psql -U learning -d learning
 docker compose exec notification-db psql -U notification -d notification
+docker compose exec generation-db psql -U generation -d generation
 ```
 
 | At the `=#` prompt      | What it does                                       |

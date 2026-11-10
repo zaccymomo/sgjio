@@ -30,3 +30,6 @@ htmlcov/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Raw model-evaluation output (services/generation/evaluation/README.md)
+services/generation/evaluation/results/

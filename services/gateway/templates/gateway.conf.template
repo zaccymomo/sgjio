@@ -160,6 +160,14 @@ server {
         include snippets/proxy.inc;
     }
 
+    # AI-drafted lessons: the job's status (requests go through /api/admin/lessons above).
+    location /api/admin/generation {
+        set $upstream ${CONTENT_UPSTREAM};
+        auth_request /_auth/admin;
+        include snippets/principal.inc;
+        include snippets/proxy.inc;
+    }
+
     # 14. Lesson images and audio: public. Range and If-None-Match pass through, so
     # Content's 206, 304 and 416 reach the browser unchanged.
     location /api/media/ {
@@ -214,6 +222,15 @@ server {
     }
 
     location /api/aptitude/ {
+        set $upstream ${LEARNING_UPSTREAM};
+        auth_request /_auth/app;
+        include snippets/principal.inc;
+        include snippets/proxy.inc;
+    }
+
+    # AI-generated lessons (docs/ai-lessons-api.md): /api/generate, /api/generate/...,
+    # /api/generated/... are all Learning's, so one prefix without a slash covers them.
+    location /api/generate {
         set $upstream ${LEARNING_UPSTREAM};
         auth_request /_auth/app;
         include snippets/principal.inc;

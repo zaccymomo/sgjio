@@ -82,3 +82,37 @@ def version_not_found() -> Problem:
 def aptitude_problem(code: str, message: str, status_code: int = 422) -> Problem:
     """The quiz's errors carry only a code and a message, as AptitudeError did."""
     return Problem(code, message, status_code)
+
+
+# --- AI-generated lessons (docs/ai-lessons-api.md) -----------------------------------------
+
+
+def daily_limit_reached(limit: int) -> Problem:
+    return Problem(
+        "daily_limit_reached",
+        f"You have reached today's limit of {limit} generated lessons. "
+        "You can generate more tomorrow.",
+        429,
+        extra={"left_today": 0},
+    )
+
+
+def no_mistakes() -> Problem:
+    return Problem(
+        "no_mistakes",
+        "There are no incorrect answers to revisit in this topic yet.",
+        409,
+        field="focus",
+    )
+
+
+def topic_not_found() -> Problem:
+    return Problem("topic_not_found", "This topic has no lessons yet.", 404)
+
+
+def generated_not_found() -> Problem:
+    return Problem("generated_not_found", "We couldn't find that lesson.", 404)
+
+
+def card_not_found() -> Problem:
+    return Problem("card_not_found", "That card isn't in this lesson.", 422, field="card_id")

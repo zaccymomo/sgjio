@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/generation.lesson.failed.schema.json",
+  "title": "generation.lesson.failed",
+  "description": "Generation could not produce a lesson for a request. aggregate_id = request_id, aggregate_version always 3. The requester shows a message for `code` and gives the slot back. off_topic: the request isn't about everyday life in Singapore (the model refused); invalid_output: the lesson failed our checks twice; unsafe: the answer check rejected it; provider: the model couldn't be reached, or generation is switched off. `detail` is for logs only, never shown to learners.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "generation.lesson.failed"
+    },
+    "producer": {
+      "const": "generation"
+    },
+    "aggregate_type": {
+      "const": "lesson_generation"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "requester", "code", "detail"],
+      "properties": {
+        "request_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "requester": {
+          "enum": ["learning", "content"]
+        },
+        "code": {
+          "enum": ["off_topic", "invalid_output", "unsafe", "provider"]
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    }
+  }
+}

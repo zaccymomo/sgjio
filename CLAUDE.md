@@ -8,7 +8,7 @@ SGJio is an IS4301 team project: a **web app** (not a mobile app) that helps int
 
 ## Repository layout
 
-The back end is four FastAPI services behind an nginx gateway, talking through RabbitMQ (`docs/architecture/`: build plan, ADRs in `decisions/`, `diagrams.md`). It replaced the monolith (`api/`) in #21.
+The back end is four FastAPI services plus two workers (Notification, Generation) behind an nginx gateway, talking through RabbitMQ (`docs/architecture/`: build plan, ADRs in `decisions/`, `diagrams.md`). It replaced the monolith (`api/`) in #21.
 
 | Path                     | What                                                                                                                                                          |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -20,6 +20,7 @@ The back end is four FastAPI services behind an nginx gateway, talking through R
 | `services/content/`      | Topics, lessons, versions, media, reported problems, aptitude question bank (:8002)                                                                           |
 | `services/learning/`     | Lesson runs, completions, progress, search, review, aptitude test and exemptions, insights; read models of content and learners (:8003)                       |
 | `services/notification/` | Email worker (no HTTP); inbox `processed_events`                                                                                                              |
+| `services/generation/`   | AI lesson worker (no HTTP, no gateway route): writes and checks lessons for Learning and Content's requests; fake model unless `GENERATION_FAKE=false`        |
 | `contracts/`             | Event JSON Schemas (`events/`), `validate.py`, and the auth and error contracts (`README.md`)                                                                 |
 | `templates/platform/`    | Plumbing copied identically into each service's `app/platform/` (errors, logging, health, principal, outbox, consumer)                                        |
 | `e2e/`                   | End-to-end suite through the gateway; `oracle/monolith-openapi.json` is the shape oracle: the monolith's API, updated by hand when the API changes on purpose |
@@ -41,18 +42,18 @@ docker compose exec <svc> python -m app.cli <command>  # identity: seed | create
                                                        # content: seed | import-lessons | prune-media | republish-catalog
                                                        # learning: seed | wait-for-read-models | demo-activity | reset-read-models
 cd services/<svc> && uv venv -p 3.11 .venv && uv pip install -p .venv/bin/python -r requirements-dev.txt
-.venv/bin/python -m pytest                             # <svc>_test DB; identity 209, content 373, learning 264, notification 33
+.venv/bin/python -m pytest                             # <svc>_test DB; identity 209, content 390, learning 294, notification 33, generation 114
 .venv/bin/python -m ruff check . && .venv/bin/python -m ruff format .
 .venv/bin/python -m alembic revision --autogenerate -m "..."   # then READ the generated file
 .venv/bin/python -m alembic upgrade head && .venv/bin/python -m alembic check
-scripts/e2e.sh [--resilience]                          # 44 e2e tests through :8000 (4 resilience drills opt-in)
+scripts/e2e.sh [--resilience]                          # 48 e2e tests through :8000 (4 resilience drills opt-in)
 contracts/.venv/bin/python contracts/validate.py       # event schemas and examples
 services/gateway/tests/run.sh                          # gateway routes against stub services
 npm run dev:web | dev:admin                            # from repo root
 npm run lint && npm run format && npm run typecheck && npm run build
 ```
 
-Ports: gateway 8000; Swagger identity 8001, content 8002, learning 8003; RabbitMQ UI 15672 (`sgjio`/`sgjio`); Mailpit 8025; Postgres identity 5433, content 5434, learning 5435, notification 5436 (user = password = db name).
+Ports: gateway 8000; Swagger identity 8001, content 8002, learning 8003; RabbitMQ UI 15672 (`sgjio`/`sgjio`); Mailpit 8025; Postgres identity 5433, content 5434, learning 5435, notification 5436, generation 5438 (user = password = db name).
 
 Seed logins: main app `newcomer@sgjio.example.com` / `UserPass123` (also `starter@`, `mixed@`, `advanced@`, `skipped@`); admin `admin@sgjio.example.com` / `AdminPass123`.
 
@@ -65,7 +66,7 @@ Seed logins: main app `newcomer@sgjio.example.com` / `UserPass123` (also `starte
 - Never edit a migration already on `main`; add a new one in the owning service. Enums are stored as VARCHAR + CHECK (`_enum()` in `models.py`), not native Postgres enums.
 - New settings go in the service's `app/config.py`, its environment in `docker-compose.yml`, and its `.env.example` if it has one. Never commit `.env`.
 - UI: use the Tailwind tokens (`bg-brand`, `text-ink`, `text-muted`, `text-subtle`, `border-line`, `bg-surface`, `text-danger`, `rounded-sm/md/lg`, `text-2xs`, `text-caption`) and reuse `@sgjio/ui` components (`Button`, `TextField`, `PasswordField`, `Alert`, `AuthCard`, `AppShell`, `AdminLayout`, `SignInForm`, `ErrorState`, `Placeholder`). Brand red `#F43F5E` is for highlights; errors use `danger` `#DC2626`.
-- Tabs whose module isn't built yet (Practice, Buddies, Portfolio) use `ComingSoonPage` in `web/`: a learner-facing summary and what the tab will do. Unfinished parts of built pages show `<Placeholder story="SCRUM-xx">`. Replace either when building that story.
+- Tabs whose module isn't built yet (Buddies, Portfolio) use `ComingSoonPage` in `web/`: a learner-facing summary and what the tab will do. Unfinished parts of built pages show `<Placeholder story="SCRUM-xx">`. Replace either when building that story.
 - Write user-facing copy in plain language; say "select", not "tap" (web app).
 
 ## Auth (Identity, `services/identity/app/auth/`; gateway forward auth)
@@ -93,4 +94,5 @@ Seed logins: main app `newcomer@sgjio.example.com` / `UserPass123` (also `starte
 - **Search (SCRUM-85).** The landing page's search bar drops down matching lessons as the user types (`LessonSearch` in `web/`, `GET /api/search`, `search_lessons` in Learning's `app/progress.py`, from `lesson_decks.cards_plain_text`): title and card text of the latest published version only. A lesson opened from it steps back to the results (`state={{ from: "search" }}`, as topic pages pass `"topic"`).
 - **Reported problems (SCRUM-82, SCRUM-83).** Learners flag a card from the flag in the lesson's top bar (`cardActions` on `LessonDeck`); `lesson_reports` keeps the lesson, version, card id, reason and note. Admins see them at `/reports` in `admin/`, never with the reporter, and mark them Fixed or Dismissed (kept). Rules in `services/content/app/reports.py`.
 - **Media** (images, audio) is uploaded once, stored in Content's Postgres (`media_assets`, `services/content/app/media.py`) and served publicly at `/api/media/{id}`; lessons refer to it by id. Images become WebP at most 1600px wide.
+- **AI-generated lessons** (`docs/ai-lessons-plan.md`, API in `docs/ai-lessons-api.md`). Learners generate from the **Practice tab** (`/practice`, `/practice/generate`, `/practice/generated/:id`, `/generated/:id/play`), plus `GeneratePrompt` cards on each topic page (more prominent once the topic is finished; `?topic=` preselects it) and on Home when every lesson is done (in place of a dead end): topic or Pick for me, Something new or My mistakes (`mistakes_for()`), optional text, how hard, length; 3 a day. Generated lessons live in Learning's own `generated_*` tables and never count toward circles, tiers, review or search. Admins use "Generate draft" on the Content page (topic, level, what to teach, length; 20 a day); the result is an ordinary Draft with `origin = "ai"` that needs "I have reviewed every card" (`reviewed: true`) before its first publish. Both front ends reuse the existing `LessonDeck` and editor. Requests go to the `generation` worker by event and never carry user ids. The real model is NUS SoC LaaS (OpenAI-compatible, NUS network or VPN only), set with `GENERATION_FAKE=false`, `GENERATION_BASE_URL`, `GENERATION_API_KEY`, `GENERATION_MODEL` (qwen3.6:35b; x-test-2 is the slower, better option), `GENERATION_CHECK_MODEL` and `GENERATION_FALLBACK_MODEL` (ornith1.5:35b) and `GENERATION_TIMEOUT_SECONDS=120` in the git-ignored `.env` (copy `.env.example`; README "AI-generated lessons"); why these, and how to re-test when SoC changes models: `docs/ai-model-evaluation.md` and `services/generation/evaluation/`.
 - Open decisions and the defaults chosen are in `docs/decisions.md`. Don't change them silently; flag it.

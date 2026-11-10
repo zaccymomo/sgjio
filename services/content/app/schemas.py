@@ -17,6 +17,7 @@ from app.lesson_doc import LessonDoc
 from app.models import (
     MAX_LEVEL,
     MIN_LEVEL,
+    LessonOrigin,
     LessonStatus,
     ReportReason,
     ReportStatus,
@@ -224,6 +225,13 @@ class LessonChangeRequest(BaseModel):
     updated_at: AwareDatetime
 
 
+class LessonPublishRequest(LessonChangeRequest):
+    """`reviewed` is the editor's "I have reviewed every card" tick, needed only for an AI
+    draft's first publish (review_required); other lessons may leave it out."""
+
+    reviewed: bool = False
+
+
 class IssueOut(BaseModel):
     """Something that stops the lesson being published (blocker) or is worth a look."""
 
@@ -296,10 +304,50 @@ class LessonOut(BaseModel):
     deletable: bool
     has_unpublished_changes: bool
     version: VersionOut | None
+    # "ai" for a draft the AI wrote; `ai_reviewed_at` is when its first publish was reviewed.
+    origin: LessonOrigin
+    ai_reviewed_at: datetime | None
     doc: LessonDoc
     issues: list[IssueOut]
     stats: StatsOut
     assets: dict[str, AssetOut]
+
+
+# --- AI drafts (docs/ai-lessons-api.md, "Content") -----------------------------------------
+
+GenerationNotes = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)
+]
+
+
+class GenerationRequest(BaseModel):
+    """ "Generate draft": topic, level, what to teach, and length in cards."""
+
+    topic_id: uuid.UUID
+    level: LessonLevel
+    notes: GenerationNotes
+    cards: Literal[4, 6, 8]
+
+
+class GenerationFailureOut(BaseModel):
+    code: str
+    message: str
+
+
+class GenerationJobOut(BaseModel):
+    """A request as the dialog polls it. `lesson_id` is set once `status` is done;
+    `left_today` is the signed-in administrator's remaining requests."""
+
+    id: uuid.UUID
+    status: Literal["requested", "writing", "done", "failed"]
+    lesson_id: uuid.UUID | None
+    failure: GenerationFailureOut | None
+    left_today: int
+
+
+class GenerationQuotaOut(BaseModel):
+    daily_limit: int
+    left_today: int
 
 
 # --- Reported problems (SCRUM-82, SCRUM-83) ------------------------------------------------

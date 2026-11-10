@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "rea
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { ContentToolbar, type View } from "../components/ContentToolbar";
+import { GenerateDraftButton, GenerateDraftDialog } from "../components/GenerateDraftDialog";
 import { ConfirmLessonDeleteDialog } from "../components/LessonDialogs";
 import { LessonRow } from "../components/LessonRow";
 import { lessonMenuGroups, type LessonActions } from "../components/menuItems";
@@ -77,6 +78,7 @@ export function ContentPage() {
   const { state, notice, setNotice, retry } = content;
   const [view, setView] = useState<View>(readView);
   const [topicDialog, setTopicDialog] = useState<TopicDialogState | null>(null);
+  const [generating, setGenerating] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
@@ -261,7 +263,7 @@ export function ContentPage() {
             Topics appear as progress circles on users&rsquo; home page, in the order shown here.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
             className="flex-1 sm:flex-none"
@@ -271,6 +273,11 @@ export function ContentPage() {
             <Plus className="size-4" aria-hidden />
             New topic
           </Button>
+          <GenerateDraftButton
+            className="flex-1 sm:flex-none"
+            onClick={() => setGenerating(true)}
+            disabled={!data}
+          />
           <Button className="flex-1 sm:flex-none" onClick={() => navigate("/lessons/new")}>
             <Plus className="size-4" aria-hidden />
             New lesson
@@ -306,6 +313,11 @@ export function ContentPage() {
       )}
 
       <TopicDialog state={topicDialog} onClose={() => setTopicDialog(null)} onSave={saveTopic} />
+      <GenerateDraftDialog
+        open={generating}
+        topics={data?.topics ?? []}
+        onClose={() => setGenerating(false)}
+      />
       <ConfirmTopicDialog
         state={confirm && confirmTopic ? { ...confirm, topic: confirmTopic } : null}
         busy={confirmBusy}

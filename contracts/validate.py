@@ -33,6 +33,11 @@ CATALOGUE = [
     "content.lesson_version.published",
     "content.aptitude_question.changed",
     "content.aptitude_bank.changed",
+    "content.lesson_generation.requested",
+    "learning.lesson_generation.requested",
+    "generation.lesson.progress",
+    "generation.lesson.generated",
+    "generation.lesson.failed",
 ]
 
 

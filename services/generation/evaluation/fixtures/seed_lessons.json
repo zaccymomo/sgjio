@@ -1,0 +1,624 @@
+{
+  "Singlish": [
+    {
+      "title": "Lah, Leh and Lor",
+      "summary": "The little words at the end of a sentence that change what it means.",
+      "level": 1,
+      "cards_text": [
+        "Singlish particles sit at the end of a sentence and carry its tone. They aren't filler: swap one for another and the meaning changes.",
+        "Lah softens or insists. \"Don't worry lah\" is reassuring, not dismissive.",
+        "Leh softens a disagreement or a request: \"But I already paid leh.\"\n\nLor signals resignation: \"Then cancel lor.\"",
+        "Meh questions something the speaker doubts: \"Really free meh?\"",
+        "Your friend isn't sure the concert is really free. They ask: \"Really free ?\"",
+        "A colleague replies to your plan with \"Can meh?\". What are they signalling?"
+      ],
+      "questions": [
+        {
+          "card_text": "Your friend isn't sure the concert is really free. They ask: *\"Really free {{blank}}?\"*",
+          "chosen": "lah",
+          "correct": "meh",
+          "explanation": "**Meh** marks doubt, so it turns a statement into a sceptical question.",
+          "why_not": "Lah reassures or insists. It doesn't question anything."
+        },
+        {
+          "card_text": "A colleague replies to your plan with *\"Can meh?\"*. What are they signalling?",
+          "chosen": "They fully agree",
+          "correct": "They doubt it will work",
+          "explanation": "\"Meh\" marks doubt, so \"Can meh?\" is a polite way of questioning whether the plan will actually work, not agreeing to it.",
+          "why_not": "That would be \"Can lah\". The particle changes everything."
+        }
+      ]
+    },
+    {
+      "title": "Words You Will Hear Every Day",
+      "summary": "Shiok, sian, makan and the other words that do a lot of work.",
+      "level": 2,
+      "cards_text": [
+        "A handful of borrowed words do a lot of work in everyday Singapore English. You'll hear them in offices as well as among friends.",
+        "Shiok: intensely satisfying, usually food.\n\nSian: bored, weary, fed up.",
+        "Makan: to eat, or a meal. \"Go makan?\"\n\nChope: to reserve a seat.\n\nAlamak: an exclamation, like \"oh no\".",
+        "Kiasu means afraid of missing out. It describes someone who queues an hour early, just in case.",
+        "Stuck in a long meeting on a Friday afternoon, your colleague sighs: \"So .\"",
+        "Your colleague finishes lunch and says the laksa was \"shiok\". What do they mean?",
+        "Using one or two of these naturally is welcomed. Try one now: \"Hungry already. Let's go !\""
+      ],
+      "questions": [
+        {
+          "card_text": "Stuck in a long meeting on a Friday afternoon, your colleague sighs: *\"So {{blank}}.\"*",
+          "chosen": "shiok",
+          "correct": "sian",
+          "explanation": "**Sian** means bored or fed up: the right word for a long Friday meeting.",
+          "why_not": "Shiok is for something satisfying, like a good meal."
+        },
+        {
+          "card_text": "Your colleague finishes lunch and says the laksa was *\"shiok\"*. What do they mean?",
+          "chosen": "It was too spicy",
+          "correct": "It was delicious",
+          "explanation": "\"Shiok\" means intensely satisfying or delicious. They enjoyed it.",
+          "why_not": ""
+        }
+      ]
+    },
+    {
+      "title": "Why Sentences Sound Shorter",
+      "summary": "Singlish grammar is a system, not a string of mistakes.",
+      "level": 3,
+      "cards_text": [
+        "Singlish often drops words English speakers expect, because its grammar borrows from Chinese dialects and Malay. It's a consistent system, not broken English.",
+        "Subjects disappear when they're obvious. \"Went already\" means \"I already went\".",
+        "Already marks something as done, where British English would change the tense: \"I eat already\" means \"I have eaten\".",
+        "Got says that something exists: \"Got queue or not?\" means \"Is there a queue?\"",
+        "You want to know if there's a queue at the chicken rice stall. You ask: \" queue or not?\"",
+        "A hawker tells you \"Sold out already\". What does \"already\" do here?"
+      ],
+      "questions": [
+        {
+          "card_text": "You want to know if there's a queue at the chicken rice stall. You ask: *\"{{blank}} queue or not?\"*",
+          "chosen": "Already",
+          "correct": "Got",
+          "explanation": "**Got** marks existence, so *\"Got queue or not?\"* asks whether there's a queue.",
+          "why_not": "Already marks something as finished, not whether it exists."
+        },
+        {
+          "card_text": "A hawker tells you *\"Sold out already\"*. What does \"already\" do here?",
+          "chosen": "Means it happened unusually early",
+          "correct": "Marks the action as completed",
+          "explanation": "\"Already\" marks the action as complete, the way a perfect tense does in British English: the stall has sold out.",
+          "why_not": "It says nothing about timing, only that it's done."
+        }
+      ]
+    },
+    {
+      "title": "Could, Can and One",
+      "summary": "Small Singlish words that make everyday requests sound natural.",
+      "level": 5,
+      "cards_text": [
+        "In everyday Singapore English, can often means both “yes” and “it is possible”. A quick “Can!” is an enthusiastic agreement.",
+        "Could is a polite way to ask for something: “Could you help me with this?” It is useful at work and in shops.",
+        "You may also hear one at the end of a sentence. It adds emphasis: “This one is cheaper one.” It is informal speech, not formal writing.",
+        "Your colleague asks, “Can we move the meeting to Friday?” Which reply means “Yes, that is possible”?"
+      ],
+      "questions": [
+        {
+          "card_text": "Your colleague asks, “Can we move the meeting to Friday?” Which reply means “Yes, that is possible”?",
+          "chosen": "Cannot, thank you.",
+          "correct": "Can.",
+          "explanation": "A short “Can” commonly means “Yes, that works” in Singapore English.",
+          "why_not": "Cannot means it is not possible."
+        }
+      ]
+    }
+  ],
+  "Hawker & Food": [
+    {
+      "title": "Ordering at a Local Hawker Centre",
+      "summary": "Chope a seat first, then order your kopi in code.",
+      "level": 1,
+      "cards_text": [
+        "At a busy hawker centre, find a seat before you queue. People reserve (\"chope\") one by leaving a packet of tissues on the table.",
+        "Coffee is ordered in code. Plain kopi is coffee with condensed milk: sweet and thick.",
+        "Add a word to change it:\n\n- O: no milk\n- C: evaporated milk\n- Kosong: no sugar\n- Siew dai: less sugar",
+        "Put them together and you get orders like this one: black coffee, no sugar.",
+        "Black coffee with sugar is kopi .",
+        "You want black coffee with no sugar. What do you ask for?"
+      ],
+      "questions": [
+        {
+          "card_text": "Black coffee **with** sugar is kopi {{blank}}.",
+          "chosen": "C",
+          "correct": "O",
+          "explanation": "**O** takes the milk out and keeps the sugar.",
+          "why_not": "C means evaporated milk, so it still has milk."
+        },
+        {
+          "card_text": "You want black coffee with no sugar. What do you ask for?",
+          "chosen": "Kopi C",
+          "correct": "Kopi O Kosong",
+          "explanation": "\"O\" means no milk and \"kosong\" means no sugar, so black coffee with no sugar is Kopi O Kosong.",
+          "why_not": "C adds evaporated milk."
+        }
+      ]
+    },
+    {
+      "title": "Return Your Tray",
+      "summary": "Clearing your table is required, and the racks are sorted for a reason.",
+      "level": 2,
+      "cards_text": [
+        "Since 2021, clearing your own table at hawker centres, coffee shops and food courts is required, not optional. Repeat offenders can be fined.",
+        "Look for the tray return racks near the entrance or along a wall. Put leftovers and tissues in the bin first.",
+        "Most racks have separate points for halal and non-halal crockery, clearly labelled. Muslim diners and stallholders need their utensils kept apart.",
+        "Cleaners still work the tables, but they're there to wipe them down, not to carry your plates away.",
+        "Why do tray return racks have separate halal and non-halal points?",
+        "Finished your chicken rice? Take your tray to the ."
+      ],
+      "questions": [
+        {
+          "card_text": "Why do tray return racks have separate halal and non-halal points?",
+          "chosen": "To sort plates by which stall they came from",
+          "correct": "To keep halal and non-halal crockery separate",
+          "explanation": "Crockery used for non-halal food is kept apart from halal crockery, so Muslim diners and stallholders are not affected by cross-contamination.",
+          "why_not": ""
+        }
+      ]
+    },
+    {
+      "title": "Sharing a Table",
+      "summary": "Sharing is normal at lunch rush, and chatting is optional.",
+      "level": 3,
+      "cards_text": [
+        "At peak lunch hours, you'll often share a table with strangers. It's completely normal.",
+        "The usual opener is \"Excuse me, anyone sitting here?\", or simply a gesture at the empty chair.",
+        "Saying yes is expected. It isn't an invitation to chat: most people eat, keep to their half of the table and leave. Neither side is being unfriendly.",
+        "A packet of tissues sits on an empty seat. The seat is .",
+        "A stranger gestures at the empty seat at your table during lunch rush. What is expected?"
+      ],
+      "questions": [
+        {
+          "card_text": "A packet of tissues sits on an empty seat. The seat is {{blank}}.",
+          "chosen": "free",
+          "correct": "choped",
+          "explanation": "A tissue packet or an umbrella means the seat is **choped**: someone is queueing for food. Look elsewhere.",
+          "why_not": "The tissues mean someone has reserved it."
+        },
+        {
+          "card_text": "A stranger gestures at the empty seat at your table during lunch rush. What is expected?",
+          "chosen": "Refuse, since you were there first",
+          "correct": "Agree to share; no need to chat",
+          "explanation": "Sharing tables at peak hours is normal. You nod or say yes; neither of you is expected to make conversation.",
+          "why_not": "Sharing at peak hours is expected."
+        }
+      ]
+    },
+    {
+      "title": "Clearing Your Table After Eating",
+      "summary": "A simple way to leave a shared food court ready for the next person.",
+      "level": 5,
+      "cards_text": [
+        "At hawker centres and food courts, return your tray, bowls and cups to the tray-return point after eating. Signs usually show where to take halal dishes and other trays.",
+        "Wipe up an obvious spill with the tissues you have, then let the cleaners handle anything larger. Do not leave food scraps for the next person.",
+        "If you shared a table, everyone can help. Clearing your own things promptly makes it easier for the next group to sit down.",
+        "You have finished lunch at a busy food court. What should you do before leaving?"
+      ],
+      "questions": [
+        {
+          "card_text": "You have finished lunch at a busy food court. What should you do before leaving?",
+          "chosen": "Leave them because cleaners will collect everything",
+          "correct": "Return your tray and dishes to the tray-return point",
+          "explanation": "Returning your tray is the normal way to help keep a busy shared dining space usable.",
+          "why_not": "Cleaners help keep the space tidy, but diners are expected to return their own trays."
+        }
+      ]
+    }
+  ],
+  "Workplace": [
+    {
+      "title": "Names and Titles at Work",
+      "summary": "How to address colleagues when you're not sure.",
+      "level": 1,
+      "cards_text": [
+        "Singapore offices are less formal than much of the region, but seniority still shows in how people address each other.",
+        "First names are common among peers, and with managers at most companies.",
+        "Many Chinese Singaporeans have an English name as well as their given name. Use whichever one they introduce themselves with.",
+        "In older or government organisations, some colleagues are Mr or Ms plus surname. Sir and Ma'am appear in uniformed and some client-facing roles.",
+        "You're unsure how to address a senior colleague. What is the safest approach?",
+        "Your new manager signs her emails \"Regards, Wei Ling\". You start your reply: \"Hi ,\""
+      ],
+      "questions": [
+        {
+          "card_text": "You're unsure how to address a senior colleague. What is the safest approach?",
+          "chosen": "Always use Mr or Ms plus surname",
+          "correct": "Copy how they sign emails and how others address them",
+          "explanation": "Following how they sign their own emails, and how the rest of the team addresses them, matches the norm of that particular workplace.",
+          "why_not": "Too formal in many offices."
+        },
+        {
+          "card_text": "Your new manager signs her emails *\"Regards, Wei Ling\"*. You start your reply: *\"Hi {{blank}},\"*",
+          "chosen": "Ms Tan",
+          "correct": "Wei Ling",
+          "explanation": "She signs with her first name, so that's how she expects to be addressed.",
+          "why_not": "Fine somewhere formal, but she signs with her first name, so follow her lead."
+        }
+      ]
+    },
+    {
+      "title": "Saying No Without Saying No",
+      "summary": "Hearing the no behind a softened reply.",
+      "level": 2,
+      "cards_text": [
+        "Direct refusal is often avoided at work, so a \"no\" usually arrives softened. It's about saving face on both sides, not about being evasive.",
+        "Phrases that usually mean no, or not yet:\n\n- \"I will try my best\"\n- \"Let me check and get back to you\"\n- Silence after a proposal",
+        "And this one, when you ask whether a deadline is possible.",
+        "You ask for a deadline and hear \"Quite challenging leh\". What does it most likely mean?",
+        "Need a firm answer? Ask for something concrete: a date, an owner, or a yes to one specific next step.",
+        "To get past \"I'll try my best\", you ask: \"Can we agree on a ?\""
+      ],
+      "questions": [
+        {
+          "card_text": "You ask for a deadline and hear *\"Quite challenging leh\"*. What does it most likely mean?",
+          "chosen": "They need one more day",
+          "correct": "The deadline is unlikely to be met",
+          "explanation": "Softened phrasing usually signals a no. It means the deadline isn't realistic, put in a way that avoids a blunt refusal.",
+          "why_not": "It's a softened no, not a small delay."
+        },
+        {
+          "card_text": "To get past *\"I'll try my best\"*, you ask: *\"Can we agree on a {{blank}}?\"*",
+          "chosen": "favour",
+          "correct": "date",
+          "explanation": "A concrete date gives both sides something definite, without forcing a blunt yes or no.",
+          "why_not": "A favour adds pressure without making the plan any clearer."
+        }
+      ]
+    },
+    {
+      "title": "Lunch, Chat Groups and Belonging",
+      "summary": "Where a lot of workplace belonging really happens.",
+      "level": 3,
+      "cards_text": [
+        "Much of workplace belonging happens outside meetings.",
+        "Teams often go for lunch together, and being asked is how inclusion is offered. Accepting sometimes matters more than accepting every time.",
+        "Expect the bill to be split evenly rather than itemised.",
+        "Most teams also run a WhatsApp or Telegram group. It carries real information alongside the jokes, so being left out really does leave you behind.",
+        "You haven't been added to the team chat yet. The best move is to .",
+        "Your team is ordering a shared lunch. What should you check first?"
+      ],
+      "questions": [
+        {
+          "card_text": "You haven't been added to the team chat yet. The best move is to {{blank}}.",
+          "chosen": "wait to be invited",
+          "correct": "ask to be added",
+          "explanation": "Missing the team chat means missing real information, so asking to be added is completely normal.",
+          "why_not": "People often just forget. Asking is normal and welcome."
+        },
+        {
+          "card_text": "Your team is ordering a shared lunch. What should you check first?",
+          "chosen": "Whether everyone can pay in cash",
+          "correct": "Dietary needs such as halal and vegetarian",
+          "explanation": "Singapore workplaces are religiously mixed, so checking dietary needs, such as halal for Muslim colleagues and vegetarian for some Hindu and Buddhist colleagues, is the normal first step.",
+          "why_not": ""
+        }
+      ]
+    },
+    {
+      "title": "Following Up After a Meeting",
+      "summary": "Turn a polite discussion into clear next steps.",
+      "level": 5,
+      "cards_text": [
+        "Meetings can end with broad agreement but no one clearly owning the next step. A short follow-up message helps everyone leave with the same understanding.",
+        "Keep it practical: list the decision, the owner and a date. This is clearer than asking “Any updates?” several days later.",
+        "If a deadline is uncertain, ask what is realistic instead of pressing for an immediate promise. That lets someone raise a concern without losing face.",
+        "What is the clearest follow-up after your team agrees to revise a proposal?"
+      ],
+      "questions": [
+        {
+          "card_text": "What is the clearest follow-up after your team agrees to revise a proposal?",
+          "chosen": "Wait until the deadline and ask whether it is done",
+          "correct": "Send a note naming the owner and the agreed date",
+          "explanation": "A brief written follow-up gives the team a shared record of who is doing what and by when.",
+          "why_not": "Waiting makes it harder to surface a problem early."
+        }
+      ]
+    }
+  ],
+  "Public Etiquette": [
+    {
+      "title": "Queueing Is Not Optional",
+      "summary": "Single file, for everything.",
+      "level": 1,
+      "cards_text": [
+        "Singapore queues for everything: bus doors, lifts, hawker stalls, taxi stands. Cutting in draws an immediate, public objection.",
+        "At MRT doors, arrows on the platform show where to stand: at the sides, leaving the middle clear for people getting off.",
+        "The MRT doors open and you're waiting at the platform markings. What comes first?",
+        "At lifts, people stand aside from the doors rather than crowding them. A bag or umbrella on the floor can be holding someone's place.",
+        "Waiting for the train, you stand  the doors until passengers have got off."
+      ],
+      "questions": [
+        {
+          "card_text": "The MRT doors open and you're waiting at the platform markings. What comes first?",
+          "chosen": "Board quickly to get a seat",
+          "correct": "Let passengers off before boarding",
+          "explanation": "Passengers leaving the train go first. Boarding before they're off blocks the doors and is the most commonly criticised breach.",
+          "why_not": "This blocks the doors, and it's the breach locals notice most."
+        },
+        {
+          "card_text": "Waiting for the train, you stand {{blank}} the doors until passengers have got off.",
+          "chosen": "in front of",
+          "correct": "beside",
+          "explanation": "Standing beside the doors keeps the way clear for passengers leaving the train.",
+          "why_not": "Standing in front of the doors blocks people getting off."
+        }
+      ]
+    },
+    {
+      "title": "On the MRT and Buses",
+      "summary": "The rules you can be fined for, and one you'll be glared at for.",
+      "level": 2,
+      "cards_text": [
+        "Public transport has its own rules, and some of them are enforced with fines.",
+        "No eating or drinking, not even water, anywhere inside stations or trains.",
+        "No durians. It's a real rule, and the signs are famous.",
+        "Reserved seats are for elderly and pregnant passengers, people with injuries and those with young children. You can sit in one, but give it up as soon as someone needs it.",
+        "You're sitting in a reserved seat and someone who needs it gets on. What is expected?",
+        "Thirsty on the train? Wait until you're  the station."
+      ],
+      "questions": [
+        {
+          "card_text": "You're sitting in a reserved seat and someone who needs it gets on. What is expected?",
+          "chosen": "Stay seated, since you boarded first",
+          "correct": "Give up the seat",
+          "explanation": "Reserved seats may be used when free, but the expectation is that you give the seat up as soon as someone who needs it boards.",
+          "why_not": ""
+        },
+        {
+          "card_text": "Thirsty on the train? Wait until you're {{blank}} the station.",
+          "chosen": "on the platform of",
+          "correct": "out of",
+          "explanation": "Eating and drinking, water included, isn't allowed anywhere inside stations or trains.",
+          "why_not": "The ban covers the whole station, platforms included."
+        }
+      ]
+    },
+    {
+      "title": "Living Close to Your Neighbours",
+      "summary": "Noise, corridors and life in an HDB block.",
+      "level": 3,
+      "cards_text": [
+        "About eight in ten residents live in HDB flats, so noise and shared space matter.",
+        "Keep drilling and heavy work to weekday daytime hours, and avoid Sundays and public holidays.",
+        "Corridors are shared and must stay clear: they're fire escape routes. And never throw anything from a window. \"Killer litter\" is a serious offence.",
+        "Where do neighbour disputes in HDB blocks usually go first?",
+        "Your corridor is an escape route, so keep it ."
+      ],
+      "questions": [
+        {
+          "card_text": "Where do neighbour disputes in HDB blocks usually go first?",
+          "chosen": "The police",
+          "correct": "The town council or Community Mediation Centre",
+          "explanation": "The town council or the Community Mediation Centre handles most neighbour disputes; the police are not the usual first step.",
+          "why_not": "The police aren't the usual first step for neighbour disputes."
+        }
+      ]
+    },
+    {
+      "title": "Escalators and Shared Space",
+      "summary": "Make room for people walking and travelling at different speeds.",
+      "level": 5,
+      "cards_text": [
+        "On most escalators in Singapore, people stand on the left and leave the right side clear for anyone who wants to walk up or down.",
+        "Keep bags close to you and avoid stopping immediately at the top or bottom. Other people may be stepping off behind you.",
+        "This is a courtesy rather than an invitation to rush. Hold the handrail, watch your step and use a lift if you have a pram, bulky luggage or need more space.",
+        "You are standing still on an escalator and someone wants to walk past. Where should you stand?"
+      ],
+      "questions": [
+        {
+          "card_text": "You are standing still on an escalator and someone wants to walk past. Where should you stand?",
+          "chosen": "In the middle so no one can pass",
+          "correct": "On the left, leaving the right side clear",
+          "explanation": "Standing on the left keeps an expected passing space open on the right.",
+          "why_not": "That blocks the shared walking side."
+        }
+      ]
+    }
+  ],
+  "Festivals": [
+    {
+      "title": "Chinese New Year",
+      "summary": "Red packets, mandarin oranges and tossing yusheng.",
+      "level": 1,
+      "cards_text": [
+        "Chinese New Year brings two public holidays in January or February, and the busiest family period of the year.",
+        "Ang bao are red packets of money, given by married people to children and unmarried younger adults. Use new notes and an even amount.",
+        "Ang bao amounts should be even, and never include a .",
+        "Visiting relatives runs over several days. If you're invited, bring mandarin oranges, traditionally in pairs.",
+        "Lo hei, a tossed raw fish salad, is shared at work and family meals. Everyone tosses together: the higher, the better.",
+        "You're invited to a colleague's home for Chinese New Year. What is a suitable gift?"
+      ],
+      "questions": [
+        {
+          "card_text": "Ang bao amounts should be even, and never include a {{blank}}.",
+          "chosen": "eight",
+          "correct": "four",
+          "explanation": "**Four** sounds like the word for death, so it's avoided.",
+          "why_not": "Eight sounds like prosperity, so it's a favourite."
+        },
+        {
+          "card_text": "You're invited to a colleague's home for Chinese New Year. What is a suitable gift?",
+          "chosen": "A set of four pastries",
+          "correct": "A pair of mandarin oranges",
+          "explanation": "A pair of mandarin oranges is the traditional gift when visiting during Chinese New Year.",
+          "why_not": "Four sounds like death and is avoided."
+        }
+      ]
+    },
+    {
+      "title": "Hari Raya Puasa",
+      "summary": "Ramadan, open houses and what to say.",
+      "level": 2,
+      "cards_text": [
+        "Hari Raya Puasa marks the end of Ramadan, the month when Muslims fast from dawn to sunset.",
+        "During Ramadan, be considerate about eating in front of fasting colleagues, and expect meetings to shift around iftar, the evening meal that breaks the fast.",
+        "On Hari Raya itself, families hold open houses and guests are genuinely welcome. Dress modestly and accept food with your right hand.",
+        "The greeting is \"Selamat Hari Raya\", often followed by \"Maaf zahir dan batin\", asking forgiveness for any wrong done.",
+        "You're visiting a colleague's open house on Hari Raya. What should you do at the door?",
+        "Arriving at the open house, you greet your hosts: \"Selamat Hari !\""
+      ],
+      "questions": [
+        {
+          "card_text": "You're visiting a colleague's open house on Hari Raya. What should you do at the door?",
+          "chosen": "Wait to be served before sitting",
+          "correct": "Remove your shoes before entering",
+          "explanation": "Shoes come off at the door in Malay and Muslim homes, and modest dress is expected when visiting.",
+          "why_not": ""
+        },
+        {
+          "card_text": "Arriving at the open house, you greet your hosts: *\"Selamat Hari {{blank}}!\"*",
+          "chosen": "Deepavali",
+          "correct": "Raya",
+          "explanation": "*\"Selamat Hari Raya\"* is the greeting for Hari Raya Puasa.",
+          "why_not": "Deepavali is the Hindu festival of lights."
+        }
+      ]
+    },
+    {
+      "title": "Deepavali",
+      "summary": "The festival of lights, and how to be a good guest.",
+      "level": 3,
+      "cards_text": [
+        "Deepavali, the festival of lights, marks the triumph of light over darkness. It falls in October or November.",
+        "Little India is lit up for weeks beforehand, and it's worth seeing in the evening.",
+        "Homes are cleaned, decorated with kolam patterns at the entrance, and opened to visitors.",
+        "If you're invited, dress brightly rather than in black or white, and greet your hosts with \"Happy Deepavali\".",
+        "What is a suitable gift when invited to a Hindu colleague's home for Deepavali?",
+        "For a Deepavali visit, choose clothes that are ."
+      ],
+      "questions": [
+        {
+          "card_text": "What is a suitable gift when invited to a Hindu colleague's home for Deepavali?",
+          "chosen": "A leather wallet",
+          "correct": "Sweets or fruit",
+          "explanation": "Sweets or fruit suit the occasion. Many Hindu households are vegetarian, so meat-based gifts and leather items are avoided.",
+          "why_not": "Leather is best avoided as a gift."
+        },
+        {
+          "card_text": "For a Deepavali visit, choose clothes that are {{blank}}.",
+          "chosen": "all black",
+          "correct": "bright",
+          "explanation": "Bright colours suit the festival of lights; black and white are best avoided.",
+          "why_not": "Black is best avoided for a celebration."
+        }
+      ]
+    },
+    {
+      "title": "Visiting During a Festival",
+      "summary": "Be a considerate guest when friends invite you to celebrate.",
+      "level": 5,
+      "cards_text": [
+        "Festival visits are often relaxed, but an invitation is still an occasion to be thoughtful. Confirm the time, arrive close to it, and let your host guide you on shoes, food and photographs.",
+        "A small gift is welcome when visiting a home, though it is not required. If you are unsure about food, choose something sealed and ask about dietary needs first.",
+        "During religious celebrations, follow your host's lead. Some homes avoid particular foods or drinks, and some guests may be fasting.",
+        "You are invited to a colleague's festival open house and are unsure what food to bring. What is the best first step?"
+      ],
+      "questions": [
+        {
+          "card_text": "You are invited to a colleague's festival open house and are unsure what food to bring. What is the best first step?",
+          "chosen": "Bring any dish without asking",
+          "correct": "Ask the host about dietary preferences before choosing",
+          "explanation": "A quick question lets you choose something considerate and shows respect for the household.",
+          "why_not": "A well-meant dish may not suit the household's dietary practices."
+        }
+      ]
+    }
+  ],
+  "Getting Around": [
+    {
+      "title": "Paying for Public Transport",
+      "summary": "Tap in, tap out, and what happens if you forget.",
+      "level": 1,
+      "cards_text": [
+        "You don't need a special transport card. Most people tap a contactless bank card or a phone wallet on the reader.",
+        "Prefer not to use a bank card? Stored-value cards such as EZ-Link are sold at station counters and convenience stores.",
+        "Tap in when you board and tap out when you leave, on buses as well as trains. Fares depend on how far you travel.",
+        "What happens if you forget to tap out when leaving a bus or train?",
+        "Getting off the bus? Remember to ."
+      ],
+      "questions": [
+        {
+          "card_text": "What happens if you forget to tap out when leaving a bus or train?",
+          "chosen": "You're charged nothing for the trip",
+          "correct": "You're charged the maximum fare for that line",
+          "explanation": "Fares are calculated between your tap in and tap out, so missing the tap out charges the maximum fare for that line.",
+          "why_not": ""
+        }
+      ]
+    },
+    {
+      "title": "Catching a Bus",
+      "summary": "Buses only stop if you ask them to.",
+      "level": 2,
+      "cards_text": [
+        "Buses in Singapore don't stop automatically. If you don't signal, your bus may drive straight past.",
+        "As your bus approaches, put your hand out. On board, press the bell once, well before your stop.",
+        "Your bus is approaching the stop. What do you need to do?",
+        "Board at the front and get off through the middle doors where there are two. Tap your card at both.",
+        "Bus numbers ending in e are express services that skip stops. Live arrival times are on most stop panels and in apps.",
+        "Bus 10e is an  service, so check it stops where you need."
+      ],
+      "questions": [
+        {
+          "card_text": "Your bus is approaching the stop. What do you need to do?",
+          "chosen": "Stand at the front of the queue and wait",
+          "correct": "Put your hand out to signal the driver",
+          "explanation": "Singapore buses stop on request. Putting your hand out signals the driver; without it the bus may drive past.",
+          "why_not": "Without a signal, the bus may not stop."
+        },
+        {
+          "card_text": "Bus 10e is an {{blank}} service, so check it stops where you need.",
+          "chosen": "evening",
+          "correct": "express",
+          "explanation": "An **e** marks an express service, which skips some stops.",
+          "why_not": "The e means express. It runs during the day too."
+        }
+      ]
+    },
+    {
+      "title": "Taxis and Ride-Hailing",
+      "summary": "Fares, surcharges and the tipping question.",
+      "level": 3,
+      "cards_text": [
+        "Ride-hailing apps such as Grab, Gojek and TADA quote a fixed fare up front. Street taxis run on the meter.",
+        "You can flag a taxi down where it's safe to stop, but not on roads with double yellow lines. In the city centre, use a taxi stand.",
+        "Expect surcharges at peak hours, late at night and for airport pickups. They're added automatically and aren't negotiable.",
+        "What is the norm on tipping taxi and ride-hailing drivers in Singapore?",
+        "In the back seat, you still need to wear a ."
+      ],
+      "questions": [
+        {
+          "card_text": "What is the norm on tipping taxi and ride-hailing drivers in Singapore?",
+          "chosen": "Ten per cent is expected",
+          "correct": "Tipping is not customary",
+          "explanation": "Tipping is not customary in Singapore. The metered or quoted fare, plus any automatic surcharges, is the full amount.",
+          "why_not": ""
+        }
+      ]
+    },
+    {
+      "title": "Giving Up Your Seat",
+      "summary": "Notice when someone may benefit more from the seat you are using.",
+      "level": 5,
+      "cards_text": [
+        "On public transport, priority seats are for people who may need them more: older passengers, pregnant passengers, people with disabilities and adults carrying young children.",
+        "You do not need to make a scene. A small gesture or a quiet “Would you like to sit?” is enough. If the person declines, simply take your seat again.",
+        "Even away from a marked priority seat, look around when the train or bus is crowded. Someone balancing a child or using a walking aid may appreciate the space.",
+        "A crowded bus stops and an older passenger boards near you. What is the considerate response?"
+      ],
+      "questions": [
+        {
+          "card_text": "A crowded bus stops and an older passenger boards near you. What is the considerate response?",
+          "chosen": "Wait for the passenger to demand a seat",
+          "correct": "Offer your seat quietly",
+          "explanation": "Offering a seat is a common, low-key courtesy on crowded public transport.",
+          "why_not": "Offering early is easier and more considerate than making someone ask."
+        }
+      ]
+    }
+  ]
+}

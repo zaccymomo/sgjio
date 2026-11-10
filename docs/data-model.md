@@ -2,7 +2,7 @@
 
 Each service owns its own Postgres database, defined in `services/<name>/app/models.py` and created by that service's migrations in `services/<name>/alembic/versions/`. No service reads another's tables, and there are **no foreign keys between services**: an id from another service (a user id in Content, a lesson id in Learning) is a plain UUID. What one service needs to know about another's data arrives as events (`contracts/events/`) and is kept in its own tables. The monolith's single schema, on `main`, is the starting point for all of this.
 
-Enumerations are stored as text with a CHECK constraint (`_enum()` in each `models.py`), not native Postgres enums, so adding a value later is a simple migration. Every producer (Identity, Content) also has an `outbox` table: events waiting for the relay (`event_id`, `type`, `aggregate_type`, `aggregate_id`, `aggregate_version`, `payload`, `schema_version`, `correlation_id`, `occurred_at`, `published_at`). Identity's email events are deleted from it as soon as they are published, since their payloads hold one-time links and addresses.
+Enumerations are stored as text with a CHECK constraint (`_enum()` in each `models.py`), not native Postgres enums, so adding a value later is a simple migration. Every producer (Identity, Content, Learning, Generation) also has an `outbox` table: events waiting for the relay (`event_id`, `type`, `aggregate_type`, `aggregate_id`, `aggregate_version`, `payload`, `schema_version`, `correlation_id`, `occurred_at`, `published_at`). Identity's email events are deleted from it as soon as they are published, since their payloads hold one-time links and addresses.
 
 ## Identity (`identity-db`, port 5433)
 
@@ -76,6 +76,7 @@ erDiagram
     topics ||--o{ lessons : "contains"
     lessons ||--o{ lesson_versions : "published as"
     lessons ||--o{ lesson_reports : "reported in"
+    lessons |o--o{ generation_jobs : "drafted by"
     lesson_versions ||--o{ lesson_reports : "as shown"
     topics ||--o{ aptitude_questions : "asked about"
 
@@ -102,6 +103,9 @@ erDiagram
         int position "order within its topic"
         smallint level "1-5, fixed once first published"
         bigint version "aggregate_version of its events"
+        string origin "authored | ai"
+        timestamptz ai_reviewed_at "an AI draft's first publish: the review tick"
+        uuid ai_reviewed_by "Identity's user id; nulled when deleted"
         timestamptz updated_at "indexed: admin list sorts by it"
     }
     lesson_versions {
@@ -157,11 +161,27 @@ erDiagram
         smallint id PK "one row"
         bigint revision "aggregate_version of content.aptitude_bank.changed"
     }
+    generation_jobs {
+        uuid id PK
+        uuid requested_by "Identity's user id, never sent to Generation; nulled when deleted"
+        uuid topic_id "plain id, no FK: a request never blocks deleting a topic"
+        smallint level "1-5"
+        smallint cards "4 | 6 | 8"
+        string notes "what to teach, up to 2000 characters"
+        string status "requested | writing | done | failed"
+        int progress_version "aggregate_version of the last generation event applied"
+        uuid lesson_id FK "the Draft it became; set null if that lesson is deleted"
+        string failure_code "off_topic | invalid_output | unsafe | provider | timeout"
+        timestamptz created_at "indexed with requested_by: the daily limit"
+        timestamptz finished_at
+    }
     erased_users {
         uuid user_id PK "deleted account: a report in flight is refused"
         timestamptz erased_at
     }
 ```
+
+`generation_jobs` holds administrators' requests for an AI draft (`services/content/app/generation.py`). A job that finishes becomes an ordinary Draft through the usual create path, with `origin = ai`; from then on the lesson is like any other, except that its first publish needs the review tick.
 
 ## Learning (`learning-db`, port 5435)
 
@@ -213,6 +233,73 @@ erDiagram
         smallint level "0-5, exempted up to; 0 = nothing"
     }
 ```
+
+### Generated lessons
+
+AI-generated lessons for one learner (`services/learning/app/generated.py`). They have tables of their own on purpose: nothing that counts progress (circles, the overall figure, topic pages, the suggestion, tiers), review or search reads them, so a generated lesson can never count toward progress by accident.
+
+```mermaid
+erDiagram
+    generated_lessons ||--o{ generated_lesson_attempts : "run through"
+    generated_lesson_attempts ||--o{ generated_lesson_answers : "answered"
+    generated_lessons ||--o{ generated_lesson_reports : "flagged in"
+
+    generated_lessons {
+        uuid id PK "also the request_id sent to Generation"
+        uuid user_id "indexed with created_at; never sent to Generation"
+        uuid topic_id
+        string status "requested | writing | checking | ready | failed | cancelled"
+        int version "newest generation event applied: 0 at request, 1-3 after"
+        string focus "new | mistakes"
+        string difficulty "easier | right | harder"
+        string length "short | usual"
+        smallint level "1-5, the level the brief used"
+        string ask "the learner's text, up to 200 characters"
+        jsonb brief "what was sent to Generation"
+        jsonb covers "the mistakes it was built from"
+        string title "set once ready"
+        string summary
+        jsonb learning_points
+        jsonb doc "the deck, in the shape of a published version"
+        jsonb questions "scored and correct option per question"
+        int reading_seconds
+        string failure_code "off_topic | invalid_output | unsafe | provider | timeout"
+        int best_correct "best finished attempt"
+        int best_scored
+        bool rating_useful
+        jsonb rating_reasons
+        timestamptz rated_at
+        timestamptz created_at
+        timestamptz ready_at
+        timestamptz failed_at
+    }
+    generated_lesson_attempts {
+        uuid id PK
+        uuid generated_lesson_id FK
+        timestamptz started_at
+        timestamptz finished_at "empty until the end card"
+        int correct "set when finished"
+        int scored
+    }
+    generated_lesson_answers {
+        uuid attempt_id PK,FK "with question_id"
+        string question_id PK "from the generated deck"
+        string option_id
+        bool correct
+        bool scored
+        timestamptz answered_at
+    }
+    generated_lesson_reports {
+        uuid id PK
+        uuid generated_lesson_id FK
+        string card_id
+        string reason "wrong | insensitive | typo | media | other"
+        string note "up to 500 characters"
+        timestamptz created_at
+    }
+```
+
+Learning also has an `outbox` (the same columns as the others) for the one event it publishes, `learning.lesson_generation.requested`, written in the same transaction as the `generated_lessons` row. Generation's answers (`generation.lesson.*`) are applied by the consumer only to a request that is still waiting and only when their `aggregate_version` is newer than `version`, so a duplicate, a late result after a cancel or a timeout, or an event out of order changes nothing. Deleting a generated lesson deletes its attempts, answers and reports (`ON DELETE CASCADE`).
 
 ### Learning's read models
 
@@ -310,6 +397,15 @@ A lesson is shown to learners only when `learner_visible` is true, its latest de
 | ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | `processed_events` | `event_id` PK, `type`, `processed_at` (indexed) | the inbox: every event already emailed, kept 30 days, so a redelivery is not emailed twice |
 
+## Generation (`generation-db`, port 5438)
+
+Generation keeps no lessons and nothing about who asked: requests carry a request id, a brief and lesson text only.
+
+| Table              | Columns                                         | What                                                                                                                           |
+| ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `outbox`           | as above                                        | `generation.lesson.progress`, `generation.lesson.generated` and `generation.lesson.failed`, waiting for the relay              |
+| `processed_events` | `event_id` PK, `type`, `processed_at` (indexed) | the inbox: every request already answered, written in the same transaction as the result, so a redelivery isn't paid for twice |
+
 ## Why it looks like this
 
 - **One `users` table for users and administrators** (Identity). `role` separates them, and one email is one account. Administrators are not created by registration; they are invited from the portal (SCRUM-81), or seeded, or added with `python -m app.cli create-admin` for the first one.
@@ -333,6 +429,8 @@ A lesson is shown to learners only when `learner_visible` is true, its latest de
 - **Exemptions are per topic, and exempted lessons are not stored** (`topic_exemptions`, SCRUM-113). Users have no level of their own. The quiz gives each topic it covers a level from 0 to 5, one row per user per topic; every published lesson in that topic at or below it is exempted (SCRUM-104). Because a published lesson's level never changes (SCRUM-103), exempted lessons are worked out from the two (`services/learning/app/exemptions.py`), so a lesson published later at an exempted level is exempted too, and nothing needs updating. `user_id` refers to the user's `aptitude_attempts` row, so exemptions only exist beside a completed quiz. Lessons are not hidden by level: everyone sees every published lesson.
 - **One aptitude quiz per user** (`aptitude_attempts`, SCRUM-113 AC2). The quiz is taken once, and only a completed one is stored, together with its exemptions (SCRUM-99 AC7); `user_id` is unique. `results` holds one entry per question given, each a copy of what mattered then (question, topic, level, prompt, the option chosen and whether it was right), so editing or deactivating a question changes no one's results (SCRUM-110 AC5). Skipping the quiz (SCRUM-98) needs no field of its own: a Newcomer with no attempt has not taken it yet, and is exempted from nothing.
 - **Aptitude questions are kept apart from lesson questions** (`aptitude_questions` in Content, copied to Learning's `quiz_questions`, SCRUM-96), so users don't meet them again in lessons. The database checks that the correct option is one of the options. Questions are deactivated, never deleted.
+- **Generated lessons are kept apart from lessons** (`generated_lessons` and the tables beside it, docs/ai-lessons-plan.md D6). They never count toward circles, tiers, review or search, and practising a mistake in one does not clear it (D8). Separate tables make that hold by construction: the existing progress queries can't see them. Attempts and first answers mirror `lesson_attempts` and `attempt_answers`; the best score is kept on the lesson's row, since each lesson belongs to one learner. Failed and cancelled requests stay as rows, and don't count toward the daily limit. Account deletion removes them all.
+- **An AI draft is an ordinary lesson with an `origin`** (Content, D9 and D10). `generation_jobs` keeps the request; the Draft it becomes is a normal `lessons` row with `origin = ai`, so the editor, checks, versions and reports need nothing new. Its first publish needs `reviewed: true` and records `ai_reviewed_at` and `ai_reviewed_by`; later publishes don't ask again.
 - **Lesson insights read Learning's tables and add none** (SCRUM-84, `services/learning/app/insights.py`). Each attempt names its version, so figures are per version, and each answer its option, so the page can say how often each wrong option was chosen. Learner counts and the newcomer/Singaporean split come from the `learners` read model. Nothing is stored about who saw what; the figures are worked out on each request.
 
 ## Seed data

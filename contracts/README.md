@@ -38,7 +38,7 @@ Every message on the `sgjio.events` exchange is one JSON object:
 | `type`                           | `<producer>.<aggregate>.<fact>`. Also the AMQP routing key and the AMQP `type` property.   |
 | `schema_version`                 | `1` for every event today. A breaking change to `data` is a new version (CONTRIBUTING.md). |
 | `occurred_at`                    | When the change was committed, RFC 3339 with a zone (the platform writes UTC `Z`).         |
-| `producer`                       | `identity` or `content` (Learning and Notification publish nothing yet).                   |
+| `producer`                       | `identity`, `content`, `learning` or `generation` (Notification publishes nothing).        |
 | `aggregate_type`, `aggregate_id` | What changed. Fixed per event; see the catalogue.                                          |
 | `aggregate_version`              | The aggregate's own version after the change. See [Ordering](#ordering-and-idempotency).   |
 | `correlation_id`                 | The `X-Request-ID` of the request that caused it, or `null` (command line, seed).          |
@@ -65,6 +65,18 @@ Consumers check two fields before any handler runs (`templates/platform/app/plat
 | `content.lesson_version.published`  | Content → Learning           | lesson_version (version_id, always 1)                                                           | version_id, lesson_id, number, title, summary, published_at, doc, questions[{card_id, question_id, scored, correct_option_id}], reading_seconds, scored_questions, assets{id: AssetOut}, cards_plain_text[]                  | a publish that creates a version (written before `lesson.changed`), republish                                                                                                                        |
 | `content.aptitude_question.changed` | Content → Learning           | aptitude_question (question_id, `aptitude_questions.version`)                                   | question_id, topic_id, level, prompt, options[{id, text}], correct_option_id, is_active, seed_key                                                                                                                            | create, update (incl. topic move), activate, deactivate, seed, republish                                                                                                                             |
 | `content.aptitude_bank.changed`     | Content → Learning           | aptitude_bank (fixed id `d69a3dc8-6470-5484-a156-901c82a34f06`, `aptitude_bank_state.revision`) | ready, topics[{topic_id, ready}] in quiz order (position, then name)                                                                                                                                                         | every change that can alter `aptitude.bank()`: any question change, and topic archive, restore, rename and reorder (one bank event per transaction, after the `topic.changed` ones), seed, republish |
+
+AI-generated lessons (docs/ai-lessons-plan.md). The aggregate is the request (`lesson_generation`, the requester's own id for it); none of these events carries a user id, name or email.
+
+| Event                                  | Producer → consumers   | Aggregate (id, version)                               | `data`                                                                                                                                                                 | Emitted when                                                                         |
+| -------------------------------------- | ---------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `learning.lesson_generation.requested` | Learning → Generation  | lesson_generation (request_id, always 1)              | request_id, brief{audience, focus, topic, level, cards, questions, ask, notes, check_answers}, grounding{lessons, mistakes, avoid_titles, feedback}                    | a learner selects Generate lesson                                                    |
+| `content.lesson_generation.requested`  | Content → Generation   | lesson_generation (request_id, always 1)              | the same as above                                                                                                                                                      | an administrator selects Generate draft                                              |
+| `generation.lesson.progress`           | Generation → requester | lesson_generation (request_id, 1 writing, 2 checking) | request_id, requester (`learning`/`content`), stage                                                                                                                    | before the write call, and before the checks                                         |
+| `generation.lesson.generated`          | Generation → requester | lesson_generation (request_id, always 3)              | request_id, requester, title, summary, learning_points, doc, questions, reading_seconds, cards_plain_text (doc and questions as in `content.lesson_version.published`) | the lesson passed every check                                                        |
+| `generation.lesson.failed`             | Generation → requester | lesson_generation (request_id, always 3)              | request_id, requester, code (`off_topic`/`invalid_output`/`unsafe`/`provider`), detail (logs only)                                                                     | refused, failed checks twice, rejected by the answer check, or the model unavailable |
+
+Requesters apply a generation event only to a request that is still waiting and only when its version is newer than the one they hold; Learning and Content each ignore events whose `requester` isn't them.
 
 Each schema's `description` says the same in more detail, field by field. What the payloads were built from:
 
@@ -99,11 +111,12 @@ Delivery is **at least once** and **unordered** (a requeued message can come bac
 
 Bindings, owned by each consumer:
 
-| Queue                 | Binds                                                   |
-| --------------------- | ------------------------------------------------------- |
-| `learning.events`     | `identity.user.*`, `content.#`                          |
-| `content.events`      | `identity.user.deleted`                                 |
-| `notification.events` | `identity.password_reset.requested`, `identity.admin.*` |
+| Queue                 | Binds                                                                         |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `learning.events`     | `identity.user.*`, `content.#`, `generation.lesson.*`                         |
+| `content.events`      | `identity.user.deleted`, `generation.lesson.*`                                |
+| `notification.events` | `identity.password_reset.requested`, `identity.admin.*`                       |
+| `generation.events`   | `learning.lesson_generation.requested`, `content.lesson_generation.requested` |
 
 A handler that raises is retried after 0.5, 1, 2 and 4 seconds; on the 5th failure the message moves to the DLQ. The platform consumer counts these failures itself, in memory per `event_id` (RabbitMQ 4 doesn't count a `nack` with requeue towards `x-delivery-limit`, and `x-acquired-count` also rises during an outage). A failure while the service's database is unreachable is not counted: the consumer holds the message, checks `SELECT 1` with backoff until Postgres answers, then retries it, so a database restart never parks events. The queue's `x-delivery-limit: 20` only catches a consumer that dies mid-message. A message that isn't JSON goes to the DLQ at once; an event type the consumer has no handler for is acknowledged and dropped. Replay parked messages from the management UI (http://localhost:15672, `sgjio`/`sgjio`) or by republishing the aggregate.
 

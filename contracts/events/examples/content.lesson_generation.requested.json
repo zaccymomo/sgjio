@@ -1,0 +1,45 @@
+{
+  "event_id": "7b1c2d3e-4f50-4a61-8b72-9c83d4e5f601",
+  "type": "content.lesson_generation.requested",
+  "schema_version": 1,
+  "occurred_at": "2026-11-10T08:00:00.123Z",
+  "producer": "content",
+  "aggregate_type": "lesson_generation",
+  "aggregate_id": "3c5e7a90-1b2d-4f46-8a1c-2e3f4a5b6c7d",
+  "aggregate_version": 1,
+  "correlation_id": "4f9d2c1b8e7a46c3a1b0d9e8f7c6b5a4",
+  "data": {
+    "request_id": "3c5e7a90-1b2d-4f46-8a1c-2e3f4a5b6c7d",
+    "brief": {
+      "audience": "admin",
+      "focus": "notes",
+      "topic": {
+        "id": "0f8e1d2c-3b4a-4596-8778-695a4b3c2d1e",
+        "name": "Workplace",
+        "description": ""
+      },
+      "level": 2,
+      "cards": 8,
+      "questions": 3,
+      "ask": null,
+      "notes": "Saying no to a manager is usually indirect: \"can try, but...\".",
+      "check_answers": false
+    },
+    "grounding": {
+      "lessons": [
+        {
+          "title": "Could, Can and One",
+          "summary": "Short answers that do a lot of work.",
+          "level": 1,
+          "cards_text": [
+            "In Singapore, \"can\" can be a whole answer.",
+            "Ask \"Can or not?\" to check if something is possible."
+          ]
+        }
+      ],
+      "mistakes": [],
+      "avoid_titles": [],
+      "feedback": []
+    }
+  }
+}

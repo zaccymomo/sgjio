@@ -19,6 +19,9 @@ const MAX_NOTE = 500;
  * to 500 characters, and send (AC1). The report names the lesson, the version shown and the
  * card (AC3). Sending closes the dialog and the page says thanks, leaving the learner on the
  * same card (AC2): the deck behind it never moves.
+ *
+ * `reportPath` sends it somewhere else, without the version: AI-generated lessons post
+ * `{ card_id, reason, note }` to `/api/generated/{id}/reports`.
  */
 export function ReportProblemDialog({
   open,
@@ -26,6 +29,7 @@ export function ReportProblemDialog({
   version,
   cardId,
   cardNumber,
+  reportPath,
   onClose,
   onSent,
 }: {
@@ -35,6 +39,8 @@ export function ReportProblemDialog({
   cardId: string;
   /** 1-based, for the dialog's description. */
   cardNumber: number;
+  /** Where to post instead of the lesson's reports. */
+  reportPath?: string;
   onClose: () => void;
   onSent: () => void;
 }) {
@@ -50,6 +56,7 @@ export function ReportProblemDialog({
         lessonId={lessonId}
         version={version}
         cardId={cardId}
+        reportPath={reportPath}
         onCancel={onClose}
         onSent={onSent}
       />
@@ -61,12 +68,14 @@ function ReportForm({
   lessonId,
   version,
   cardId,
+  reportPath,
   onCancel,
   onSent,
 }: {
   lessonId: string;
   version: number;
   cardId: string;
+  reportPath?: string;
   onCancel: () => void;
   onSent: () => void;
 }) {
@@ -85,9 +94,11 @@ function ReportForm({
     setSending(true);
     setError(null);
     try {
-      await apiFetch(`/api/lessons/${lessonId}/reports`, {
+      await apiFetch(reportPath ?? `/api/lessons/${lessonId}/reports`, {
         method: "POST",
-        body: { version, card_id: cardId, reason, note },
+        body: reportPath
+          ? { card_id: cardId, reason, note }
+          : { version, card_id: cardId, reason, note },
       });
       onSent();
     } catch (failure) {

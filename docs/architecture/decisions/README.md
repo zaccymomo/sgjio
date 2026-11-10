@@ -1,6 +1,6 @@
 # Architecture decision records
 
-One page each: the context, what we decided, and what it costs. They describe the code as built (merged in #21); [../diagrams.md](../diagrams.md) has the pictures.
+One page each: the context, what we decided, and what it costs. They describe the code as built (0001 to 0009 merged in #21; 0010 added with AI-generated lessons); [../diagrams.md](../diagrams.md) has the pictures.
 
 | ADR                                                   | Decision                                                                                        |
 | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -13,5 +13,6 @@ One page each: the context, what we decided, and what it costs. They describe th
 | [0007](0007-read-models-in-learning.md)               | Learning keeps read models of content and learners                                              |
 | [0008](0008-account-deletion-saga.md)                 | Account deletion as an event-driven saga                                                        |
 | [0009](0009-failure-isolation.md)                     | Failure isolation: what degrades, how it says so, how it recovers                               |
+| [0010](0010-generation-worker.md)                     | AI generation as a separate worker (Generation), reached only by events                         |
 
 Product decisions (password rules, session lengths, and so on) stay in [docs/decisions.md](../../decisions.md).

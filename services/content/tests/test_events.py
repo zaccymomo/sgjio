@@ -580,10 +580,10 @@ def test_a_deleted_users_ids_are_forgotten(db):
     assert db.get(LessonReport, reports[0].id) is not None  # the report itself is kept
 
 
-def test_the_consumer_listens_only_for_deleted_users():
+def test_the_consumer_listens_for_deleted_users_and_generation():
     consumer = build_consumer()
     assert consumer.queue == "content.events"
-    assert consumer.routing_keys == ["identity.user.deleted"]
+    assert consumer.routing_keys == ["identity.user.deleted", "generation.lesson.*"]
     other = make_envelope("identity.user.registered", {}, uuid.uuid4())
     assert consumer.handle(json.dumps(other).encode()) is Outcome.ACK
     assert consumer.handle(b"not json") is Outcome.REJECT

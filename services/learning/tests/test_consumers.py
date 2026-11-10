@@ -46,7 +46,7 @@ def _last(bus, type: str, aggregate_id=None) -> dict:
 
 def test_the_queue_binds_what_learning_consumes():
     assert consumer.queue == "learning.events"
-    assert ROUTING_KEYS == ["identity.user.*", "content.#"]
+    assert ROUTING_KEYS == ["identity.user.*", "content.#", "generation.lesson.*"]
     assert set(HANDLERS) == {
         "content.topic.changed",
         "content.topic.deleted",
@@ -56,6 +56,9 @@ def test_the_queue_binds_what_learning_consumes():
         "content.aptitude_bank.changed",
         "identity.user.registered",
         "identity.user.deleted",
+        "generation.lesson.progress",
+        "generation.lesson.generated",
+        "generation.lesson.failed",
     }
 
 
