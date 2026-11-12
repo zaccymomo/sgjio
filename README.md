@@ -1,8 +1,45 @@
 # SGJio
 
-A web app that helps international residents learn Singapore's cultural norms and build an evidenced record of their integration effort. IS4301 team project. Backlog: Jira project **SCRUM** · Design: Figma file **SGJIO**.
+A web app that helps international residents learn Singapore's cultural norms (Singlish, hawker etiquette, the workplace, festivals and more) in short, card-based lessons, and build an evidenced record of their integration effort. IS4301 team project. Backlog: Jira project **SCRUM** · Design: Figma file **SGJIO**.
 
-> **The back end is four services and an AI worker behind an API gateway**, talking through RabbitMQ (since #21, which replaced the single FastAPI back end, `api/`). The front ends are unchanged. Why and how: [docs/architecture/](docs/architecture/README.md) (decisions in [decisions/](docs/architecture/decisions/README.md), pictures in [diagrams.md](docs/architecture/diagrams.md)).
+**Quick start** (needs Docker, Node 20.19+ and bash; details in [First-time setup](#first-time-setup)):
+
+```bash
+npm install && cp web/.env.example web/.env.local && cp .env.example .env
+./dev.local --seed     # then open http://localhost:5173 and sign in as newcomer@sgjio.example.com / UserPass123
+```
+
+## What it looks like
+
+The main app is designed phone-first and also works on desktop; the admin portal is for desktop.
+
+| Home: progress per topic               | A topic's lessons, by level              | A lesson card with a question              | Aptitude test results                                          |
+| -------------------------------------- | ---------------------------------------- | ------------------------------------------ | -------------------------------------------------------------- |
+| ![Home](docs/screenshots/web-home.png) | ![Topic](docs/screenshots/web-topic.png) | ![Lesson](docs/screenshots/web-lesson.png) | ![Aptitude results](docs/screenshots/web-aptitude-results.png) |
+
+| Admin portal: lesson editor with live preview       | Admin portal: lesson insights                           |
+| --------------------------------------------------- | ------------------------------------------------------- |
+| ![Lesson editor](docs/screenshots/admin-editor.png) | ![Lesson insights](docs/screenshots/admin-insights.png) |
+
+## What it does
+
+**For learners** (main app, http://localhost:5173):
+
+- Register with email or **Continue with Google**, see a short introduction, and set up a profile (all skippable).
+- Take a one-off **aptitude test**: it places you at a level in each topic and exempts the lessons you already know, with a radar chart of the results.
+- **Home** shows one progress circle per topic, an overall figure, search across every lesson, and a suggested next lesson from your weakest topic.
+- **Lessons** are short decks of cards with text, images, audio and questions. Answers are checked on the server and each lesson keeps your best score. Learners can report a problem with a card.
+- **Practice**: generate a short **AI lesson** on a topic of your choice or on your past mistakes (3 a day; never counted toward progress).
+- **Profile** and **Settings**: your levels per topic, profile details, password, replaying the introduction, and deleting your account.
+- **Buddies** and **Portfolio** are later modules: their tabs explain what is coming.
+
+**For content administrators** (admin portal, http://localhost:5174):
+
+- Manage topics and lessons: drafts, numbered published versions, withdrawing, levels, and a card editor with a live phone preview.
+- **Generate draft** writes a lesson with AI for an administrator to review before publishing.
+- Manage the aptitude question bank, review learners' reported problems, see anonymous **lesson insights**, and invite or remove other administrators.
+
+**How it is built:** two React front ends call one API gateway (nginx), which routes to four Python services (Identity, Content, Learning, Notification) and an AI worker (Generation). Each service owns its own Postgres database, and they share changes as events through RabbitMQ. Why and how: [docs/architecture/](docs/architecture/README.md) (decisions in [decisions/](docs/architecture/decisions/README.md), pictures in [diagrams.md](docs/architecture/diagrams.md)).
 
 ## What is where
 
@@ -65,7 +102,7 @@ npm run dev:admin                     # http://localhost:5174
 
 Ctrl-C stops the two Vite servers; the stack keeps running in Docker. Next time, `./dev.local` without `--seed` is enough. Stop the stack with `docker compose down` (keeps your data) or `docker compose down -v` (wipes it).
 
-Set up before #21 (the monolith)? Its containers were the compose project `sgjio` and hold Mailpit's ports: stop them once with `docker compose -p sgjio down`. The old data is not carried over; `--seed` makes fresh accounts and lessons.
+When it is ready, open **http://localhost:5173** and sign in with one of the [seeded accounts](#running-it) below, or register a new one to see the introduction and the aptitude test from the start.
 
 ## Running it
 

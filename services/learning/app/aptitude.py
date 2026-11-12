@@ -13,8 +13,8 @@ Where the facts come from now:
   readiness rule of its own.
 - the questions: `quiz_questions` (content.aptitude_question.changed); topic names:
   `learnable_topics`.
-- who may take it: the caller's principal, from the gateway (X-User-Type and
-  X-Profile-Completed), which Identity answers fresh on every request.
+- who may take it: the caller's principal, from the gateway (X-User-Type), which Identity
+  answers fresh on every request, and whether they have already taken it.
 """
 
 import random

@@ -1,5 +1,5 @@
-"""SCRUM-98: skipping the aptitude quiz for now and taking it later. (Ported from
-api/tests/test_aptitude_skip.py.)
+"""SCRUM-98: skipping the aptitude quiz for now and taking it later. (Ported from the
+monolith's tests.)
 
 Nothing is stored for a skip, so these tests are about a user with no quiz attempt: what
 they see, and what happens when they take the quiz later on. AC1 itself, leaving for the

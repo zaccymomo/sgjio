@@ -1,6 +1,14 @@
 # AI-generated lessons: implementation plan
 
-Status: built (pull request from branch `feature/ai-generated-lessons`). The plan below is kept as the record of what was decided and why; where the build changed a detail, the code, `docs/ai-lessons-api.md` and `docs/decisions.md` are the reference (for example, the request timeout is set to 180 seconds in `docker-compose.yml`, and the copy on the screens was revised).
+**Status: built in #23.** The plan below is kept as the record of what was decided and why. Where the build changed a detail, the code, [ai-lessons-api.md](ai-lessons-api.md), [data-model.md](data-model.md) and [decisions.md](decisions.md) are the reference. The main differences:
+
+- The request timeout is 90 seconds by default and **180 seconds in `docker-compose.yml`** (each model call may take `GENERATION_TIMEOUT_SECONDS` in the worker, 120 in `.env.example`).
+- Playing uses attempts, as for published lessons: `GET /api/generated/{id}/lesson`, `POST /api/generated/{id}/attempts`, then `/api/generated/attempts/{attempt_id}/answers` and `/finish` (not `/api/generated/{id}/answers` and `/finish`), stored in a `generated_lesson_attempts` table beside the ones listed in section 7. The play page is `/generated/:id/play`, outside the Practice tab's layout.
+- Learner text is screened by the check model before the write call (D12a), so a learner request with text makes one more call than D12 counts.
+- `GET /api/admin/generation` (the admin's daily allowance) was added beside `GET /api/admin/generation/{id}`.
+- Generation's modules are `consumer.py`, `handlers.py`, `pipeline.py`, `prompt.py`, `llm.py`, `checks.py` and `worker.py` (no `brief.py`); see `services/generation/README.md`.
+- The copy on the screens was revised.
+
 Mockups: "SGJio AI Lessons Mockups" canvas (boards 1 to 6 for learners, A1 and A2 for admins).
 Provider: NUS SoC LaaS (D20). Models chosen in `docs/ai-model-evaluation.md`: `qwen3.6:35b` writes (fast), `ornith1.5:35b` checks and is the fallback; `x-test-2` (DeepSeek) is the higher-quality, slower option. The fake model still runs tests and CI.
 
@@ -354,7 +362,9 @@ Steps 3 to 4, 5 and 6 can run in parallel once 1 and 2 land. With the fake model
 
 ---
 
-## 11. What we need from Yash or the team
+## 11. What we needed from Yash or the team
+
+Asked at planning time and kept for the record; the caps and trade-offs below are what was built.
 
 1. ~~A SoC LaaS key~~: done; models chosen by the evaluation in `docs/ai-model-evaluation.md`. The key stays in the git-ignored `sgjio/.env`.
 2. **Team agreement:**

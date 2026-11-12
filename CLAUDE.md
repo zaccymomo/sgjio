@@ -4,7 +4,7 @@ SGJio is an IS4301 team project: a **web app** (not a mobile app) that helps int
 
 - **Backlog:** Jira project `SCRUM` on `is4301sgjio.atlassian.net`. Stories use "As a / I want / So that" with numbered GIVEN/WHEN/THEN acceptance criteria and MoSCoW priority. Refer to criteria as e.g. "SCRUM-62 AC5".
 - **Design:** Figma file `SGJIO` (file key `rshLkESAaKlry48qBcYOLO`). Key frames: `home-screen` (node 30:8) and `topic-screen / Singlish` (63:5). Frames are drawn at 375px phone width; the app must also work on desktop.
-- **Modules:** 1 lessons and quizzes (+ portfolio landing page), 2 buddy matching, 3 integration portfolio / tiers, 4 AI scenario chatbot. Sprint 1 covers accounts and the first lesson/admin stories.
+- **Modules:** 1 lessons and quizzes (+ portfolio landing page), 2 buddy matching, 3 integration portfolio / tiers, 4 AI scenario chatbot. Module 1 (with the aptitude test and AI-generated lessons) is built; Buddies and Portfolio show Coming Soon pages.
 
 ## Repository layout
 
@@ -36,7 +36,7 @@ Python is 3.11 via **uv** with a `.venv` per folder (`services/<name>`, `e2e`, `
 
 ```bash
 ./dev.local [--seed]                                   # stack up (build, wait), optional seed, both Vite servers
-docker compose up -d --build --wait                    # project sgjio-ms: 4 Postgres, RabbitMQ, Mailpit, services, gateway
+docker compose up -d --build --wait                    # project sgjio-ms: 5 Postgres, RabbitMQ, Mailpit, services, gateway
 scripts/seed-all.sh [--demo]                           # identity, content, then learning once its read models caught up
 docker compose exec <svc> python -m app.cli <command>  # identity: seed | create-admin | send-reset | seed-demo-learners | republish-learners
                                                        # content: seed | import-lessons | prune-media | republish-catalog

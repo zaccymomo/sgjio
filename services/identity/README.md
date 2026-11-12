@@ -35,13 +35,13 @@ Swagger: http://localhost:8001/docs (direct, bypassing the gateway). The gateway
 
 Published (outbox, same transaction as the change; schemas in `contracts/events/`):
 
-| Event                               | When                                                         | Consumed by       |
-| ----------------------------------- | ------------------------------------------------------------ | ----------------- |
-| `identity.user.registered`          | register, Google sign-up, admin invite, `create-admin`, seed | Learning          |
-| `identity.user.deleted`             | delete-account, `clear-demo-learners`                        | Learning, Content |
-| `identity.password_reset.requested` | forgot-password for an account that exists                   | Notification      |
-| `identity.admin.invitation_issued`  | invite, resend, restore, forgot-password by an invited admin | Notification      |
-| `identity.admin.removed`            | remove an administrator                                      | Notification      |
+| Event                               | When                                                                                                     | Consumed by       |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------- |
+| `identity.user.registered`          | register, Google sign-up, admin invite, `create-admin`, seed, `seed-demo-learners`, `republish-learners` | Learning          |
+| `identity.user.deleted`             | delete-account, `clear-demo-learners`, `seed-demo-learners` (the previous demo learners)                 | Learning, Content |
+| `identity.password_reset.requested` | forgot-password for an account that exists                                                               | Notification      |
+| `identity.admin.invitation_issued`  | invite, resend, restore, forgot-password by an invited admin                                             | Notification      |
+| `identity.admin.removed`            | remove an administrator                                                                                  | Notification      |
 
 Consumed: none.
 

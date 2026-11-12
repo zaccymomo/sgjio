@@ -35,7 +35,7 @@ SCRUM-61: add registration form and validation
 GitHub → repository → **Settings → Branches → Add branch ruleset** (or "Add rule") for `main`:
 
 - Require a pull request before merging, with **0 required approvals**
-- Require status checks to pass: select every job above (they appear after CI has run once). The old **API** check (from the monolith) is gone; the four **Service** checks replace it.
+- Require status checks to pass: select every job above (they appear after CI has run once). The old **API** check (from the monolith) is gone; the five **Service** checks replace it.
 - Block force pushes
 
 ## Working on a service

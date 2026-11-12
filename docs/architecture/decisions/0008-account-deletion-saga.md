@@ -11,8 +11,8 @@ In the monolith, deleting an account was one transaction: foreign keys cascaded 
 A choreographed saga with one command and two reactions, no coordinator:
 
 1. **Identity** (`POST /api/auth/delete-account`, after the password or a fresh Google token confirms it): in one transaction, delete the user (sessions, reset links and profile cascade), delete their sign-in history, and write `identity.user.deleted` to the outbox. The cookie is cleared. From the next request on, the gateway's session check fails, so the user can no longer read or write anything.
-2. **Learning** consumes the event (`app/erasure.py`): in one transaction, under the learner's advisory lock, add the id to `erased_learners` (a tombstone kept for good), then delete their attempts and answers, completions, aptitude quiz and exemptions, and the `learners` row.
-3. **Content** consumes the event (`app/erasure.py`): in one transaction, under the user's advisory lock, add the id to `erased_users` (a tombstone kept for good), then null it wherever it appears (`lesson_reports.reporter_id` and `resolved_by`, `lesson_versions.published_by`, `media_assets.created_by`).
+2. **Learning** consumes the event (`app/erasure.py`): in one transaction, under the learner's advisory lock, add the id to `erased_learners` (a tombstone kept for good), then delete their attempts and answers, completions, aptitude quiz and exemptions, generated lessons (with their attempts, answers and reports), and the `learners` row.
+3. **Content** consumes the event (`app/erasure.py`): in one transaction, under the user's advisory lock, add the id to `erased_users` (a tombstone kept for good), then null it wherever it appears (`lesson_reports.reporter_id` and `resolved_by`, `lesson_versions.published_by`, `media_assets.created_by`, `generation_jobs.requested_by`, `lessons.ai_reviewed_by`).
 
 There are no compensating steps because nothing can be refused: Identity's step is the decision, and the reactions only remove data. Each reaction is repeatable, so a redelivered event is harmless.
 

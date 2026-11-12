@@ -21,7 +21,7 @@ Three features cross the line and were split by who acts:
 - **Reported problems** are about a card in a version and are handled by administrators, so they live in Content, though learners create them.
 - **Lesson insights** are computed from learners' attempts, so they live in Learning, though administrators read them.
 
-The gateway (nginx) is a fifth component with no data of its own.
+The gateway (nginx) is a fifth component with no data of its own. Generation, a worker for AI-generated lessons, was added later as a fifth service ([ADR 0010](0010-generation-worker.md)).
 
 ## Consequences
 

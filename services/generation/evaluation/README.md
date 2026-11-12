@@ -28,6 +28,8 @@ the answer check), so the numbers are what the app would see.
   harmful, injection, a different topic, a normal request).
 - `grading.py`: exports generated lessons blind (random ids) for quality grading, then
   scores them per model.
+- `judge_real.py`: gives the lessons the graders blocked, and as many of the best-graded
+  ones, to each answer-check model, to see which it catches.
 
 ## Running it
 
@@ -40,6 +42,9 @@ export GENERATION_BASE_URL=https://soclaas-api.comp.nus.edu.sg/v1 GENERATION_API
 .venv/bin/python -m evaluation.run judge evaluation/results/judge.jsonl --models a,b
 .venv/bin/python -m evaluation.run report evaluation/results/*.jsonl
 .venv/bin/python -m evaluation.grading export evaluation/results/full.jsonl evaluation/results/grading
+.venv/bin/python -m evaluation.grading score evaluation/results/grading     # after grades.jsonl is filled in
+.venv/bin/python -m evaluation.judge_real evaluation/results/full.jsonl evaluation/results/grading evaluation/results/judge-real.jsonl --models a,b
+.venv/bin/python -m evaluation.textbox WRITER CHECKER
 ```
 
 `evaluation/results/` is git-ignored: it holds raw model output.

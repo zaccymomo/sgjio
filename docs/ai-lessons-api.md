@@ -1,6 +1,6 @@
 # AI-generated lessons: HTTP API
 
-The agreed shapes between `web/`, `admin/`, Learning and Content for docs/ai-lessons-plan.md. Errors use the usual `{"detail": {"code", "message", ...}}` body (contracts/README.md). Times are ISO 8601 UTC. Ids are UUIDs.
+The shapes between `web/`, `admin/`, Learning and Content for [ai-lessons-plan.md](ai-lessons-plan.md), as built (routes in `services/learning/app/routers/generated.py` and `services/content/app/routers/admin.py`; each service's Swagger page has the full schemas). Errors use the usual `{"detail": {"code", "message", ...}}` body ([contracts/README.md](../contracts/README.md)). Times are ISO 8601 UTC. Ids are UUIDs.
 
 ## Learning (app sign-in: `require_principal("app")`)
 
@@ -113,7 +113,7 @@ The same shape as `GET /api/lessons/{id}` (`LearnerLessonOut`), so `LessonDeck` 
 
 ### Playing: mirrors lesson attempts exactly
 
-- `POST /api/generated/{id}/attempts` → `{ "id": "uuid" }`
+- `POST /api/generated/{id}/attempts` → 201 `{ "id": "uuid" }`
 - `POST /api/generated/attempts/{attempt_id}/answers` with `{ question_id, option_id }` → `CheckResult` (`correct`, `correct_option_id`, `why_not`, `explanation`). Only the first answer to a question in an attempt counts; a repeat returns the same result.
 - `POST /api/generated/attempts/{attempt_id}/finish` → `{ "attempt_id", "score": {correct, scored}, "best": {correct, scored} }`. Needs every scored question answered, as for lessons.
 
@@ -128,7 +128,7 @@ Nothing here touches `lesson_attempts`, `lesson_completions` or `/api/progress`.
 
 At most 4 reasons. Saving again replaces the rating.
 
-### `POST /api/generated/{id}/reports` → 201
+### `POST /api/generated/{id}/reports` → 201 `{ "id", "created_at" }`
 
 `{ card_id, reason, note }`, with the reasons and note limit of `ReportProblemDialog` (Content's `ReportReason`). Stored in Learning; no admin screen yet.
 

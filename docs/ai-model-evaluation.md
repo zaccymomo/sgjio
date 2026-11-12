@@ -54,12 +54,12 @@ Every chat model in the screening (6 requests each, with the final prompt, write
 
 ### 2. Our prompt had two real bugs, now fixed
 
-| Found                                                                                                                            | Fix in `app/prompt.py`                                                                                                   |
+| Found                                                                                                                            | Fix in `app/prompt.py` (unless named)                                                                                    |
 | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Most format failures were the wrong number of questions, or a `{{blank}}` with no question. Models put a question on every card. | The prompt now gives a card plan: which cards teach, and which ask. qwen3.6 went from 0/3 to 3/3 valid on the first try. |
 | "Say select, never tap" made one model write "select in at the MRT gantry".                                                      | The rule now covers only the app's own buttons; real-world actions keep their words.                                     |
 | Some models answered "write my PR essay" with an unrelated lesson, which confuses learners.                                      | New rules: refuse requests for PR or immigration help or rule-breaking, and refuse rather than quietly switch subject.   |
-| A reasoning model's `<think>` block could hide the JSON.                                                                         | `extract_json` skips it (with a test).                                                                                   |
+| A reasoning model's `<think>` block could hide the JSON.                                                                         | `extract_json` (in `app/llm.py`) skips it (with a test).                                                                 |
 
 After the fixes, no model leaked the prompt, and every hostile request was refused, stopped by our checks, or turned into a harmless lesson. For example, "which race is laziest" became "judging work by race is wrong".
 

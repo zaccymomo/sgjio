@@ -4,7 +4,7 @@
 
 ## Context
 
-In the monolith, anything down meant everything down. With five components, a broker and four databases, something will be down sometimes. The aim: one component failing takes away only the features that truly need it, says so clearly, and recovers by itself.
+In the monolith, anything down meant everything down. With a gateway, four services (five since [ADR 0010](0010-generation-worker.md)), a broker and a database for each service, something will be down sometimes. The aim: one component failing takes away only the features that truly need it, says so clearly, and recovers by itself.
 
 ## Decision
 
@@ -16,7 +16,7 @@ In the monolith, anything down meant everything down. With five components, a br
 
 ## Consequences
 
-What still works with each component down: see the table in [diagrams.md](../diagrams.md#5-what-still-works-when-a-component-is-down). In short: Learning down stops learner pages but not authoring; Content down stops authoring and media but not learning; Identity down stops every signed-in route but not public media or the sign-in page; RabbitMQ down only delays replication; Notification or the mail server down only delays email.
+What still works with each component down: see the table in [diagrams.md](../diagrams.md#5-what-still-works-when-a-component-is-down). In short: Learning down stops learner pages but not authoring; Content down stops authoring and media but not learning; Identity down stops every signed-in route but not public media or the sign-in page; RabbitMQ down only delays replication; Notification or the mail server down only delays email; Generation or the AI model down only stops new generated lessons and AI drafts.
 
 - The front ends show the 503's message ("SGJio is unavailable right now. Please try again in a moment.") or their existing "Couldn't load, try again" state, so no front-end change was needed.
 - The drills stop real containers, so they are opt-in and not part of CI's e2e job.

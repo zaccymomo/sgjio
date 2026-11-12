@@ -25,7 +25,7 @@ Then add `pika==1.3.2` to the service's `requirements.txt` (the rest, FastAPI, S
 
 ## Using it
 
-**`app/main.py`** (Content shown; Identity passes `consumers=[]`, Learning `relay=False`):
+**`app/main.py`** (Content shown; Identity passes `consumers=[]` and `discard_after_publish=` its three email event types):
 
 ```python
 from contextlib import asynccontextmanager

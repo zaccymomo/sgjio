@@ -5,7 +5,7 @@ The only things the services share. A service never imports another's code; it a
 - `events/envelope.schema.json`: the envelope every event travels in
 - `events/<type>.schema.json`: one JSON Schema (draft 2020-12) per event, envelope plus `data`
 - `events/examples/<type>.json`: one valid example per event
-- `validate.py`: checks every schema and example, and that the schemas really are strict (151 checks)
+- `validate.py`: checks every schema and example, and that the schemas really are strict (16 schemas, 208 instances checked)
 
 ```bash
 uv venv -p 3.11 contracts/.venv && uv pip install -p contracts/.venv/bin/python -r contracts/requirements.txt

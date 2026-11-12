@@ -6,16 +6,16 @@ nginx on port 8000 (container 8080): the only way in from a browser. Both Vite d
 
 The full table, numbered, is `templates/gateway.conf.template`.
 
-| Paths                                                                                                                    | Service                      | Session check                              |
-| ------------------------------------------------------------------------------------------------------------------------ | ---------------------------- | ------------------------------------------ |
-| `/api/auth/*`, `/api/admin/auth/*`, `/api/admin/admins*`, `/api/admin/ping`, `/api/profile*`, `/api/intro/*`             | Identity                     | none here: Identity checks its own cookies |
-| `/api/admin/topics*`, `/api/admin/lessons*`, `/api/admin/media`, `/api/admin/reports*`, `/api/admin/aptitude-questions*` | Content                      | admin                                      |
-| `/api/lessons/{id}/reports`                                                                                              | Content                      | app                                        |
-| `/api/media/*`                                                                                                           | Content                      | none (public)                              |
-| `/api/lessons/*`, `/api/attempts/*`, `/api/progress`, `/api/topics/*`, `/api/search`, `/api/review`, `/api/aptitude/*`   | Learning                     | app                                        |
-| `/api/admin/lessons/{id}/insights`                                                                                       | Learning                     | admin                                      |
-| `/api/health`                                                                                                            | the gateway itself           | none                                       |
-| anything else, including `/internal/*`                                                                                   | 404 `{"detail":"Not Found"}` |                                            |
+| Paths                                                                                                                                                             | Service                      | Session check                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------------------------------------------ |
+| `/api/auth/*`, `/api/admin/auth/*`, `/api/admin/admins*`, `/api/admin/ping`, `/api/profile*`, `/api/intro/*`                                                      | Identity                     | none here: Identity checks its own cookies |
+| `/api/admin/topics*`, `/api/admin/lessons*`, `/api/admin/media`, `/api/admin/reports*`, `/api/admin/aptitude-questions*`, `/api/admin/generation*`                | Content                      | admin                                      |
+| `/api/lessons/{id}/reports`                                                                                                                                       | Content                      | app                                        |
+| `/api/media/*`                                                                                                                                                    | Content                      | none (public)                              |
+| `/api/lessons/*`, `/api/attempts/*`, `/api/progress`, `/api/topics/*`, `/api/search`, `/api/review`, `/api/aptitude/*`, `/api/generate*` (also `/api/generated*`) | Learning                     | app                                        |
+| `/api/admin/lessons/{id}/insights`                                                                                                                                | Learning                     | admin                                      |
+| `/api/health`                                                                                                                                                     | the gateway itself           | none                                       |
+| anything else, including `/internal/*`                                                                                                                            | 404 `{"detail":"Not Found"}` |                                            |
 
 ## Session check (forward auth)
 
@@ -29,11 +29,11 @@ There is no cache: signing out or deleting an account takes effect on the next r
 
 ## Errors and limits
 
-| Case                                          | Answer                                      |
-| --------------------------------------------- | ------------------------------------------- |
-| a service is down (cannot connect)            | 503 `service_unavailable`, `Retry-After: 5` |
-| a service connects but answers after 15 s     | 504 `gateway_timeout`                       |
-| body over 10 MB (20 MB on `/api/admin/media`) | 413 `payload_too_large` / `media_too_large` |
+| Case                                                                   | Answer                                      |
+| ---------------------------------------------------------------------- | ------------------------------------------- |
+| a service is down (cannot connect)                                     | 503 `service_unavailable`, `Retry-After: 5` |
+| a service connects but answers after 15 s (60 s on `/api/admin/media`) | 504 `gateway_timeout`                       |
+| body over 10 MB (20 MB on `/api/admin/media`)                          | 413 `payload_too_large` / `media_too_large` |
 
 Errors a service returns pass through unchanged. Every response carries `X-Request-ID` (the client's, or a new one), which is also sent to the service and logged as JSON by both.
 
