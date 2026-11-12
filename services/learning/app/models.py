@@ -3,6 +3,9 @@
 Own data (written by learners' requests):
 - lesson_attempts, attempt_answers, lesson_completions (SCRUM-15, SCRUM-16)
 - aptitude_attempts, topic_exemptions (Epic 6, SCRUM-113)
+- generated_lessons, generated_lesson_attempts, generated_lesson_answers,
+  generated_lesson_reports (AI-generated lessons, docs/ai-lessons-plan.md)
+- outbox: the events Learning publishes (learning.lesson_generation.requested)
 
 Ids of users, lessons, versions and topics are plain UUIDs: they belong to Identity and
 Content, so there are no foreign keys to them. Foreign keys inside Learning stay.
@@ -40,6 +43,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+from app.platform.outbox import define_outbox_table
 
 # --- Levels (SCRUM-110) ----------------------------------------------------------------------
 
@@ -225,6 +229,130 @@ class TopicExemption(Base):
     level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
 
 
+# --- AI-generated lessons (own data, docs/ai-lessons-plan.md) ---------------------------------
+
+# A request is waiting while requested, writing or checking; then ready, failed or cancelled.
+GENERATION_WAITING = ("requested", "writing", "checking")
+GENERATION_STATUSES = (*GENERATION_WAITING, "ready", "failed", "cancelled")
+GENERATION_FOCUSES = ("new", "mistakes")
+GENERATION_DIFFICULTIES = ("easier", "right", "harder")
+GENERATION_LENGTHS = ("short", "usual")
+GENERATION_FAILURES = ("off_topic", "invalid_output", "unsafe", "provider", "timeout")
+# What the rating's reasons may be (contracts: the brief's feedback reasons).
+RATING_REASONS = (
+    "right_level",
+    "clear",
+    "more_like_this",
+    "too_easy",
+    "too_hard",
+    "not_relevant",
+    "something_wrong",
+)
+# Content's ReportReason, as ReportProblemDialog offers them.
+REPORT_REASONS = ("wrong", "insensitive", "typo", "media", "other")
+
+
+class GeneratedLesson(Base):
+    """One learner's request for an AI-generated lesson, and the lesson once it arrives.
+
+    Private to the learner and never counted toward circles, tiers, review or search: no
+    progress query reads this table. `version` is the newest generation event applied (0 at
+    request; 1 writing, 2 checking, 3 the result), so a stale or repeated event changes
+    nothing. `brief` is what was sent to Generation; `covers` the mistakes it was built from.
+    """
+
+    __tablename__ = "generated_lessons"
+    __table_args__ = (
+        Index("ix_generated_lessons_user_id_created_at", "user_id", "created_at"),
+        _one_of("status", GENERATION_STATUSES, "status_known"),
+        _one_of("focus", GENERATION_FOCUSES, "focus_known"),
+        _one_of("difficulty", GENERATION_DIFFICULTIES, "difficulty_known"),
+        _one_of("length", GENERATION_LENGTHS, "length_known"),
+        _one_of("failure_code", GENERATION_FAILURES, "failure_code_known"),
+        _level_check(),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    topic_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="requested")
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    focus: Mapped[str] = mapped_column(String(20), nullable=False)
+    difficulty: Mapped[str] = mapped_column(String(20), nullable=False)
+    length: Mapped[str] = mapped_column(String(20), nullable=False)
+    level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    ask: Mapped[str | None] = mapped_column(String(200))
+    brief: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    covers: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    # The lesson, once Generation sent it (generation.lesson.generated).
+    title: Mapped[str | None] = mapped_column(String(200))
+    summary: Mapped[str | None] = mapped_column(String(160))
+    learning_points: Mapped[list | None] = mapped_column(JSONB)
+    doc: Mapped[dict | None] = mapped_column(JSONB)
+    questions: Mapped[list | None] = mapped_column(JSONB)
+    reading_seconds: Mapped[int | None] = mapped_column(Integer)
+    failure_code: Mapped[str | None] = mapped_column(String(20))
+    # The best finished attempt: first-try correct answers out of the scored questions.
+    best_correct: Mapped[int | None] = mapped_column(Integer)
+    best_scored: Mapped[int | None] = mapped_column(Integer)
+    rating_useful: Mapped[bool | None] = mapped_column(Boolean)
+    rating_reasons: Mapped[list | None] = mapped_column(JSONB)
+    rated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created_at()
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class GeneratedLessonAttempt(Base):
+    """One run through a generated lesson, like `lesson_attempts`."""
+
+    __tablename__ = "generated_lesson_attempts"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    generated_lesson_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("generated_lessons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    started_at: Mapped[datetime] = _created_at()
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    correct: Mapped[int | None] = mapped_column(Integer)
+    scored: Mapped[int | None] = mapped_column(Integer)
+
+    answers: Mapped[list["GeneratedLessonAnswer"]] = relationship(
+        cascade="all, delete-orphan", order_by="GeneratedLessonAnswer.answered_at"
+    )
+
+
+class GeneratedLessonAnswer(Base):
+    """The first answer to one question in one attempt, like `attempt_answers`."""
+
+    __tablename__ = "generated_lesson_answers"
+
+    attempt_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("generated_lesson_attempts.id", ondelete="CASCADE"), primary_key=True
+    )
+    question_id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    option_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    scored: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    answered_at: Mapped[datetime] = _created_at()
+
+
+class GeneratedLessonReport(Base):
+    """A learner's flag on a card of their generated lesson. No admin screen yet (D17)."""
+
+    __tablename__ = "generated_lesson_reports"
+    __table_args__ = (_one_of("reason", REPORT_REASONS, "reason_known"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    generated_lesson_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("generated_lessons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    card_id: Mapped[str] = mapped_column(String(40), nullable=False)
+    reason: Mapped[str] = mapped_column(String(20), nullable=False)
+    note: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    created_at: Mapped[datetime] = _created_at()
+
+
 # --- Read models (written only by app/consumers.py) ------------------------------------------
 
 
@@ -368,3 +496,5 @@ READ_MODELS = (
     QuizBank,
     Learner,
 )
+
+outbox = define_outbox_table(Base.metadata)

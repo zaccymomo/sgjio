@@ -38,7 +38,8 @@
         "identity",
         "content",
         "learning",
-        "notification"
+        "notification",
+        "generation"
       ]
     },
     "aggregate_type": {

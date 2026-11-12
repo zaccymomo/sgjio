@@ -102,11 +102,26 @@ services:
       <<: *db-healthcheck
       test: ["CMD-SHELL", "pg_isready -U notification -d notification"]
 
+  generation-db:
+    image: postgres:16-alpine
+    networks: [generation-data]
+    environment:
+      POSTGRES_USER: generation
+      POSTGRES_PASSWORD: generation
+      POSTGRES_DB: generation
+    ports: ["127.0.0.1:5438:5432"]
+    volumes:
+      - generation-db:/var/lib/postgresql/data
+      - ./infra/postgres/init-test-db.sh:/docker-entrypoint-initdb.d/10-init-test-db.sh:ro
+    healthcheck:
+      <<: *db-healthcheck
+      test: ["CMD-SHELL", "pg_isready -U generation -d generation"]
+
   # --- Broker and email -------------------------------------------------------------
   # Management UI: http://localhost:15672 (sgjio / sgjio)
   rabbitmq:
     image: rabbitmq:4.4.0-management # pinned: consumer retry logic relies on 4.4 delivery-limit behaviour
-    networks: [identity-net, content-net, learning-net, notification-net]
+    networks: [identity-net, content-net, learning-net, notification-net, generation-net]
     hostname: rabbitmq
     ports:
       - "127.0.0.1:5672:5672"
@@ -179,6 +194,8 @@ services:
       MEDIA_MAX_IMAGE_MB: "15"
       MEDIA_MAX_AUDIO_MB: "10"
       MEDIA_MAX_AUDIO_SECONDS: "120"
+      # AI drafts: wait longer than the worker's write call (docs/ai-model-evaluation.md).
+      GENERATION_TIMEOUT_SECONDS: "180"
       # Lesson files and content/aptitude_questions.yaml, read by `python -m app.cli seed`
       # and `import-lessons`. Mounted, not baked in, so the image builds from services/content.
       CONTENT_DIR: /srv/content/lessons
@@ -199,8 +216,10 @@ services:
       SERVICE_NAME: learning
       GATEWAY_KEY: *gateway-key
       DATABASE_URL: postgresql+psycopg://learning:learning@learning-db:5432/learning
-      # Learning publishes nothing, so it has no outbox to relay.
-      RUN_RELAY: "false"
+      # Learning publishes learning.lesson_generation.requested (AI-generated lessons).
+      GENERATION_DAILY_LIMIT: "3"
+      # Longer than the worker's two calls (docs/ai-model-evaluation.md): about 1 min at worst.
+      GENERATION_TIMEOUT_SECONDS: "180"
     ports: ["127.0.0.1:8003:8000"]
     healthcheck: *api-healthcheck
     depends_on:
@@ -237,6 +256,39 @@ services:
       rabbitmq: { condition: service_healthy }
       mailpit: { condition: service_started }
 
+  # Writes AI lessons (docs/ai-lessons-plan.md). A worker with no HTTP API, reached only
+  # through events. GENERATION_FAKE=true (the default) uses the built-in fake model: no
+  # key, no network. For the real model set GENERATION_FAKE=false, GENERATION_BASE_URL and
+  # GENERATION_API_KEY in the shell or the root .env (never committed).
+  generation:
+    build: services/generation
+    networks: [generation-data, generation-net]
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && exec python -m app.worker
+    environment:
+      <<: *service-env
+      SERVICE_NAME: generation
+      DATABASE_URL: postgresql+psycopg://generation:generation@generation-db:5432/generation
+      GENERATION_ENABLED: ${GENERATION_ENABLED:-true}
+      GENERATION_FAKE: ${GENERATION_FAKE:-true}
+      GENERATION_BASE_URL: ${GENERATION_BASE_URL:-}
+      GENERATION_API_KEY: ${GENERATION_API_KEY:-}
+      GENERATION_MODEL: ${GENERATION_MODEL:-}
+      GENERATION_CHECK_MODEL: ${GENERATION_CHECK_MODEL:-}
+      GENERATION_FALLBACK_MODEL: ${GENERATION_FALLBACK_MODEL:-}
+      GENERATION_TIMEOUT_SECONDS: ${GENERATION_TIMEOUT_SECONDS:-60}
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.cli", "health"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      generation-db: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
   # The only way in from a browser. Front ends' Vite servers proxy /api to localhost:8000.
   gateway:
     build: services/gateway
@@ -268,14 +320,17 @@ networks:
   content-data:
   learning-data:
   notification-data: # also Mailpit
+  generation-data:
   identity-net:
   content-net:
   learning-net:
   notification-net:
+  generation-net:
 
 volumes:
   identity-db:
   content-db:
   learning-db:
   notification-db:
+  generation-db:
   rabbitmq:

@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/generation.lesson.progress.schema.json",
+  "title": "generation.lesson.progress",
+  "description": "Generation reached a stage of a request, so the requester can show real progress. aggregate_id = request_id; aggregate_version 1 for writing, 2 for checking (the result events are 3), so a requester applies only a newer version than it holds. Consumers whose requester this isn't ignore it.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "generation.lesson.progress"
+    },
+    "producer": {
+      "const": "generation"
+    },
+    "aggregate_type": {
+      "const": "lesson_generation"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "requester", "stage"],
+      "properties": {
+        "request_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "requester": {
+          "enum": ["learning", "content"]
+        },
+        "stage": {
+          "enum": ["writing", "checking"]
+        }
+      }
+    }
+  }
+}

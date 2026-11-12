@@ -28,6 +28,20 @@ MONOLITH_ROUTES = {
     ("GET", "/api/aptitude/result"),
     ("GET", "/api/admin/lessons/{lesson_id}/insights"),
 }
+# AI-generated lessons, new since the monolith (docs/ai-lessons-api.md).
+GENERATED_ROUTES = {
+    ("GET", "/api/generate/options"),
+    ("POST", "/api/generate"),
+    ("GET", "/api/generate/{generated_id}"),
+    ("POST", "/api/generate/{generated_id}/cancel"),
+    ("GET", "/api/generated"),
+    ("GET", "/api/generated/{generated_id}/lesson"),
+    ("POST", "/api/generated/{generated_id}/attempts"),
+    ("POST", "/api/generated/attempts/{attempt_id}/answers"),
+    ("POST", "/api/generated/attempts/{attempt_id}/finish"),
+    ("POST", "/api/generated/{generated_id}/rating"),
+    ("POST", "/api/generated/{generated_id}/reports"),
+}
 
 
 def test_the_routes_are_the_monoliths_learning_routes():
@@ -37,12 +51,17 @@ def test_the_routes_are_the_monoliths_learning_routes():
         if path.startswith("/api/")
         for method in operations
     }
-    assert routes == MONOLITH_ROUTES
+    assert routes == MONOLITH_ROUTES | GENERATED_ROUTES
 
 
 def test_every_api_route_refuses_a_request_without_the_gateway_key(client):
-    ids = {"lesson_id": uuid.uuid4(), "attempt_id": uuid.uuid4(), "topic_id": uuid.uuid4()}
-    for method, path in MONOLITH_ROUTES:
+    ids = {
+        "lesson_id": uuid.uuid4(),
+        "attempt_id": uuid.uuid4(),
+        "topic_id": uuid.uuid4(),
+        "generated_id": uuid.uuid4(),
+    }
+    for method, path in MONOLITH_ROUTES | GENERATED_ROUTES:
         url = path.format(**ids)
         headers = app_headers() | {"X-Gateway-Key": ""}
         response = client.request(method, url, headers=headers, json={})

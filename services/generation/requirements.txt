@@ -1,0 +1,10 @@
+# Generation's runtime dependencies, pinned as the other services pin them.
+# app/platform (lifespan, errors, health) imports FastAPI, though there is no HTTP API.
+fastapi==0.141.1
+sqlalchemy==2.0.43
+psycopg[binary]==3.2.10
+alembic==1.16.5
+pydantic-settings==2.11.0
+pika==1.3.2
+# The OpenAI-compatible model client (app/llm.py); no provider SDK.
+httpx==0.28.1

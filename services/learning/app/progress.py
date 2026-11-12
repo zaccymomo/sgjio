@@ -173,6 +173,19 @@ def _levels(db: Session, user_id: uuid.UUID) -> dict[uuid.UUID, int]:
     }
 
 
+def topic_figures(db: Session, user_id: uuid.UUID) -> list:
+    """The circles' raw figures (id, name, completed, exempted, available) in topic order:
+    every topic with a lesson learners can open. AI-generated lessons use it (app/generated.py).
+    """
+    return list(db.execute(_topic_rows(user_id)).all())
+
+
+def weakest_first(topics: list) -> list:
+    """Topics by the smallest share covered first (`completed / available`, as the circles
+    count). `sorted` is stable, so a tie keeps the order administrators set."""
+    return sorted(topics, key=lambda t: Fraction(t.completed, t.available))
+
+
 def progress_for(db: Session, user_id: uuid.UUID) -> Progress:
     """Per-topic and overall figures for one user."""
     levels = _levels(db, user_id)
@@ -210,7 +223,7 @@ def _suggestion(db: Session, user_id: uuid.UUID, topics: list[TopicProgress]) ->
     passed over (AC3); with everything covered there is no suggestion (AC4).
     """
     unfinished = [topic for topic in topics if topic.completed < topic.available]
-    ranked = sorted(unfinished, key=lambda t: Fraction(t.completed, t.available))
+    ranked = weakest_first(unfinished)
     for rank, topic in enumerate(ranked):
         completed = select(LessonCompletion.id).where(
             LessonCompletion.lesson_id == LearnableLesson.id, LessonCompletion.user_id == user_id

@@ -4,6 +4,7 @@ import { ChevronRight, Info, PartyPopper, RotateCcw, Sparkles } from "lucide-rea
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { GeneratePrompt } from "../components/GeneratePrompt";
 import { LessonSearch } from "../components/LessonSearch";
 import { type Progress, type Suggestion, type TopicProgress, useProgress } from "../lib/progress";
 
@@ -239,16 +240,22 @@ function SuggestionSection({
           <ChevronRight className="size-4 shrink-0 text-subtle" aria-hidden />
         </Link>
       ) : (
-        <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3.5 py-3">
-          <PartyPopper className="size-5 shrink-0 text-brand" aria-hidden />
-          <p className="text-sm text-ink">
-            {anyExempted
-              ? "You've completed, or been exempted from, every lesson available."
-              : "You've completed every lesson available."}{" "}
-            There&apos;s nothing new for now; new lessons will appear here when they&apos;re
-            published.
-          </p>
-        </div>
+        <>
+          <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-3.5 py-3">
+            <PartyPopper className="size-5 shrink-0 text-brand" aria-hidden />
+            <p className="text-sm text-ink">
+              {anyExempted
+                ? "You've completed, or been exempted from, every lesson available."
+                : "You've completed every lesson available."}{" "}
+              New lessons will appear here when they&apos;re published.
+            </p>
+          </div>
+          {/* AI-generated lessons: keep practising while there is nothing new. */}
+          <GeneratePrompt
+            title="Keep practising"
+            text="Generate a short lesson tailored to you, on any topic or on questions you found difficult."
+          />
+        </>
       )}
     </section>
   );

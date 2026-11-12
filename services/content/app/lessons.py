@@ -48,6 +48,7 @@ from app.lesson_doc import Issue, LessonDoc, Stats
 from app.models import (
     MIN_LEVEL,
     Lesson,
+    LessonOrigin,
     LessonReport,
     LessonStatus,
     LessonVersion,
@@ -64,6 +65,7 @@ from app.problems import (
     lesson_out_of_date,
     lesson_status_conflict,
     level_locked,
+    review_required,
     topic_archived,
     topic_not_found,
     topic_required,
@@ -117,6 +119,8 @@ class LessonDetail:
     deletable: bool
     has_unpublished_changes: bool
     version: VersionInfo | None
+    origin: LessonOrigin
+    ai_reviewed_at: datetime | None
     doc: dict
     issues: list[Issue]
     stats: Stats
@@ -164,6 +168,8 @@ def _detail(db: Session, lesson: Lesson) -> LessonDetail:
         deletable=latest is None,
         has_unpublished_changes=lesson.has_unpublished_changes,
         version=VersionInfo(latest.number, latest.published_at) if latest else None,
+        origin=lesson.origin,
+        ai_reviewed_at=lesson.ai_reviewed_at,
         doc=lesson.draft,
         issues=lesson_doc.issues(
             doc,
@@ -329,7 +335,7 @@ def _differs_from(lesson: Lesson, version: LessonVersion | None) -> bool:
     )
 
 
-def create_lesson(
+def add_draft(
     db: Session,
     title: str = "",
     summary: str = "",
@@ -337,8 +343,10 @@ def create_lesson(
     doc: LessonDoc | None = None,
     key: str | None = None,
     level: int = MIN_LEVEL,
-) -> LessonDetail:
-    """A new draft, at the end of its topic (or of the lessons with no topic)."""
+    origin: LessonOrigin = LessonOrigin.AUTHORED,
+) -> Lesson:
+    """A new draft, at the end of its topic (or of the lessons with no topic), added in the
+    caller's transaction. The AI-draft consumer uses it directly (app/generation.py)."""
     if topic_id is not None:
         _check_topic(db, topic_id)
     lesson = Lesson(
@@ -350,8 +358,24 @@ def create_lesson(
         status=LessonStatus.DRAFT,
         position=next_lesson_position(db, topic_id),
         level=level,
+        origin=origin,
     )
     db.add(lesson)
+    db.flush()
+    return lesson
+
+
+def create_lesson(
+    db: Session,
+    title: str = "",
+    summary: str = "",
+    topic_id: uuid.UUID | None = None,
+    doc: LessonDoc | None = None,
+    key: str | None = None,
+    level: int = MIN_LEVEL,
+) -> LessonDetail:
+    """A new draft, at the end of its topic (or of the lessons with no topic)."""
+    lesson = add_draft(db, title, summary, topic_id, doc, key, level)
     db.commit()
     return _detail(db, lesson)
 
@@ -447,8 +471,12 @@ def publish_lesson(
     lesson_id: uuid.UUID,
     expected_updated_at: datetime,
     published_by: uuid.UUID | None = None,
+    reviewed: bool = False,
 ) -> LessonDetail:
     """Make the draft what users see.
+
+    An AI draft's first publish needs `reviewed` (review_required), and records when and by
+    whom it was reviewed; later publishes don't ask again.
 
     Refused while anything blocks it (lesson_has_blockers, with the issues). The draft
     becomes a new version unless it is the same as the latest one, so publishing a withdrawn
@@ -458,15 +486,21 @@ def publish_lesson(
     try:
         lesson = _for_change(db, lesson_id, expected_updated_at)
         before = projections.lesson_projection(db, lesson)
+        latest = latest_version(db, lesson.id)
+        first_ai_publish = lesson.origin == LessonOrigin.AI and latest is None
+        if first_ai_publish and not reviewed:
+            raise review_required()
         blockers = blockers_of(db, lesson)
         if blockers:
             raise lesson_has_blockers(blockers)
-        latest = latest_version(db, lesson.id)
         new_version = latest is None or _differs_from(lesson, latest)
         if not new_version and lesson.status == LessonStatus.PUBLISHED:
             db.rollback()
             return _detail(db, lesson)
         now = datetime.now(UTC)
+        if first_ai_publish:
+            lesson.ai_reviewed_at = now
+            lesson.ai_reviewed_by = published_by
         if new_version:
             version = LessonVersion(
                 lesson_id=lesson.id,

@@ -109,12 +109,16 @@ def test_get_returns_the_draft_with_everything_the_editor_needs(admin, db):
         "deletable",
         "has_unpublished_changes",
         "version",
+        "origin",
+        "ai_reviewed_at",
         "doc",
         "issues",
         "stats",
         "assets",
     }
     assert body["title"] == "Lah, Leh and Lor"
+    assert body["origin"] == "authored"
+    assert body["ai_reviewed_at"] is None
     assert body["doc"] == {"cards": []}
     assert body["topic_id"] == str(topic.id)
     assert body["status"] == "draft"

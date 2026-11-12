@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sgjio.example.com/contracts/events/generation.lesson.generated.schema.json",
+  "title": "generation.lesson.generated",
+  "description": "A lesson written and checked for a request. aggregate_id = request_id, aggregate_version always 3. `doc` has the same shape as a published lesson version's (no images or audio: those are always null), and `questions` the same per-question facts, so Learning grades it as it grades any lesson and Content stores it as a draft. Learning stores it only while the request is still waiting; a cancelled or timed-out request ignores it.",
+  "allOf": [
+    {
+      "$ref": "envelope.schema.json"
+    }
+  ],
+  "properties": {
+    "type": {
+      "const": "generation.lesson.generated"
+    },
+    "producer": {
+      "const": "generation"
+    },
+    "aggregate_type": {
+      "const": "lesson_generation"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "requester", "title", "summary", "learning_points", "doc", "questions", "reading_seconds", "cards_plain_text"],
+      "properties": {
+        "request_id": {
+          "$ref": "envelope.schema.json#/$defs/uuid"
+        },
+        "requester": {
+          "enum": ["learning", "content"]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "learning_points": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "doc": {
+          "$ref": "content.lesson_version.published.schema.json#/$defs/doc"
+        },
+        "questions": {
+          "type": "array",
+          "description": "One per question, in card order, as in content.lesson_version.published.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["card_id", "question_id", "scored", "correct_option_id"],
+            "properties": {
+              "card_id": {
+                "$ref": "content.lesson_version.published.schema.json#/$defs/short_id"
+              },
+              "question_id": {
+                "$ref": "content.lesson_version.published.schema.json#/$defs/short_id"
+              },
+              "scored": {
+                "type": "boolean"
+              },
+              "correct_option_id": {
+                "$ref": "content.lesson_version.published.schema.json#/$defs/short_id"
+              }
+            }
+          }
+        },
+        "reading_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cards_plain_text": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,8 @@
 """Forgetting a deleted account (identity.user.deleted) and keeping it forgotten.
 
 Content keeps no copy of users, only their ids on what they did: the learner who reported
-a problem, the administrator who dealt with it, published a version or uploaded a file.
+a problem, the administrator who dealt with it, published a version, uploaded a file,
+asked for an AI draft or reviewed one before publishing it.
 When Identity deletes an account, Content's consumer, in one transaction:
 
 1. takes the user's advisory lock (exclusive),
@@ -23,7 +24,14 @@ from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.models import ErasedUser, LessonReport, LessonVersion, MediaAsset
+from app.models import (
+    ErasedUser,
+    GenerationJob,
+    Lesson,
+    LessonReport,
+    LessonVersion,
+    MediaAsset,
+)
 from app.platform.errors import not_signed_in
 
 _LOCK = "SELECT pg_advisory_xact_lock{mode}(hashtext(:key))"
@@ -32,6 +40,8 @@ USER_COLUMNS = (
     LessonReport.resolved_by,
     LessonVersion.published_by,
     MediaAsset.created_by,
+    GenerationJob.requested_by,
+    Lesson.ai_reviewed_by,
 )
 
 
@@ -56,9 +66,12 @@ def erase(db: Session, user_id: uuid.UUID, erased_at: datetime) -> None:
         .on_conflict_do_nothing(index_elements=["user_id"])
     )
     for column in USER_COLUMNS:
+        values = {column.key: None}
+        if column.class_ is Lesson:
+            values["updated_at"] = Lesson.updated_at  # not an edit: the editor's copy stays valid
         db.execute(
             update(column.class_)
             .where(column == user_id)
-            .values({column.key: None})
+            .values(values)
             .execution_options(synchronize_session=False)
         )

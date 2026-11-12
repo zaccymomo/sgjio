@@ -3,6 +3,7 @@ import { readingLabel } from "@sgjio/ui/lesson";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
+import { GeneratePrompt } from "../components/GeneratePrompt";
 import { LessonMark } from "../components/LessonMark";
 import { type Topic, type TopicLesson, useTopic } from "../lib/topic";
 
@@ -60,7 +61,8 @@ function TopicView({ topicId }: { topicId: string }) {
 }
 
 function TopicDetail({ topic }: { topic: Topic }) {
-  const { name, description, completed, exempted, available, lessons } = topic;
+  const { id, name, description, completed, exempted, available, lessons } = topic;
+  const finished = available > 0 && completed >= available;
   const questions = lessons.reduce((total, lesson) => total + lesson.questions, 0);
 
   return (
@@ -110,6 +112,14 @@ function TopicDetail({ topic }: { topic: Topic }) {
             </div>
           </section>
 
+          {finished && (
+            <GeneratePrompt
+              topicId={id}
+              title={`You've finished ${name}`}
+              text="Keep practising with a short lesson generated for you on this topic."
+            />
+          )}
+
           <section className="flex flex-col gap-2.5">
             <h2 className="text-caption font-semibold tracking-wide text-muted uppercase">
               Lessons &amp; quizzes
@@ -129,6 +139,14 @@ function TopicDetail({ topic }: { topic: Topic }) {
               </div>
             ))}
           </section>
+
+          {!finished && (
+            <GeneratePrompt
+              topicId={id}
+              title={`More practice in ${name}`}
+              text="Generate a short lesson on something specific, or on questions you found difficult."
+            />
+          )}
         </>
       )}
     </>

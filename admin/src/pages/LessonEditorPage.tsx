@@ -20,6 +20,7 @@ import {
   EyeOff,
   RotateCcw,
   Send,
+  Sparkles,
   Trash2,
   Undo2,
 } from "lucide-react";
@@ -301,6 +302,8 @@ function LessonEditor({
   const [issuesShown, setIssuesShown] = useState<Issue[] | null>(null);
   const [toast, setToast] = useState<Toast | null>(null);
   const [leaveFailed, setLeaveFailed] = useState(false);
+  // "I have reviewed every card": an AI draft's first publish needs it (D10).
+  const [reviewed, setReviewed] = useState(false);
   // The newest version of the lesson from the server, for actions run after an await.
   const latest = useRef(initialLesson);
   // Lets the move to a new lesson's own address through the unsaved-changes guard.
@@ -355,6 +358,8 @@ function LessonEditor({
   const changed = Boolean(lesson?.has_unpublished_changes || autosave.dirty);
   const changesToPublish = !everPublished || status === "withdrawn" || changed;
   const stopped = autosave.status === "conflict" || autosave.status === "signed-out";
+  const aiDraft = lesson?.origin === "ai";
+  const needsReview = aiDraft && !everPublished;
 
   const learnerCards = useMemo(() => toLearnerCards(draft.doc, null), [draft.doc]);
   const check = useMemo(() => checkLocally(draft.doc), [draft.doc]);
@@ -465,7 +470,11 @@ function LessonEditor({
         navigate("/", { state: { notice } });
         return;
       }
-      const result = await lessonApi.change(current, action);
+      const result = await lessonApi.change(
+        current,
+        action,
+        action === "publish" && needsReview ? reviewed : undefined,
+      );
       latest.current = result;
       setLesson(result);
       if (action === "discard") setDraft(draftOf(result));
@@ -641,6 +650,12 @@ function LessonEditor({
         <div className="flex shrink-0 flex-col items-start gap-2 lg:items-end">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <StatusBadge status={status} />
+            {aiDraft && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-2xs font-bold text-indigo-700">
+                <Sparkles className="size-3" aria-hidden />
+                AI draft
+              </span>
+            )}
             {lesson?.version && (
               <span className="text-caption text-muted">Version {lesson.version.number}</span>
             )}
@@ -663,11 +678,13 @@ function LessonEditor({
             </Button>
             <Button
               onClick={() => void startPublish()}
-              disabled={!lesson || stopped || !changesToPublish}
+              disabled={!lesson || stopped || !changesToPublish || (needsReview && !reviewed)}
               title={
                 blockers.length
                   ? `${blockers.length} thing${blockers.length === 1 ? "" : "s"} to fix first`
-                  : undefined
+                  : needsReview && !reviewed
+                    ? "Tick “I have reviewed every card” first."
+                    : undefined
               }
             >
               <Send className="size-4" aria-hidden />
@@ -723,6 +740,31 @@ function LessonEditor({
       </header>
 
       {/* What needs saying about the lesson as a whole. */}
+      {aiDraft && lesson && (
+        <div className="flex flex-col gap-2 rounded-md border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm text-indigo-900 sm:flex-row sm:items-center sm:justify-between">
+          <span className="flex items-start gap-2">
+            <Sparkles className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span>
+              <strong className="font-semibold">
+                Drafted by AI from your notes on {formatDateTime(lesson.created_at)}.
+              </strong>{" "}
+              Check every card and answer before publishing. Once published, learners see it like
+              any other lesson.
+            </span>
+          </span>
+          {needsReview && (
+            <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 font-semibold">
+              <input
+                type="checkbox"
+                checked={reviewed}
+                onChange={(event) => setReviewed(event.target.checked)}
+                className="size-4 accent-ink"
+              />
+              I have reviewed every card
+            </label>
+          )}
+        </div>
+      )}
       {stopped && (
         <Alert tone="error">
           <div className="flex flex-col items-start gap-2">

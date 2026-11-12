@@ -28,9 +28,14 @@ flowchart LR
         ctdb[(content-db)]
     end
     subgraph learning [Learning]
-        ln["learning :8003<br/>lesson runs, progress,<br/>quiz, insights"]
+        ln["learning :8003<br/>lesson runs, progress,<br/>quiz, insights,<br/>generated lessons"]
         lndb[(learning-db)]
     end
+    subgraph generation [Generation]
+        gen["generation<br/>worker, no HTTP API"]
+        gendb[(generation-db)]
+    end
+    llm[["AI model<br/>NUS SoC LaaS"]]
 
     learner --> web
     admin --> adm
@@ -39,12 +44,16 @@ flowchart LR
     adm -- "/api" --> gw
     gw -- "sign-in, account,<br/>profile, admins" --> id
     gw -. "session check on every<br/>protected request" .-> id
-    gw -- "authoring, media,<br/>reporting a problem" --> ct
-    gw -- "learner pages,<br/>lesson insights" --> ln
+    gw -- "authoring, AI drafts,<br/>media, reporting a problem" --> ct
+    gw -- "learner pages, generated<br/>lessons, lesson insights" --> ln
     id --- iddb
     ct --- ctdb
     ln --- lndb
+    gen --- gendb
+    gen -- "HTTPS, OpenAI-compatible<br/>(fake model by default)" --> llm
 ```
+
+The gateway has no route to Generation: Learning and Content reach it only through events (below), and it is the only component that calls the AI model ([ADR 0010](decisions/0010-generation-worker.md)).
 
 Events (asynchronous, through RabbitMQ). Producers write to their own `outbox` table in the same transaction as the change; a relay thread publishes it.
 
@@ -57,17 +66,25 @@ flowchart LR
     nt["notification<br/>(worker)"]
     ntdb[(notification-db<br/>inbox)]
     mail["Mailpit<br/>:8025"]
+    gen["generation<br/>(worker)"]
+    gendb[(generation-db<br/>outbox, inbox)]
 
     id -- "identity.user.registered<br/>identity.user.deleted<br/>identity.password_reset.requested<br/>identity.admin.*" --> mq
-    ct -- "content.topic.*<br/>content.lesson.changed<br/>content.lesson_version.published<br/>content.aptitude_*" --> mq
-    mq -- "learning.events:<br/>identity.user.*, content.#" --> ln
-    mq -- "content.events:<br/>identity.user.deleted" --> ct
+    ct -- "content.topic.*<br/>content.lesson.changed<br/>content.lesson_version.published<br/>content.aptitude_*<br/>content.lesson_generation.requested" --> mq
+    ln -- "learning.lesson_generation.requested" --> mq
+    gen -- "generation.lesson.progress<br/>generation.lesson.generated<br/>generation.lesson.failed" --> mq
+    mq -- "learning.events:<br/>identity.user.*, content.#,<br/>generation.lesson.*" --> ln
+    mq -- "content.events:<br/>identity.user.deleted,<br/>generation.lesson.*" --> ct
     mq -- "notification.events:<br/>password_reset, admin.*" --> nt
+    mq -- "generation.events:<br/>*.lesson_generation.requested" --> gen
     nt --- ntdb
     nt -- SMTP --> mail
+    gen --- gendb
 ```
 
-Only the gateway is published on all interfaces; every other port is bound to `127.0.0.1` for development. Inside Docker each service has two networks: `<name>-data`, shared only with its own database (Notification's also holds Mailpit), and `<name>-net`, shared with RabbitMQ and, for Identity, Content and Learning, the gateway. No two services share a network, so only the gateway can call them. Content and Learning refuse requests that lack the gateway's `X-Gateway-Key`; the compose default key (`dev-gateway-key`) is public, so set `GATEWAY_KEY` anywhere but a development machine. Learning and Notification publish nothing.
+Both Learning and Content bind `generation.lesson.*`, so each receives every answer; each applies only those whose `requester` is itself, to a request it is still waiting for.
+
+Only the gateway is published on all interfaces; every other port is bound to `127.0.0.1` for development. Inside Docker each service has two networks: `<name>-data`, shared only with its own database (Notification's also holds Mailpit), and `<name>-net`, shared with RabbitMQ and, for Identity, Content and Learning, the gateway. No two services share a network, so only the gateway can call them, and nothing can call Generation. Content and Learning refuse requests that lack the gateway's `X-Gateway-Key`; the compose default key (`dev-gateway-key`) is public, so set `GATEWAY_KEY` anywhere but a development machine. Notification publishes nothing; Learning publishes only `learning.lesson_generation.requested`.
 
 ## 2. Publishing a lesson until a learner sees it
 
@@ -144,11 +161,11 @@ sequenceDiagram
     par Learning (queue learning.events)
         MQ->>L: identity.user.deleted
         L->>L: advisory lock on the user, insert erased_learners (tombstone)
-        L->>L: delete attempts, answers, completions, quiz, exemptions, learners row
+        L->>L: delete attempts, answers, completions, quiz, exemptions,<br/>generated lessons, learners row
         L-->>MQ: ack
     and Content (queue content.events)
         MQ->>C: identity.user.deleted
-        C->>C: null reporter_id, resolved_by, published_by, created_by
+        C->>C: null reporter_id, resolved_by, published_by, created_by,<br/>requested_by, ai_reviewed_by
         C-->>MQ: ack
     end
 ```
@@ -191,15 +208,65 @@ Identity's own routes (`/api/auth/*`, `/api/profile`, ...) skip the subrequest; 
 
 From the resilience drills (`e2e/test_resilience.py`, run with `scripts/e2e.sh --resilience`), the gateway's outage checks (`services/gateway/tests/run.sh`) and the services' own tests. Every outage answer is `503 {"detail":{"code":"service_unavailable",...}}` with `Retry-After: 5`.
 
-| Down                             | Still works                                                                                                        | Stops (503)                                                                          | After recovery                                                                                                                | Checked by                                                                                    |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| **Learning**                     | sign-in, account and profile; all authoring, including publishing; media                                           | learner pages: home, topics, lessons, search, review, aptitude test; lesson insights | events published meanwhile wait in `learning.events` and are applied; the learner sees the lesson published during the outage | drill `test_learning_down_then_catches_up`                                                    |
-| **learning-db**                  | everything outside Learning                                                                                        | Learning's routes (503, not 500)                                                     | Learning recovers by itself; its consumer held messages without dead-lettering them                                           | drill `test_learning_database_down_answers_503_not_500`                                       |
-| **Identity**                     | public media; `/api/health`; signed-out visitors get the normal 401, so the sign-in page shows                     | every signed-in route on both front ends, including sign-in itself                   | sessions are in identity-db, so everyone is still signed in                                                                   | drill `test_identity_down_refuses_signed_in_routes_but_serves_media`; gateway `identity-down` |
-| **Content**                      | learner pages, lessons and the aptitude test (served from Learning's read models); sign-in                         | authoring and the admin content pages; lesson images and audio; reporting a problem  | `identity.user.deleted` events wait in `content.events`                                                                       | gateway `content-down`                                                                        |
-| **RabbitMQ**                     | every request, including publishing and forgot-password                                                            | nothing; changes stop reaching other services                                        | outboxes drain within seconds (reconnect backoff is capped at 5 s); the learner sees the lesson                               | drill `test_broker_outage_delays_but_never_loses_a_publish`                                   |
-| **Mail server** (Mailpit / SMTP) | every request; forgot-password and invites still answer 204                                                        | nothing; email is delayed                                                            | Notification retries without counting failures; the email arrives                                                             | `services/notification/tests/test_delivery.py`                                                |
-| **Notification**                 | every request                                                                                                      | nothing; email is delayed                                                            | messages wait in the durable `notification.events` queue and are sent                                                         | by design (queue is durable)                                                                  |
-| **Gateway**                      | services directly on 127.0.0.1 ports, for Swagger only (Content and Learning refuse calls without the gateway key) | the whole app for browsers                                                           | stateless: just restart it                                                                                                    | —                                                                                             |
+| Down                                               | Still works                                                                                                                                   | Stops (503)                                                                          | After recovery                                                                                                                                                                                                                                                                                                                                                                                                                                 | Checked by                                                                                                      |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Learning**                                       | sign-in, account and profile; all authoring, including publishing; media                                                                      | learner pages: home, topics, lessons, search, review, aptitude test; lesson insights | events published meanwhile wait in `learning.events` and are applied; the learner sees the lesson published during the outage                                                                                                                                                                                                                                                                                                                  | drill `test_learning_down_then_catches_up`                                                                      |
+| **learning-db**                                    | everything outside Learning                                                                                                                   | Learning's routes (503, not 500)                                                     | Learning recovers by itself; its consumer held messages without dead-lettering them                                                                                                                                                                                                                                                                                                                                                            | drill `test_learning_database_down_answers_503_not_500`                                                         |
+| **Identity**                                       | public media; `/api/health`; signed-out visitors get the normal 401, so the sign-in page shows                                                | every signed-in route on both front ends, including sign-in itself                   | sessions are in identity-db, so everyone is still signed in                                                                                                                                                                                                                                                                                                                                                                                    | drill `test_identity_down_refuses_signed_in_routes_but_serves_media`; gateway `identity-down`                   |
+| **Content**                                        | learner pages, lessons and the aptitude test (served from Learning's read models); sign-in                                                    | authoring and the admin content pages; lesson images and audio; reporting a problem  | `identity.user.deleted` events wait in `content.events`                                                                                                                                                                                                                                                                                                                                                                                        | gateway `content-down`                                                                                          |
+| **RabbitMQ**                                       | every request, including publishing and forgot-password                                                                                       | nothing; changes stop reaching other services                                        | outboxes drain within seconds (reconnect backoff is capped at 5 s); the learner sees the lesson                                                                                                                                                                                                                                                                                                                                                | drill `test_broker_outage_delays_but_never_loses_a_publish`                                                     |
+| **Mail server** (Mailpit / SMTP)                   | every request; forgot-password and invites still answer 204                                                                                   | nothing; email is delayed                                                            | Notification retries without counting failures; the email arrives                                                                                                                                                                                                                                                                                                                                                                              | `services/notification/tests/test_delivery.py`                                                                  |
+| **Notification**                                   | every request                                                                                                                                 | nothing; email is delayed                                                            | messages wait in the durable `notification.events` queue and are sent                                                                                                                                                                                                                                                                                                                                                                          | by design (queue is durable)                                                                                    |
+| **Generation** (or generation-db, or the AI model) | everything else, including the rest of the Practice tab, playing lessons already generated, and editing and publishing AI drafts already made | nothing; new generated lessons and AI drafts don't arrive                            | requests wait in `generation.events` and are answered when it is back; a request older than Learning's or Content's `GENERATION_TIMEOUT_SECONDS` (180 s in compose; the code default is 90) is shown as failed and its slot given back, and a later answer to it is ignored. If only the model is down, Generation answers `failed` (`provider`) once its call times out (after one try of `GENERATION_FALLBACK_MODEL`, if set), also refunded | Learning's and Content's timeout tests (`test_generated.py`, `test_ai_drafts.py`); by design (queue is durable) |
+| **Gateway**                                        | services directly on 127.0.0.1 ports, for Swagger only (Content and Learning refuse calls without the gateway key)                            | the whole app for browsers                                                           | stateless: just restart it                                                                                                                                                                                                                                                                                                                                                                                                                     | —                                                                                                               |
 
 What does not happen in any row: a 500, a lost event, or one service's outage taking down another's routes.
+
+## 6. Generating a lesson for a learner
+
+Administrators' drafts follow the same path through Content (`content.lesson_generation.requested`; no answer check, since a person reviews the draft; the result becomes a Draft lesson with `origin = ai`).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Learner
+    participant L as Learning
+    participant LDB as learning-db
+    participant MQ as RabbitMQ
+    participant GEN as Generation
+    participant M as AI model
+
+    U->>L: POST /api/generate (through the gateway)
+    rect rgba(127,127,127,0.12)
+    note over L,LDB: one transaction
+    L->>LDB: check the daily limit, insert generated_lessons (requested)
+    L->>LDB: outbox: learning.lesson_generation.requested<br/>(request id, brief, grounding, no user id)
+    end
+    L-->>U: 202 status
+    L->>MQ: relay publishes
+    MQ->>GEN: generation.events
+    GEN->>MQ: generation.lesson.progress writing (v1, committed at once)
+    opt the learner typed text
+        GEN->>M: screening (check model)
+        M-->>GEN: usable, or refused (off_topic: stop here)
+    end
+    GEN->>M: write call
+    M-->>GEN: lesson JSON (or a refusal)
+    GEN->>MQ: generation.lesson.progress checking (v2)
+    GEN->>GEN: checks in code, one retry with the problems listed
+    GEN->>M: answer check (learner requests only)
+    M-->>GEN: ok, or the problems
+    rect rgba(127,127,127,0.12)
+    note over GEN: one transaction
+    GEN->>GEN: outbox: generation.lesson.generated or .failed (v3)
+    GEN->>GEN: processed_events: the request's event id
+    end
+    MQ->>L: learning.events: progress, then the result
+    L->>LDB: update the row if still waiting and the version is newer
+    loop every 1.5 s
+        U->>L: GET /api/generate/{id}
+        L-->>U: writing, checking, then ready or failed
+    end
+```
+
+A redelivered request is skipped by Generation's inbox, so the model is not paid for twice. Cancelling, or a timeout, only changes Learning's row; a result that arrives later is ignored.

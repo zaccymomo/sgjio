@@ -14,7 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from pydantic import AwareDatetime
 from sqlalchemy.orm import Session
 
-from app import aptitude, lessons, media, reports, topics
+from app import aptitude, generation, lessons, media, reports, topics
+from app.config import get_settings
 from app.db import get_db
 from app.platform.principal import Principal, require_principal
 from app.problems import ContentProblem
@@ -24,10 +25,14 @@ from app.schemas import (
     AptitudeQuestionOut,
     AptitudeQuestionUpdate,
     AssetOut,
+    GenerationJobOut,
+    GenerationQuotaOut,
+    GenerationRequest,
     LessonChangeRequest,
     LessonCreateRequest,
     LessonOrderRequest,
     LessonOut,
+    LessonPublishRequest,
     LessonSummaryOut,
     LessonUpdateRequest,
     ReportOut,
@@ -317,19 +322,23 @@ STATUS_REFUSED = {
         **LESSON_NOT_FOUND,
         409: {
             "description": "Something still blocks it (lesson_has_blockers, with `issues`), "
-            "or it changed since it was loaded (lesson_out_of_date)"
+            "it changed since it was loaded (lesson_out_of_date), or it is an AI draft's "
+            "first publish without `reviewed: true` (review_required)"
         },
     },
 )
 def publish_lesson(
     lesson_id: uuid.UUID,
-    body: LessonChangeRequest,
+    body: LessonPublishRequest,
     db: Session = Depends(get_db),
     admin: Principal = Depends(require_admin),
 ) -> lessons.LessonDetail:
-    """Make the draft what users see, as a new version. Safe to repeat."""
+    """Make the draft what users see, as a new version. Safe to repeat. An AI draft's first
+    publish needs `reviewed: true`, the editor's "I have reviewed every card"."""
     try:
-        return lessons.publish_lesson(db, lesson_id, body.updated_at, admin.user_id)
+        return lessons.publish_lesson(
+            db, lesson_id, body.updated_at, admin.user_id, reviewed=body.reviewed
+        )
     except ContentProblem as problem:
         raise _refuse(problem) from None
 
@@ -365,6 +374,62 @@ def restore_lesson(
         return lessons.restore_lesson(db, lesson_id, body.updated_at)
     except ContentProblem as problem:
         raise _refuse(problem) from None
+
+
+# --- AI drafts (docs/ai-lessons-api.md, "Content") -----------------------------------------
+
+
+@router.post(
+    "/lessons/generate",
+    response_model=GenerationJobOut,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        404: {"description": "No such active topic (topic_not_found, field topic_id)"},
+        429: {"description": "20 drafts today already (daily_limit_reached, left_today 0)"},
+    },
+)
+def generate_draft(
+    body: GenerationRequest,
+    db: Session = Depends(get_db),
+    admin: Principal = Depends(require_admin),
+) -> dict:
+    """Ask the AI for a Draft lesson from the administrator's notes. Poll
+    GET /generation/{id}; when it is done, `lesson_id` is the new Draft."""
+    try:
+        job = generation.request_draft(
+            db, admin.user_id, body.topic_id, body.level, body.notes, body.cards
+        )
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+    return generation.job_out(db, job, admin.user_id)
+
+
+@router.get("/generation", response_model=GenerationQuotaOut)
+def generation_quota(
+    db: Session = Depends(get_db), admin: Principal = Depends(require_admin)
+) -> dict:
+    """How many drafts the administrator can still ask for today, for the dialog's footer."""
+    return {
+        "daily_limit": get_settings().generation_admin_daily_limit,
+        "left_today": generation.left_today(db, admin.user_id),
+    }
+
+
+@router.get(
+    "/generation/{job_id}",
+    response_model=GenerationJobOut,
+    responses={404: {"description": "No such request (generation_not_found)"}},
+)
+def generation_status(
+    job_id: uuid.UUID, db: Session = Depends(get_db), admin: Principal = Depends(require_admin)
+) -> dict:
+    """A draft request's progress. One still waiting after GENERATION_TIMEOUT_SECONDS is
+    failed (timeout)."""
+    try:
+        job = generation.get_job(db, job_id)
+    except ContentProblem as problem:
+        raise _refuse(problem) from None
+    return generation.job_out(db, job, admin.user_id)
 
 
 # --- Images and audio (SCRUM-19) -----------------------------------------------------------

@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [identity, content, learning, notification]
+        service: [identity, content, learning, notification, generation]
     defaults:
       run:
         working-directory: services/${{ matrix.service }}
@@ -122,7 +122,7 @@ jobs:
           .venv/bin/python -m pytest -rs
       - name: Every service's app/platform is an unchanged copy
         run: |
-          for service in identity content learning notification; do
+          for service in identity content learning notification generation; do
             diff -r -x __pycache__ templates/platform/app/platform "services/$service/app/platform"
           done
 

@@ -1,7 +1,7 @@
 """Learning's event consumer: the only writer of its read models (contracts/README.md).
 
-Queue `learning.events`, bound to `identity.user.*` and `content.#`. Every handler is
-idempotent, because delivery is at least once and unordered:
+Queue `learning.events`, bound to `identity.user.*`, `content.#` and `generation.lesson.*`.
+Every handler is idempotent, because delivery is at least once and unordered:
 
 - **Version guard.** Topics, lessons and aptitude questions keep the `aggregate_version`
   they were built from; an upsert applies only when the event's version is newer
@@ -12,6 +12,8 @@ idempotent, because delivery is at least once and unordered:
 - **Tombstones.** `topic.deleted` marks the topic deleted at the newer version, so a stale
   `topic.changed` can't bring it back. `user.deleted` adds the id to `erased_learners` for
   good and erases the learner's data (app/erasure.py).
+- **Generated lessons** (app/generated.py): Generation's answers apply only to a request
+  Learning made that is still waiting, and only when newer than the stage it holds.
 
 Handlers read only the fields they need and ignore the rest (tolerant reader), run inside
 the consumer's transaction, and never commit.
@@ -24,6 +26,7 @@ from sqlalchemy import exists, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app import generated
 from app.db import SessionLocal
 from app.erasure import erase, is_erased
 from app.models import (
@@ -37,7 +40,7 @@ from app.models import (
 )
 from app.platform.consumer import Consumer
 
-ROUTING_KEYS = ["identity.user.*", "content.#"]
+ROUTING_KEYS = ["identity.user.*", "content.#", "generation.lesson.*"]
 
 
 class ImpossibleEvent(Exception):
@@ -227,6 +230,9 @@ HANDLERS = {
     "content.aptitude_bank.changed": on_aptitude_bank_changed,
     "identity.user.registered": on_user_registered,
     "identity.user.deleted": on_user_deleted,
+    "generation.lesson.progress": generated.on_progress,
+    "generation.lesson.generated": generated.on_generated,
+    "generation.lesson.failed": generated.on_failed,
 }
 
 consumer = Consumer(

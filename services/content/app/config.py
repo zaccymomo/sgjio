@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # (content/README.md). The aptitude bank is content_dir.parent / aptitude_questions.yaml.
     content_dir: Path = _REPO_CONTENT
 
+    # AI drafts (app/generation.py): requests per administrator per Singapore day (failed
+    # ones don't count), and how long a request may wait before it is shown as failed.
+    generation_admin_daily_limit: int = 20
+    generation_timeout_seconds: int = 90
+
 
 @lru_cache
 def get_settings() -> Settings:

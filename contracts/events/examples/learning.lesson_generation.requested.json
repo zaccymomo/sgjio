@@ -1,0 +1,64 @@
+{
+  "event_id": "7b1c2d3e-4f50-4a61-8b72-9c83d4e5f601",
+  "type": "learning.lesson_generation.requested",
+  "schema_version": 1,
+  "occurred_at": "2026-11-10T08:00:00.123Z",
+  "producer": "learning",
+  "aggregate_type": "lesson_generation",
+  "aggregate_id": "3c5e7a90-1b2d-4f46-8a1c-2e3f4a5b6c7d",
+  "aggregate_version": 1,
+  "correlation_id": "4f9d2c1b8e7a46c3a1b0d9e8f7c6b5a4",
+  "data": {
+    "request_id": "3c5e7a90-1b2d-4f46-8a1c-2e3f4a5b6c7d",
+    "brief": {
+      "audience": "learner",
+      "focus": "mistakes",
+      "topic": {
+        "id": "0f8e1d2c-3b4a-4596-8778-695a4b3c2d1e",
+        "name": "Singlish",
+        "description": "The little words and sentence endings you will hear every day."
+      },
+      "level": 2,
+      "cards": 6,
+      "questions": 2,
+      "ask": "My colleagues keep asking \"can or not?\"",
+      "notes": null,
+      "check_answers": true
+    },
+    "grounding": {
+      "lessons": [
+        {
+          "title": "Could, Can and One",
+          "summary": "Short answers that do a lot of work.",
+          "level": 1,
+          "cards_text": [
+            "In Singapore, \"can\" can be a whole answer.",
+            "Ask \"Can or not?\" to check if something is possible."
+          ]
+        }
+      ],
+      "mistakes": [
+        {
+          "lesson_title": "Could, Can and One",
+          "card_text": "Your colleague asks, \"Lunch at 12, can or not?\" You reply {{blank}}.",
+          "chosen": "Yes, that timing works well for me.",
+          "correct": "Can!",
+          "explanation": "A quick yes-or-no question gets a quick answer.",
+          "why_not": "Polite, but sounds stiff here."
+        }
+      ],
+      "avoid_titles": [
+        "Lah at Work: Sounding Friendly"
+      ],
+      "feedback": [
+        {
+          "title": "Lah at Work: Sounding Friendly",
+          "useful": false,
+          "reasons": [
+            "too_easy"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -8,6 +8,9 @@ from app.models import (
     AptitudeAttempt,
     AttemptAnswer,
     ErasedLearner,
+    GeneratedLesson,
+    GeneratedLessonAttempt,
+    GeneratedLessonReport,
     Learner,
     LessonAttempt,
     LessonCompletion,
@@ -30,6 +33,26 @@ def _run(client, lesson):
     assert client.post(f"/api/attempts/{attempt}/finish").status_code == 200
 
 
+def _generated(db, user, topic) -> None:
+    """A generated lesson with an attempt and a report (tests/test_generated.py plays one)."""
+    row = GeneratedLesson(
+        user_id=user.id,
+        topic_id=topic.id,
+        status="ready",
+        focus="new",
+        difficulty="right",
+        length="short",
+        level=1,
+        brief={"topic": {"name": topic.name}},
+        covers=[],
+    )
+    db.add(row)
+    db.flush()
+    db.add(GeneratedLessonAttempt(generated_lesson_id=row.id))
+    db.add(GeneratedLessonReport(generated_lesson_id=row.id, card_id="c1", reason="typo"))
+    db.commit()
+
+
 @pytest.fixture
 def world(client, db, content, make_user):
     topic = content.topic("Singlish")
@@ -39,6 +62,7 @@ def world(client, db, content, make_user):
         sign_in(client, user)
         _run(client, lesson)
         quiz(db, user, {topic: 1})
+        _generated(db, user, topic)
     complete(db, gone, content.lesson(topic, "Leh"))
     return gone, kept, lesson
 
@@ -53,10 +77,13 @@ def test_deleting_an_account_erases_the_learner_and_nobody_else(db, identity, wo
         (AptitudeAttempt, AptitudeAttempt.user_id),
         (TopicExemption, TopicExemption.user_id),
         (Learner, Learner.user_id),
+        (GeneratedLesson, GeneratedLesson.user_id),
     ):
         assert _count(db, model, column == gone.id) == 0, model.__tablename__
         assert _count(db, model, column == kept.id) == 1, model.__tablename__
     assert _count(db, AttemptAnswer) == 1  # only the kept learner's answer
+    assert _count(db, GeneratedLessonAttempt) == 1  # their attempts and reports go with them
+    assert _count(db, GeneratedLessonReport) == 1
     assert _count(db, ErasedLearner, ErasedLearner.user_id == gone.id) == 1
 
 

@@ -78,6 +78,23 @@ class MediaKind(str, enum.Enum):
     AUDIO = "audio"
 
 
+class LessonOrigin(str, enum.Enum):
+    """Who wrote a lesson's first draft: an administrator, or the AI from an administrator's
+    notes (docs/ai-lessons-plan.md, D9 and D10)."""
+
+    AUTHORED = "authored"
+    AI = "ai"
+
+
+class GenerationStatus(str, enum.Enum):
+    """An administrator's request for an AI draft (app/generation.py)."""
+
+    REQUESTED = "requested"
+    WRITING = "writing"
+    DONE = "done"
+    FAILED = "failed"
+
+
 # --- Levels (SCRUM-110) ----------------------------------------------------------------------
 
 # Lessons and aptitude questions share one scale of Level 1 to 5 (Epic 6, SCRUM-93).
@@ -232,6 +249,17 @@ class Lesson(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     level: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=MIN_LEVEL)
     version: Mapped[int] = _version(0)
+    # "ai" for a draft the AI wrote (app/generation.py). Its first publish needs an
+    # administrator to say they reviewed every card, recorded in the ai_reviewed_ columns
+    # (ai_reviewed_by is Identity's user id, nulled if that account is deleted).
+    origin: Mapped[LessonOrigin] = mapped_column(
+        _enum(LessonOrigin, "lesson_origin"),
+        nullable=False,
+        default=LessonOrigin.AUTHORED,
+        server_default=LessonOrigin.AUTHORED.value,
+    )
+    ai_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ai_reviewed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = _created_at()
     # Indexed because the admin lesson list sorts by it (SCRUM-66 AC3). Reordering
     # deliberately leaves it alone: moving a lesson is not editing it.
@@ -411,6 +439,48 @@ class AptitudeBankState(Base):
 
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False, default=1)
     revision: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+
+
+# --- AI drafts (docs/ai-lessons-plan.md, section 6) ------------------------------------------
+
+
+class GenerationJob(Base):
+    """One administrator's request for an AI-drafted lesson (app/generation.py).
+
+    `requested_by` is Identity's user id, nulled if that account is deleted; it is never
+    sent to Generation. `topic_id` is a plain id, not a foreign key, so a request never
+    stops a topic being deleted. `progress_version` is the aggregate_version of the last
+    generation.lesson.* event applied (0 until the first), so older or repeated ones are
+    ignored. `lesson_id` is the Draft it became.
+    """
+
+    __tablename__ = "generation_jobs"
+    __table_args__ = (
+        _level_check(),
+        CheckConstraint("cards IN (4, 6, 8)", name="cards_allowed"),
+        Index("ix_generation_jobs_requested_by_created_at", "requested_by", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    topic_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    cards: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    notes: Mapped[str] = mapped_column(String(2000), nullable=False)
+    status: Mapped[GenerationStatus] = mapped_column(
+        _enum(GenerationStatus, "generation_status"),
+        nullable=False,
+        default=GenerationStatus.REQUESTED,
+    )
+    progress_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default=sql_text("0")
+    )
+    lesson_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lessons.id", ondelete="SET NULL")
+    )
+    failure_code: Mapped[str | None] = mapped_column(String(40))
+    created_at: Mapped[datetime] = _created_at()
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ErasedUser(Base):
